@@ -9,12 +9,15 @@ if not os.path.isdir("build/default"):
 subprocess.run(["cmake", "--build", "--preset", "default"], check=True)
 
 port = 5555
-dsp = subprocess.Popen(["build/default/dsp", str(port)])
+engine = subprocess.Popen(["build/default/engine", str(port)])
+
 def cleanup_subprocess(process):
     if is_running(process):
         process.terminate()
         process.wait()
-atexit.register(cleanup_subprocess, dsp)
+
+atexit.register(cleanup_subprocess, engine)
+
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
 def send(data: bytes):
