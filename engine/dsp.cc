@@ -1,50 +1,136 @@
 #include <libgccjit++.h>
 
-#include <fstream>
-
 #include <iostream>
 #include <utility>
 #include <boost/asio.hpp>
 
 using boost::asio::ip::udp;
+using boost::asio::awaitable;
+using boost::asio::buffer;
+using boost::asio::co_spawn;
+using boost::asio::detached;
+using boost::asio::use_awaitable;
 
-class server {
-  udp::socket socket;
-  udp::endpoint sender;
-  char data[1024];
+#include "bytes.hpp"
+using mlang::get_value;
+using mlang::get_values;
+#include "math.hpp"
+using mlang::tau;
 
-public:
-  server(boost::asio::io_context& io_context, short port)
-  : socket{io_context, udp::endpoint(udp::v4(), port)}
-  { do_receive(); }
+namespace {
 
-private:
-  void do_receive() {
-    socket.async_receive_from(
-      boost::asio::buffer(data), sender,
-      [this](boost::system::error_code ec, std::size_t bytes_recvd) {
-        if (!ec && bytes_recvd > 0) {
-          std::cout << bytes_recvd << " bytes received" << std::endl;
-	  std::cout << *reinterpret_cast<int *>(&data[0]) << std::endl;
-          do_receive();
-        }
+struct dag {
+  std::vector<float> constants;
+
+  static std::optional<dag> parse(std::span<const std::byte> bytes)
+  {
+    if (auto n = get_value<unsigned short>(bytes)) {
+      if (auto consts = get_values<float>(bytes, *n)) {
+        if (!bytes.empty()) return std::nullopt;
+
+        return dag{std::move(consts.value())};
       }
-    );
-  }
-
-  void do_send(std::size_t length) {
-    socket.async_send_to(
-      boost::asio::buffer(data, length), sender,
-      [this](boost::system::error_code /*ec*/, std::size_t /*bytes_sent*/) {
-        do_receive();
-      }
-    );
+    }
+    return std::nullopt;
   }
 };
 
+class engine {
+public:
+  awaitable<void> udp_server(udp::socket socket) {
+    std::byte data[1024];
+    try {
+      for (;;) {
+        udp::endpoint sender;
+        size_t n = co_await socket.async_receive_from(buffer(data), sender, use_awaitable);
+        packet_received(std::span(&data[0], n));
+      }
+    } catch (std::exception& e) {
+      std::cerr << e.what() << std::endl;
+    }
+  }
+
+  void packet_received(std::span<const std::byte> view) {
+    if (auto i = get_value<unsigned short>(view)) {
+      switch (*i) {
+      case 0: std::cout << "quit" << std::endl; break;
+      case 1:
+        if (auto dag = dag::parse(view)) {
+          std::cout << "Consts:";
+	  for (auto v: dag->constants) {
+            std::cout << ' ' << v;
+	  }
+	  std::cout << std::endl;
+        }
+        break;
+      default:
+        std::cout << *i << std::endl;
+      }
+    }
+  }
+};
+
+}
+
+template <typename F>
+gccjit::lvalue make_table(gccjit::context gcc, std::string name, size_t n, F f)
+{
+  auto fp_type = gcc.get_type(GCC_JIT_TYPE_DOUBLE);
+  auto array_type = gcc.new_array_type(fp_type.get_const(), n + 1);
+  auto lvalue = gcc.new_global(GCC_JIT_GLOBAL_INTERNAL, array_type, "tab_" + name);
+  std::vector<gccjit::rvalue> init;
+  for (size_t i = 0; i < n; i++) {
+    init.push_back(gcc.new_rvalue(fp_type, static_cast<double>(f(i, n))));
+  }
+  init.push_back(init.front());
+  lvalue.set_initializer_rvalue(gcc.new_array_ctor(array_type, init));
+
+  return lvalue;  
+}
+
+gccjit::function lookup(gccjit::context gcc, gccjit::rvalue ptr) {
+  auto fp_type = gcc.get_type(GCC_JIT_TYPE_DOUBLE);
+  auto index_type = gcc.get_type(GCC_JIT_TYPE_SIZE_T);
+  auto param = std::vector<gccjit::param> {
+    gcc.new_param(fp_type, "index")
+  };
+  auto func = gcc.new_function(GCC_JIT_FUNCTION_EXPORTED, fp_type, "ix_sin", param, 0);
+  auto i = func.new_local(index_type, "i");
+  auto a = func.new_local(fp_type, "a");
+  auto b = func.new_local(fp_type, "b");
+  auto block = func.new_block("entry");
+  block.add_assignment(i, gcc.new_cast(func.get_param(0), i.get_type())); 
+  block.add_assignment(a, gcc.new_array_access(ptr, i));
+  block.add_assignment(b, gcc.new_array_access(ptr, i + index_type.one()));
+  block.end_with_return(
+    gcc.get_builtin_function("__builtin_fma")(
+      func.get_param(0) - gcc.new_cast(i, fp_type), b - a, a
+    )
+  );
+  return func;
+}
+
 int main(int argc, const char *argv[]) {
+  auto gcc = gccjit::context::acquire();
+  gcc.set_int_option(GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL, 3);
+  gcc.add_command_line_option("-march=alderlake");
+  auto t = make_table(gcc, "sin", 1024, [](size_t i, size_t n) {
+    return std::sin(tau<double> * i / n);
+  });
+  auto ix_sin = lookup(gcc, t);
+  gcc.dump_to_file("xxx.gimple", false);
+  gcc.compile_to_file(GCC_JIT_OUTPUT_KIND_ASSEMBLER, "xxx.s");
+  auto result = gcc.compile();
+
+  gcc.release();
+
+
   boost::asio::io_context io;
-  server srv(io, std::atoi(argv[1]));
+  engine world;
+
+  udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
+  co_spawn(io, world.udp_server(std::move(socket)), detached);
+
   io.run();
 
   return 0;

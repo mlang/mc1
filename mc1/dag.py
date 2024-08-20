@@ -1,4 +1,6 @@
 import abc
+import inspect
+
 
 class BaseUGen(metaclass=abc.ABCMeta):
     def __add__(self, other):
@@ -17,6 +19,12 @@ class BaseUGen(metaclass=abc.ABCMeta):
 class Constant(BaseUGen):
     def __init__(self, value):
         self.value = value
+
+class NamedControl(BaseUGen):
+    def __init__(self, name, value):
+        self.name = name
+        self.value = value
+        self.inputs = []
 
 
 class Nary(BaseUGen):
@@ -45,6 +53,7 @@ class SinOsc(Nary):
 # The magic!
 def dag(expr):
     constants = []
+    arguments = []
     nodes = []
 
     def find_hash(h):
@@ -75,3 +84,12 @@ def dag(expr):
         del node["hash"]
 
     return { "constants": constants, "nodes": nodes }
+
+def synth(func):
+    signature = inspect.signature(func)
+    args = {}
+    for param_name, param in signature.parameters.items():
+        if param.default is inspect.Parameter.empty:
+            raise ValueError(f"Argument '{param_name}' has no default value.")
+        args[param_name] = NamedControl(param_name, param.default)
+    return dag(func(**args))
