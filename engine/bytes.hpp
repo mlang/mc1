@@ -31,4 +31,14 @@ std::optional<std::vector<T>> get_values(std::span<const std::byte> &span, size_
   return result;
 }
 
+std::optional<std::string> get_pstring(std::span<const std::byte> &span)
+{
+  if (auto n = get_value<unsigned char>(span)) {
+    if (auto chars = get_values<char>(span, *n)) {
+      return std::string{chars->begin(), chars->end()};
+    }
+  }
+  return std::nullopt;
+}
+
 }

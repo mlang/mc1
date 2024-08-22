@@ -12,6 +12,7 @@ using boost::asio::detached;
 using boost::asio::use_awaitable;
 
 #include "bytes.hpp"
+using mlang::get_pstring;
 using mlang::get_value;
 using mlang::get_values;
 #include "math.hpp"
@@ -21,19 +22,71 @@ namespace {
 
 struct dag {
   std::vector<float> constants;
+  struct op {
+    std::string name;
+    char rate;
+    std::vector<unsigned short> args;
+
+    static std::optional<op> parse(std::span<const std::byte> &bytes)
+    {
+      if (auto name = get_pstring(bytes)) {
+        if (auto rate = get_value<char>(bytes)) {
+          if (auto nargs = get_value<unsigned short>(bytes)) {
+            if (auto args = get_values<unsigned short>(bytes, nargs.value())) {
+              return op{
+                std::move(name.value()),
+                std::move(rate.value()),
+                std::move(args.value())
+              };
+            }
+          }
+        }
+      }
+      return std::nullopt;
+    }
+  };
+  std::vector<op> ops;
 
   static std::optional<dag> parse(std::span<const std::byte> bytes)
   {
     if (auto n = get_value<unsigned short>(bytes)) {
       if (auto consts = get_values<float>(bytes, *n)) {
-        if (!bytes.empty()) return std::nullopt;
+        if (auto nops = get_value<unsigned short>(bytes)) {
+          std::vector<op> ops;
+          ops.reserve(nops.value());
+          for (int i = 0; i != nops.value(); i++) {
+            auto op = op::parse(bytes);
+            if (!op) return std::nullopt;
+            ops.emplace_back(std::move(op.value()));
+          }
 
-        return dag{std::move(consts.value())};
+          if (bytes.empty())
+            return dag{std::move(consts.value()), std::move(ops)};
+        }
       }
     }
     return std::nullopt;
   }
 };
+
+// Overload for << operator to print the dag structure
+std::ostream& operator<<(std::ostream& os, const dag& d) {
+  os << "Constants: ";
+  for (const auto& constant : d.constants) {
+    os << constant << " ";
+  }
+  os << "\nOperations:\n";
+  for (const auto& operation : d.ops) {
+    os << "  Name: " << operation.name << "\n";
+    os << "  Rate: " << operation.rate << "\n";
+    os << "  Args: ";
+    for (const auto& arg : operation.args) {
+      os << arg << " ";
+    }
+    os << "\n";
+  }
+  return os;
+}
 
 class engine {
 public:
@@ -56,11 +109,7 @@ public:
       case 0: std::cout << "quit" << std::endl; break;
       case 1:
         if (auto dag = dag::parse(view)) {
-          std::cout << "Consts:";
-	  for (auto v: dag->constants) {
-            std::cout << ' ' << v;
-	  }
-	  std::cout << std::endl;
+          std::cout << dag.value();
         }
         break;
       default:
@@ -113,7 +162,6 @@ gccjit::function lookup(gccjit::context gcc, gccjit::rvalue ptr) {
 int main(int argc, const char *argv[]) {
   auto gcc = gccjit::context::acquire();
   gcc.set_int_option(GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL, 3);
-  gcc.add_command_line_option("-march=alderlake");
   auto t = make_table(gcc, "sin", 1024, [](size_t i, size_t n) {
     return std::sin(tau<double> * i / n);
   });
