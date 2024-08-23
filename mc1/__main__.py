@@ -1,8 +1,11 @@
 import atexit
+import code
 import os
 import socket
 import struct
 import subprocess
+
+from mc1.dag import *
 
 if not os.path.isdir("build/default"):
     subprocess.run(["cmake", "--preset", "default"], check=True)
@@ -20,8 +23,14 @@ atexit.register(cleanup_subprocess, engine)
 
 udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-def send(data: bytes):
-    return udp.sendto(data, ("localhost", port))
+def send(data):
+    return udp.sendto(bytes(data), ("localhost", port))
+
+def msg(id: int, content):
+    return struct.pack('H', id) + bytes(content)
 
 def is_running(process):
     return process.poll() is None
+
+
+code.interact(local=locals(), banner="MiniCollider", exitmsg="Bye!")

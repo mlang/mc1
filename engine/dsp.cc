@@ -50,7 +50,7 @@ struct dag {
   static std::optional<dag> parse(std::span<const std::byte> bytes)
   {
     if (auto n = get_value<unsigned short>(bytes)) {
-      if (auto consts = get_values<float>(bytes, *n)) {
+      if (auto consts = get_values<float>(bytes, n.value())) {
         if (auto nops = get_value<unsigned short>(bytes)) {
           std::vector<op> ops;
           ops.reserve(nops.value());
@@ -60,8 +60,12 @@ struct dag {
             ops.emplace_back(std::move(op.value()));
           }
 
-          if (bytes.empty())
-            return dag{std::move(consts.value()), std::move(ops)};
+          if (bytes.empty()) {
+            return dag{
+              std::move(consts.value()),
+              std::move(ops)
+            };
+          }
         }
       }
     }
@@ -70,27 +74,23 @@ struct dag {
 };
 
 // Overload for << operator to print the dag structure
-std::ostream& operator<<(std::ostream& os, const dag& d) {
-  os << "Constants: ";
-  for (const auto& constant : d.constants) {
-    os << constant << " ";
-  }
+std::ostream& operator<<(std::ostream& os, const dag& d)
+{
+  os << "Constants:"; for (const auto& c: d.constants) os << ' ' << c;
   os << "\nOperations:\n";
-  for (const auto& operation : d.ops) {
-    os << "  Name: " << operation.name << "\n";
-    os << "  Rate: " << operation.rate << "\n";
-    os << "  Args: ";
-    for (const auto& arg : operation.args) {
-      os << arg << " ";
-    }
-    os << "\n";
+  for (const auto& op: d.ops) {
+    os<<"  Name: " << op.name << "\n";
+    os<<"  Rate: " << op.rate << "\n";
+    os<<"  Args:"; for (const auto& arg: op.args) os<<' '<<arg; os<<"\n";
   }
+
   return os;
 }
 
 class engine {
 public:
-  awaitable<void> udp_server(udp::socket socket) {
+  awaitable<void> udp_server(udp::socket socket)
+  {
     std::byte data[1024];
     try {
       for (;;) {
@@ -103,12 +103,13 @@ public:
     }
   }
 
-  void packet_received(std::span<const std::byte> view) {
-    if (auto i = get_value<unsigned short>(view)) {
-      switch (*i) {
+  void packet_received(std::span<const std::byte> bytes)
+  {
+    if (auto i = get_value<unsigned short>(bytes)) {
+      switch (i.value()) {
       case 0: std::cout << "quit" << std::endl; break;
       case 1:
-        if (auto dag = dag::parse(view)) {
+        if (auto dag = dag::parse(bytes)) {
           std::cout << dag.value();
         }
         break;
