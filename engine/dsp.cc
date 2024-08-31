@@ -111,7 +111,7 @@ std::ostream& operator<<(std::ostream& os, const dag& d) {
 namespace pipewire {
 
 using main_loop_ptr = std::unique_ptr<pw_main_loop, void (*)(pw_main_loop*)>;
-using stream_ptr = std::unique_ptr<pw_stream, void (*)(pw_stream*)>;
+using filter_ptr = std::unique_ptr<pw_filter, void (*)(pw_filter*)>;
 
 main_loop_ptr make_main_loop(const spa_dict *props = nullptr)
 { return {pw_main_loop_new(props), pw_main_loop_destroy}; }
@@ -119,37 +119,85 @@ main_loop_ptr make_main_loop(const spa_dict *props = nullptr)
 pw_loop *get_loop(main_loop_ptr const &main_loop)
 { return pw_main_loop_get_loop(main_loop.get()); }
 
-stream_ptr make_stream(main_loop_ptr const &main_loop,
-  const char *name, pw_properties *props, const pw_stream_events *events,
+filter_ptr make_filter(main_loop_ptr const &main_loop,
+  const char *name, pw_properties *props, const pw_filter_events *events,
   void *data
 ) {
   return {
-    pw_stream_new_simple(get_loop(main_loop), name, props, events, data),
-    pw_stream_destroy
+    pw_filter_new_simple(get_loop(main_loop), name, props, events, data),
+    pw_filter_destroy
   };
 }
 
+template<typename T>
+T *add_port(filter_ptr const &filter,
+  enum pw_direction direction, enum pw_filter_port_flags flags,
+  pw_properties *props, std::vector<spa_pod *> params = {}
+) {
+  return pw_filter_add_port(filter.get(),
+    direction, flags, sizeof(T), props, params.data(), params.size()
+  );
 }
 
-class engine {
+awaitable<void> run(main_loop_ptr const &main_loop) {
+  auto loop = get_loop(main_loop);
+  stream_descriptor fd(co_await this_coro::executor, pw_loop_get_fd(loop));
+
+  try {
+    pw_loop_enter(loop);
+    while (true) {
+      co_await fd.async_wait(wait_read, use_awaitable);
+      pw_loop_iterate(loop, -1);
+    }
+    pw_loop_leave(loop);
+  } catch (std::exception &e) {
+    std::cerr << e.what() << std::endl;
+  }
+}
+
+}
+
+class engine final {
   pipewire::main_loop_ptr main_loop;
+  pipewire::filter_ptr filter;
+
+  static pw_properties *filter_props() {
+    return pw_properties_new(
+      PW_KEY_MEDIA_TYPE, "Audio",
+      PW_KEY_MEDIA_CATEGORY, "Source",
+      PW_KEY_MEDIA_ROLE, "DSP",
+      PW_KEY_MEDIA_CLASS, "Stream/Output/Audio",
+      PW_KEY_NODE_AUTOCONNECT, "true",
+      nullptr
+    );
+  }
+  static pw_properties *port_props() {
+    return pw_properties_new(
+      PW_KEY_FORMAT_DSP, "32 bit float mono audio",
+      PW_KEY_PORT_NAME, "output",
+      nullptr
+    );
+  }
+  static void do_process(void *data, spa_io_position *position)
+  { static_cast<engine *>(data)->process(*position); }
+
+  void process(spa_io_position &position) {
+  }
+
+  static constexpr pw_filter_events filter_events = {
+    PW_VERSION_FILTER_EVENTS,
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    engine::do_process,
+    nullptr, nullptr
+  };
 
 public:
-  engine() : main_loop{pipewire::make_main_loop()} {}
+  engine()
+  : main_loop{pipewire::make_main_loop()}
+  , filter{pipewire::make_filter(main_loop, "dsp", filter_props(), &filter_events, this)}
+  {}
 
-  awaitable<void> pipewire() {
-    auto loop = pipewire::get_loop(main_loop);
-    stream_descriptor fd(co_await this_coro::executor, pw_loop_get_fd(loop));
-
-    try {
-      for (;;) {
-        co_await fd.async_wait(wait_read, use_awaitable);
-        pw_loop_iterate(loop, -1);
-      }
-    } catch (std::exception& e) {
-      std::cerr << e.what() << std::endl;
-    }
-  }
+  awaitable<void> pipewire() { co_await pipewire::run(main_loop); }
 
   awaitable<void> udp_server(udp::socket socket)
   {
@@ -239,8 +287,10 @@ int main(int argc, char *argv[]) {
   boost::asio::io_context io;
   engine world;
 
-  udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
-  co_spawn(io, world.udp_server(std::move(socket)), detached);
+  {
+    udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
+    co_spawn(io, world.udp_server(std::move(socket)), detached);
+  }
   co_spawn(io, world.pipewire(), detached);
 
   io.run();
