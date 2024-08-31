@@ -1,32 +1,40 @@
 """A DSL to describe and serialize signal graphs."""
 
+# {{{ Imports
 import abc
 import enum
 import inspect
 import io
 import struct
+# }}}
+
+__all__ = ('SinOsc', 'DAG')
 
 
-from mc1.abc import ArgExpander
+class _BroadcastInputs(metaclass=abc.ABCMeta):
+    """Expand list arguments to tuples of instances."""
+
+    def __new__(cls, *args, **kwargs):
+        seq = (list, range, tuple)
+        lengths = [len(arg) for arg in args if isinstance(arg, seq)]
+        lengths.extend(len(v) for k, v in kwargs.items() if isinstance(v, seq))
+        if not lengths:
+            return super().__new__(cls)
+
+        def item(arg, index: int):
+            return arg[index % len(arg)] if isinstance(arg, seq) else arg
+
+        return tuple(
+            cls(
+                *(item(arg, index) for arg in args),
+                **{k: item(v, index) for k, v in kwargs.items()}
+            ) for index in range(max(lengths))
+        )
 
 
-_consts = []
-_ctrls = []
-_ops = []
-
-
-class Op(ArgExpander, metaclass=abc.ABCMeta):
-    def __init__(self, rate, *args):
-        self.rate = rate
-        self.args = [_convert(arg).ref() for arg in args]
-        self._index = len(_ops)
-        _ops.append(self)
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.rate} {self.args!r}>"
-
-    def ref(self):
-        return {'node': self._index}
+class _Node(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def ref(self): pass
 
     def __add__(self, other):  return Add(self, other)
     def __radd__(self, other): return Add(other, self)
@@ -36,40 +44,71 @@ class Op(ArgExpander, metaclass=abc.ABCMeta):
     def __rsub__(self, other): return Sub(other, self)
 
 
-class Const(Op):
+class Op(_BroadcastInputs, _Node):
+    __slots__ = ('rate', 'inputRates', 'args', '_index')
+
+    def __init__(self, rate, *args):
+        self.rate = rate
+        args = tuple(map(_convert, args))
+        self.inputRates = b''.join(arg.rate.value for arg in args)
+        self.args = [arg.ref() for arg in args]
+        self._index = _append(DAG._operations, self)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {self.rate} {self.args!r}>"
+
+    def ref(self):
+        return {'node': self._index}
+
+
+class Rate(enum.Enum):
+    AUDIO = b'a'
+    BLOCK = b'b'
+    CONST = b'c'
+
+
+class Const(_Node):
+    __slots__ = ('_index')
+    rate = Rate.CONST
+
     def __init__(self, value):
         value = float(value)
-        self.rate = Rate.CONST
         try:
-            self._index = _consts.index(value)
+            self._index = DAG._constants.index(value)
         except ValueError:
-            self._index = len(_consts)
-            _consts.append(value)
+            self._index = _append(DAG._constants, value)
 
     def __float__(self):
-        return _consts[self._index]
+        return _constants[self._index]
 
     def ref(self):
         return {'const': self._index}
 
 
-class Control(Op):
+class Param(_Node):
+    __slots__ = ('name', '_index', '_ctrlindex')
+    args = []
+    rate = Rate.BLOCK
+
     def __init__(self, name, *values):
         self.name = name
-        super().__init__(Rate.BLOCK)
-        self._ctrlindex = len(_ctrls)
-        _ctrls.extend(values)
+        self._index = _append(DAG._operations, self)
+        self._ctrlindex = DAG._controls.extend(values)
+        DAG._controlNames.append((name, self._ctrlindex))
+
+    def ref(self):
+        return {'node': self._index}
 
 
-class BinOp(Op, metaclass=abc.ABCMeta):
+class _BinOp(Op):
     def __init__(self, left, right):
         super().__init__(Rate.AUDIO, left, right)
 
 
-class Add(BinOp): pass
-class Div(BinOp): pass
-class Mul(BinOp): pass
-class Sub(BinOp): pass
+class Add(_BinOp): pass
+class Div(_BinOp): pass
+class Mul(_BinOp): pass
+class Sub(_BinOp): pass
 
 
 class SinOsc(Op):
@@ -79,27 +118,35 @@ class SinOsc(Op):
 
 
 def _convert(x):
-    if isinstance(x, Op):
+    if isinstance(x, _Node):
         return x
     return Const(x)
 
 
-class Rate(enum.Enum):
-    AUDIO = b'a'
-    BLOCK = b'b'
-    CONST = b'c'
-
-
 class DAG:
+    _constants = []
+    _controls = []
+    _controlNames = []
+    _operations = []
+    __slots__ = ('constants', 'controls', 'controlNames', 'operations')
+
     def __init__(self, func):
-        _reset()
-        def ctrl(name, value):
+        def param(name, value):
             if not isinstance(value, (list, range, tuple)):
                 value = (value,)
-            return Control(name, *value)
-        _WrapDefaults(func, ctrl)(func)
-        self.constants, self.controls, self.operations = _consts, _ctrls, _ops
-        _reset()
+            return Param(name, *value)
+        self._reset()
+        func = _WrapDefaults(func, param)
+        func()
+        for slot in self.__slots__:
+            setattr(self, slot, getattr(self, f'_{slot}'))
+
+    @classmethod
+    def _reset(cls):
+        cls._constants = []
+        cls._controls = []
+        cls._controlNames = []
+        cls._operations = []
 
     def __bytes__(self):
         buf = io.BytesIO()
@@ -108,6 +155,9 @@ class DAG:
 
         pack('H', len(self.constants))
         pack('f'*len(self.constants), *self.constants)
+
+        pack('H', len(self.controls))
+        pack('f'*len(self.controls), *self.controls)
 
         pack('H', len(self.operations))
         for op in self.operations:
@@ -124,15 +174,9 @@ class DAG:
         return buf.getvalue()
 
 
-def _reset():
-    global _consts, _ctrls, _ops
-
-    _consts = []
-    _ctrls = []
-    _ops = []
-
-
 class _WrapDefaults:
+    __slots__ = ('func', 'args', 'kwargs')
+
     def __init__(self, func, wrap=None):
         if not wrap:
             def wrap(name, value):
@@ -150,14 +194,21 @@ class _WrapDefaults:
             elif param.kind == param.KEYWORD_ONLY:
                 kwargs[param.name] = wrap(param.name, param.default)
     
+        self.func = func
         self.args = tuple(args)
         self.kwargs = kwargs
 
-    def __call__(self, func):
-        return func(*self.args, **self.kwargs)
+    def __call__(self):
+        return self.func(*self.args, **self.kwargs)
+
+
+def _append(lst, item) -> int:
+    index = len(lst)
+    lst.append(item)
+    return index
 
 
 @DAG
-def foo(freq=440):
+def foo(freq=440, amp=0.1):
     sig = SinOsc.ar([freq, freq+1], 0)
-    return (SinOsc.ar(sig + freq, 0)[0] + SinOsc.ar(sig + freq, 0)[1]) * 0.1
+    return (SinOsc.ar(sig + freq, 0)[0] + SinOsc.ar(sig + freq, 0)[1]) * amp

@@ -33,4 +33,4 @@ def is_running(process):
     return process.poll() is None
 
 
-code.interact(local=locals(), banner="MiniCollider", exitmsg="Bye!")
+code.interact(local=locals(), banner="", exitmsg="Bye!")

@@ -3,7 +3,9 @@ project(MiniCollider VERSION 1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 
-find_package(Boost)
+find_package(Boost REQUIRED)
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PipeWire REQUIRED IMPORTED_TARGET libpipewire-0.3)
 
 add_executable(engine engine/dsp.cc)
-target_link_libraries(engine gccjit)
+target_link_libraries(engine gccjit PkgConfig::PipeWire)

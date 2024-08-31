@@ -1,3 +1,4 @@
+#include <pipewire/pipewire.h>
 #include <libgccjit++.h>
 
 #include <iostream>
@@ -10,6 +11,11 @@ using boost::asio::buffer;
 using boost::asio::co_spawn;
 using boost::asio::detached;
 using boost::asio::use_awaitable;
+using boost::asio::posix::stream_descriptor::wait_read;
+using boost::asio::posix::stream_descriptor;
+namespace this_coro = boost::asio::this_coro;
+
+
 
 #include "bytes.hpp"
 using mlang::get_pstring;
@@ -22,6 +28,7 @@ namespace {
 
 struct dag {
   std::vector<float> constants;
+  std::vector<float> controls;
   struct op {
     std::string name;
     char rate;
@@ -51,21 +58,26 @@ struct dag {
   {
     if (auto n = get_value<unsigned short>(bytes)) {
       if (auto consts = get_values<float>(bytes, n.value())) {
-        if (auto nops = get_value<unsigned short>(bytes)) {
-          std::vector<op> ops;
-          ops.reserve(nops.value());
-          for (int i = 0; i != nops.value(); i++) {
-            auto op = op::parse(bytes);
-            if (!op) return std::nullopt;
-            ops.emplace_back(std::move(op.value()));
-          }
+        if (auto nctrlvals = get_value<unsigned short>(bytes)) {
+          if (auto ctrlvals = get_values<float>(bytes, nctrlvals.value())) {
+            if (auto nops = get_value<unsigned short>(bytes)) {
+              std::vector<op> ops;
+              ops.reserve(nops.value());
+              for (int i = 0; i != nops.value(); i++) {
+                auto op = op::parse(bytes);
+                if (!op) return std::nullopt;
+                ops.emplace_back(std::move(op.value()));
+              }
 
-          if (bytes.empty()) {
-            return dag{
-              std::move(consts.value()),
-              std::move(ops)
-            };
-          }
+              if (bytes.empty()) {
+                return dag{
+                  std::move(consts.value()),
+                  std::move(ctrlvals.value()),
+                  std::move(ops)
+                };
+              }
+            }
+	  }
         }
       }
     }
@@ -74,21 +86,71 @@ struct dag {
 };
 
 // Overload for << operator to print the dag structure
-std::ostream& operator<<(std::ostream& os, const dag& d)
-{
-  os << "Constants:"; for (const auto& c: d.constants) os << ' ' << c;
-  os << "\nOperations:\n";
-  for (const auto& op: d.ops) {
-    os<<"  Name: " << op.name << "\n";
-    os<<"  Rate: " << op.rate << "\n";
-    os<<"  Args:"; for (const auto& arg: op.args) os<<' '<<arg; os<<"\n";
+std::ostream& operator<<(std::ostream& os, const dag& d) {
+  os << "Constants: ";
+  for (const auto& constant : d.constants) {
+    os << constant << " ";
   }
-
+  os << "\nControls: ";
+  for (const auto& control : d.controls) {
+    os << control << " ";
+  }
+  os << "\nOperations:\n";
+  for (const auto& operation : d.ops) {
+    os << "  Name: " << operation.name << "\n";
+    os << "  Rate: " << operation.rate << "\n";
+    os << "  Args: ";
+    for (const auto& arg : operation.args) {
+      os << arg << " ";
+    }
+    os << "\n";
+  }
   return os;
 }
 
+namespace pipewire {
+
+using main_loop_ptr = std::unique_ptr<pw_main_loop, void (*)(pw_main_loop*)>;
+using stream_ptr = std::unique_ptr<pw_stream, void (*)(pw_stream*)>;
+
+main_loop_ptr make_main_loop(const spa_dict *props = nullptr)
+{ return {pw_main_loop_new(props), pw_main_loop_destroy}; }
+
+pw_loop *get_loop(main_loop_ptr const &main_loop)
+{ return pw_main_loop_get_loop(main_loop.get()); }
+
+stream_ptr make_stream(main_loop_ptr const &main_loop,
+  const char *name, pw_properties *props, const pw_stream_events *events,
+  void *data
+) {
+  return {
+    pw_stream_new_simple(get_loop(main_loop), name, props, events, data),
+    pw_stream_destroy
+  };
+}
+
+}
+
 class engine {
+  pipewire::main_loop_ptr main_loop;
+
 public:
+  engine() : main_loop{pipewire::make_main_loop()} {}
+
+  awaitable<void> pipewire() {
+    auto loop = pipewire::get_loop(main_loop);
+    stream_descriptor fd(co_await this_coro::executor, pw_loop_get_fd(loop));
+
+    try {
+      for (;;) {
+        co_await fd.async_wait(wait_read, use_awaitable);
+        pw_loop_iterate(loop, -1);
+      }
+    } catch (std::exception& e) {
+      std::cerr << e.what() << std::endl;
+    }
+  }
+
   awaitable<void> udp_server(udp::socket socket)
   {
     std::byte data[1024];
@@ -103,13 +165,12 @@ public:
     }
   }
 
-  void packet_received(std::span<const std::byte> bytes)
-  {
-    if (auto i = get_value<unsigned short>(bytes)) {
-      switch (i.value()) {
+  void packet_received(std::span<const std::byte> view) {
+    if (auto i = get_value<unsigned short>(view)) {
+      switch (*i) {
       case 0: std::cout << "quit" << std::endl; break;
       case 1:
-        if (auto dag = dag::parse(bytes)) {
+        if (auto dag = dag::parse(view)) {
           std::cout << dag.value();
         }
         break;
@@ -160,7 +221,8 @@ gccjit::function lookup(gccjit::context gcc, gccjit::rvalue ptr) {
   return func;
 }
 
-int main(int argc, const char *argv[]) {
+int main(int argc, char *argv[]) {
+  pw_init(&argc, &argv);
   auto gcc = gccjit::context::acquire();
   gcc.set_int_option(GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL, 3);
   auto t = make_table(gcc, "sin", 1024, [](size_t i, size_t n) {
@@ -179,8 +241,11 @@ int main(int argc, const char *argv[]) {
 
   udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
   co_spawn(io, world.udp_server(std::move(socket)), detached);
+  co_spawn(io, world.pipewire(), detached);
 
   io.run();
+
+  pw_deinit();
 
   return 0;
 }
