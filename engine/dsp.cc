@@ -1,9 +1,12 @@
-#include <pipewire/pipewire.h>
-#include <libgccjit++.h>
-
 #include <iostream>
 #include <utility>
+
+#include <libgccjit++.h>
 #include <boost/asio.hpp>
+
+#include "bytes.hpp"
+#include "math.hpp"
+#include "pipewire.hpp"
 
 using boost::asio::ip::udp;
 using boost::asio::awaitable;
@@ -11,22 +14,15 @@ using boost::asio::buffer;
 using boost::asio::co_spawn;
 using boost::asio::detached;
 using boost::asio::use_awaitable;
-using boost::asio::posix::stream_descriptor::wait_read;
-using boost::asio::posix::stream_descriptor;
-namespace this_coro = boost::asio::this_coro;
 
-
-
-#include "bytes.hpp"
 using mlang::get_pstring;
 using mlang::get_value;
 using mlang::get_values;
-#include "math.hpp"
 using mlang::tau;
 
 namespace {
 
-struct dag {
+struct dag final {
   std::vector<float> constants;
   std::vector<float> controls;
   struct op {
@@ -77,7 +73,7 @@ struct dag {
                 };
               }
             }
-	  }
+          }
         }
       }
     }
@@ -86,7 +82,8 @@ struct dag {
 };
 
 // Overload for << operator to print the dag structure
-std::ostream& operator<<(std::ostream& os, const dag& d) {
+std::ostream& operator<<(std::ostream& os, const dag& d)
+{
   os << "Constants: ";
   for (const auto& constant : d.constants) {
     os << constant << " ";
@@ -108,58 +105,25 @@ std::ostream& operator<<(std::ostream& os, const dag& d) {
   return os;
 }
 
-namespace pipewire {
-
-using main_loop_ptr = std::unique_ptr<pw_main_loop, void (*)(pw_main_loop*)>;
-using filter_ptr = std::unique_ptr<pw_filter, void (*)(pw_filter*)>;
-
-main_loop_ptr make_main_loop(const spa_dict *props = nullptr)
-{ return {pw_main_loop_new(props), pw_main_loop_destroy}; }
-
-pw_loop *get_loop(main_loop_ptr const &main_loop)
-{ return pw_main_loop_get_loop(main_loop.get()); }
-
-filter_ptr make_filter(main_loop_ptr const &main_loop,
-  const char *name, pw_properties *props, const pw_filter_events *events,
-  void *data
-) {
-  return {
-    pw_filter_new_simple(get_loop(main_loop), name, props, events, data),
-    pw_filter_destroy
-  };
-}
-
-template<typename T>
-T *add_port(filter_ptr const &filter,
-  enum pw_direction direction, enum pw_filter_port_flags flags,
-  pw_properties *props, std::vector<spa_pod *> params = {}
-) {
-  return pw_filter_add_port(filter.get(),
-    direction, flags, sizeof(T), props, params.data(), params.size()
-  );
-}
-
-awaitable<void> run(main_loop_ptr const &main_loop) {
-  auto loop = get_loop(main_loop);
-  stream_descriptor fd(co_await this_coro::executor, pw_loop_get_fd(loop));
-
-  try {
-    pw_loop_enter(loop);
-    while (true) {
-      co_await fd.async_wait(wait_read, use_awaitable);
-      pw_loop_iterate(loop, -1);
+class osc {
+  double phase;
+public:
+  template<size_t Size>
+  void process(std::span<float, Size> buffer, spa_io_position &position)
+  {
+    const double diff = tau<decltype(phase)> * 440 / position.clock.rate.denom;
+    for (auto &sample: buffer) {
+      sample = std::sin(phase) * 0.2;
+      phase += diff;
+      if (phase >= tau<decltype(phase)>) phase -= tau<decltype(phase)>;
     }
-    pw_loop_leave(loop);
-  } catch (std::exception &e) {
-    std::cerr << e.what() << std::endl;
   }
-}
-
-}
+};
 
 class engine final {
   pipewire::main_loop_ptr main_loop;
   pipewire::filter_ptr filter;
+  osc *out;
 
   static pw_properties *filter_props() {
     return pw_properties_new(
@@ -181,8 +145,8 @@ class engine final {
   static void do_process(void *data, spa_io_position *position)
   { static_cast<engine *>(data)->process(*position); }
 
-  void process(spa_io_position &position) {
-  }
+  void process(spa_io_position &position)
+  { pipewire::process_port(out, position); }
 
   static constexpr pw_filter_events filter_events = {
     PW_VERSION_FILTER_EVENTS,
@@ -195,7 +159,8 @@ public:
   engine()
   : main_loop{pipewire::make_main_loop()}
   , filter{pipewire::make_filter(main_loop, "dsp", filter_props(), &filter_events, this)}
-  {}
+  , out{pipewire::add_port<osc>(filter, PW_DIRECTION_OUTPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS, filter_props())}
+  { new(out)osc{}; }
 
   awaitable<void> pipewire() { co_await pipewire::run(main_loop); }
 

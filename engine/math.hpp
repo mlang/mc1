@@ -1,3 +1,5 @@
+#pragma once
+
 #include <numbers>
 
 namespace mlang {

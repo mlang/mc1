@@ -1,5 +1,7 @@
-#include <span>
+#pragma once
+
 #include <optional>
+#include <span>
 
 namespace mlang {
 
