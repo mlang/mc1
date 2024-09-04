@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <memory>
+#include <system_error>
 #include <utility>
 #include <boost/asio/awaitable.hpp>
 #include <boost/asio/posix/stream_descriptor.hpp>
@@ -42,6 +43,16 @@ T *add_port(filter_ptr const &filter,
   );
 }
 
+std::error_code connect(filter_ptr const& filter,
+  enum pw_filter_flags flags, std::vector<const spa_pod *> params = {}
+) {
+  const int result = pw_filter_connect(filter.get(),
+    flags, params.data(), params.size()
+  );
+  if (result < 0) return { -result, std::generic_category() };
+  return {};
+}
+
 boost::asio::awaitable<void> run(main_loop_ptr const &main_loop) {
   auto loop = get_loop(main_loop);
   boost::asio::posix::stream_descriptor fd(
@@ -60,37 +71,43 @@ boost::asio::awaitable<void> run(main_loop_ptr const &main_loop) {
   }
 }
 
-namespace process_impl {
-
-template<typename T, size_t I>
-void call(T &obj, std::span<float> span, spa_io_position &position)
-{ obj.template process<I>(std::span<float, I>(span), position); }
-
-}
-
-template<size_t... Is, typename T>
-void process(std::index_sequence<Is...> seq, T &obj, std::span<float> span, spa_io_position &position)
+template<size_t... Is, typename T, typename U, typename... Args>
+void
+process(std::index_sequence<Is...>,
+  T &obj, std::span<U> span, Args&&... args)
 {
-  static constexpr void(*proc[])(T &, std::span<float>, spa_io_position &) = {
-    &process_impl::call<T, Is>...
+  static constexpr void(* const proc[])(T &, std::span<U>, Args&&...) = {
+    [](T &obj, std::span<U> span, Args&&... args) {
+      obj.process(std::span<U, Is>(span), std::forward<Args>(args)...);
+    }...
   };
-  return proc[span.size()](obj, span, position);
+  assert(std::size(proc) > span.size());
+  proc[span.size()](obj, std::move(span), std::forward<Args>(args)...);
 }
 
 template<typename T>
 void process_port(T *port, spa_io_position &position)
 {
-  process(
-    std::index_sequence<8192>{},
-    *port,
-    std::span(
-      static_cast<float *>(
-        pw_filter_get_dsp_buffer(port, position.clock.duration)
-      ),
-      position.clock.duration
-    ),
-    position
+  const auto sample_count = position.clock.duration;
+  float *const buffer = static_cast<float *>(
+    pw_filter_get_dsp_buffer(port, sample_count)
   );
+  assert(buffer);
+  auto span = std::span(buffer, sample_count);
+  process(std::make_index_sequence<1024>{}, *port, std::move(span), position);
 }
+
+template<typename Derived> class make_filter_events
+{
+  static void do_process(void *data, spa_io_position *position)
+  { static_cast<Derived *>(data)->process(*position); }
+protected:
+  static constexpr pw_filter_events filter_events = {
+    PW_VERSION_FILTER_EVENTS,
+    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    make_filter_events::do_process,
+    nullptr, nullptr
+  };
+};
 
 }

@@ -6,7 +6,10 @@
       "name": "default",
       "displayName": "Default Config",
       "description": "Default build",
-      "binaryDir": "${sourceDir}/build/default"
+      "binaryDir": "${sourceDir}/build/default",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
     }
   ],
   "buildPresets": [

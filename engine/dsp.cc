@@ -120,7 +120,7 @@ public:
   }
 };
 
-class engine final {
+class engine final : pipewire::make_filter_events<engine> {
   pipewire::main_loop_ptr main_loop;
   pipewire::filter_ptr filter;
   osc *out;
@@ -142,18 +142,13 @@ class engine final {
       nullptr
     );
   }
-  static void do_process(void *data, spa_io_position *position)
-  { static_cast<engine *>(data)->process(*position); }
 
+  friend class pipewire::make_filter_events<engine>;
   void process(spa_io_position &position)
-  { pipewire::process_port(out, position); }
-
-  static constexpr pw_filter_events filter_events = {
-    PW_VERSION_FILTER_EVENTS,
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-    engine::do_process,
-    nullptr, nullptr
-  };
+  {
+    std::cout << position.clock.rate.num << '/' << position.clock.rate.denom << std::endl;
+    pipewire::process_port(out, position);
+  }
 
 public:
   engine()
@@ -161,6 +156,9 @@ public:
   , filter{pipewire::make_filter(main_loop, "dsp", filter_props(), &filter_events, this)}
   , out{pipewire::add_port<osc>(filter, PW_DIRECTION_OUTPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS, filter_props())}
   { new(out)osc{}; }
+
+  std::error_code connect()
+  { return pipewire::connect(filter, PW_FILTER_FLAG_RT_PROCESS); }
 
   awaitable<void> pipewire() { co_await pipewire::run(main_loop); }
 
@@ -251,6 +249,11 @@ int main(int argc, char *argv[]) {
 
   boost::asio::io_context io;
   engine world;
+
+  if (auto errc = world.connect()) {
+    std::cerr << errc.message() << std::endl;
+    return EXIT_FAILURE;
+  }
 
   {
     udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
