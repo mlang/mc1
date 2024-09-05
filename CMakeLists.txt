@@ -7,5 +7,5 @@ find_package(Boost REQUIRED)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PipeWire REQUIRED IMPORTED_TARGET libpipewire-0.3)
 
-add_executable(engine engine/dsp.cc)
+add_executable(engine engine/dag.cpp engine/dsp.cc)
 target_link_libraries(engine gccjit PkgConfig::PipeWire)

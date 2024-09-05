@@ -7,12 +7,12 @@ import subprocess
 
 from mc1.dag import *
 
-if not os.path.isdir("build/default"):
+if not os.path.isdir(".build/default"):
     subprocess.run(["cmake", "--preset", "default"], check=True)
 subprocess.run(["cmake", "--build", "--preset", "default"], check=True)
 
 port = 5555
-engine = subprocess.Popen(["build/default/engine", str(port)])
+engine = subprocess.Popen([".build/default/engine", str(port)])
 
 def cleanup_subprocess(process):
     if is_running(process):

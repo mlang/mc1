@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstring>
 #include <optional>
 #include <span>
 
@@ -33,7 +34,8 @@ std::optional<std::vector<T>> get_values(std::span<const std::byte> &span, size_
   return result;
 }
 
-std::optional<std::string> get_pstring(std::span<const std::byte> &span)
+inline std::optional<std::string>
+get_pstring(std::span<const std::byte> &span)
 {
   if (auto n = get_value<unsigned char>(span)) {
     if (auto chars = get_values<char>(span, *n)) {

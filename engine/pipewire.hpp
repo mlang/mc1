@@ -25,10 +25,9 @@ filter_ptr make_filter(main_loop_ptr const &main_loop,
   const char *name, pw_properties *props, const pw_filter_events *events,
   void *data
 ) {
-  return {
-    pw_filter_new_simple(get_loop(main_loop), name, props, events, data),
-    pw_filter_destroy
-  };
+  auto ptr = pw_filter_new_simple(get_loop(main_loop), name, props, events, data);
+  if (!ptr) throw std::runtime_error("pw_filter_new_simple failed");
+  return { ptr, pw_filter_destroy };
 }
 
 template<typename T>
