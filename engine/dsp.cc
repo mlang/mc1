@@ -1,4 +1,5 @@
 #include <iostream>
+#include <ranges>
 #include <utility>
 
 #include <boost/asio.hpp>
@@ -110,19 +111,39 @@ public:
 }
 
 template<typename T>
+auto phases_view(size_t n, T period = tau<T>)
+{
+  return
+    std::views::iota(size_t{}, n)
+  | std::views::transform([period, n](size_t i) { return period * i / n; });
+}
+
+template<typename T>
 gccjit::function
 tabled_function
 (gccjit::context gcc, std::string name, T period, size_t n, T(*f)(T))
 {
   auto fp_type = gccjit::get_type<T>(gcc);
+  assert(n > 0);
   auto array_type = gcc.new_array_type(fp_type.get_const(), n + 1);
-  auto table = gcc.new_global(GCC_JIT_GLOBAL_INTERNAL, array_type, "tab_" + name);
-  std::vector<gccjit::rvalue> init;
-  init.reserve(n + 1);
-  for (size_t i = 0; i < n; i++)
-    init.push_back(gcc.new_rvalue(fp_type, f(period * i / n)));
-  init.push_back(init.front());
-  table.set_initializer_rvalue(gcc.new_array_ctor(array_type, init));
+  auto table = gcc.new_global(GCC_JIT_GLOBAL_INTERNAL, array_type, name + "__table");
+  { // Initialize the table
+    std::vector<gccjit::rvalue> init;
+    init.reserve(n + 1);
+    std::ranges::copy(
+      phases_view(n, period) | std::views::transform(f) |
+      std::views::transform([&](T v) { return gcc.new_rvalue(fp_type, v); }),
+      std::back_inserter(init)
+    );
+    init.push_back(init.front());
+    table.set_initializer_rvalue(gcc.new_array_ctor(array_type, init));
+  }
+
+  auto const_fp_ptr_type = fp_type.get_const().get_pointer().get_const();
+  auto table_a = gcc.new_global(GCC_JIT_GLOBAL_INTERNAL, const_fp_ptr_type, name + "__a");
+  table_a.set_initializer_rvalue(table[0].get_address());
+  auto table_b = gcc.new_global(GCC_JIT_GLOBAL_INTERNAL, const_fp_ptr_type, name + "__b");
+  table_b.set_initializer_rvalue(table[1].get_address());
 
   auto param = std::vector{gcc.new_param(fp_type, "x")};
   auto func = gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
@@ -137,8 +158,8 @@ tabled_function
     func.get_param(0) * gcc.new_rvalue(fp_type, static_cast<T>(n) / period)
   );
   block.add_assignment(i, gcc.new_cast(func.get_param(0), i.get_type())); 
-  block.add_assignment(a, gcc.new_array_access(table, i));
-  block.add_assignment(b, gcc.new_array_access(table, i + index_type.one()));
+  block.add_assignment(a, table_a[i]);
+  block.add_assignment(b, table_b[i]);
   block.end_with_return(
     gcc.get_builtin_function("__builtin_fma")(
       func.get_param(0) - gcc.new_cast(i, fp_type), b - a, a
@@ -148,6 +169,7 @@ tabled_function
   return func;
 }
 
+
 int main(int argc, char *argv[])
 {
   pw_init(&argc, &argv);
@@ -155,10 +177,16 @@ int main(int argc, char *argv[])
   gcc.set_int_option(GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL, 3);
   gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
   gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_SUMMARY, true);
-  tabled_function(gcc, "ix_sin", tau<double>, 1024, std::sin);
+  tabled_function(gcc, "fast_sin", tau<double>, 256, std::sin);
+  gcc.dump_to_file("xxx.gimple", false);
   {
-    auto sin = gccjit::get_code<double(double)>(gccjit::compile(gcc), "ix_sin");
-    std::cout << (*sin)(0) << ' ' << (*sin)(M_PI) << std::endl;
+    auto sin = gccjit::get_code<double(double)>(gccjit::compile(gcc), "fast_sin");
+    const auto diff = std::ranges::max(
+      phases_view<double>(48000) | std::views::transform([sin](double phase) {
+        return std::abs(std::sin(phase) - (*sin)(phase));
+      })
+    );
+    std::cout << "diff = " << diff << std::endl;
   }
 
   gcc.release();
