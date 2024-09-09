@@ -42,10 +42,10 @@ template<typename Signature>
 std::shared_ptr<Signature>
 get_code(std::shared_ptr<gcc_jit_result> result, const char *name)
 {
-  return {
-    std::move(result),
-    reinterpret_cast<Signature *>(gcc_jit_result_get_code(result.get(), name))
-  };
+  auto * const ptr = reinterpret_cast<Signature *>(
+    gcc_jit_result_get_code(result.get(), name)
+  );
+  return { std::move(result), ptr };
 }
 
 template<typename T>
@@ -59,10 +59,11 @@ make_tabled_function(context gcc, std::string name, T period, size_t n, T(*f)(T)
   { // Initialize the table
     std::vector<gccjit::rvalue> init;
     init.reserve(n + 1);
-    std::ranges::copy(
-      mlang::views::sampled_interval(period, n) | std::views::transform(f) |
-      std::views::transform([&](T v) { return gcc.new_rvalue(fp_type, v); }),
-      std::back_inserter(init)
+    std::ranges::copy
+    ( mlang::views::sampled_interval(period, n)
+    | std::views::transform(f)
+    | std::views::transform([&](T v) { return gcc.new_rvalue(fp_type, v); })
+    , std::back_inserter(init)
     );
     init.push_back(init.front());
     table.set_initializer_rvalue(gcc.new_array_ctor(array_type, init));
@@ -79,8 +80,7 @@ make_tabled_function(context gcc, std::string name, T period, size_t n, T(*f)(T)
     fp_type, name, param, 0
   );
   auto x = func.get_param(0);
-  auto index_type = gcc.get_type(GCC_JIT_TYPE_SIZE_T);
-  auto i = func.new_local(index_type, "i");
+  auto i = func.new_local(gcc.get_type(GCC_JIT_TYPE_SIZE_T), "i");
   auto a = func.new_local(fp_type, "a");
   auto b = func.new_local(fp_type, "b");
 
