@@ -10,7 +10,7 @@
 #include <boost/asio/use_awaitable.hpp>
 #include <pipewire/pipewire.h>
 
-namespace pipewire {
+namespace mlang::pipewire {
 
 using main_loop_ptr = std::unique_ptr<pw_main_loop, void (*)(pw_main_loop*)>;
 using filter_ptr = std::unique_ptr<pw_filter, void (*)(pw_filter*)>;

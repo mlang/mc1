@@ -15,14 +15,16 @@ class _BroadcastInputs(metaclass=abc.ABCMeta):
     """Expand list arguments to tuples of instances."""
 
     def __new__(cls, *args, **kwargs):
-        seq = (list, range, tuple)
-        lengths = [len(arg) for arg in args if isinstance(arg, seq)]
-        lengths.extend(len(v) for k, v in kwargs.items() if isinstance(v, seq))
+        sequence_types = (list, range, tuple)
+        lengths = [len(arg) for arg in args if isinstance(arg, sequence_types)]
+        lengths.extend(len(v)
+            for v in kwargs.values() if isinstance(v, sequence_types)
+        )
         if not lengths:
             return super().__new__(cls)
 
         def item(arg, index: int):
-            return arg[index % len(arg)] if isinstance(arg, seq) else arg
+            return arg[index % len(arg)] if isinstance(arg, sequence_types) else arg
 
         return tuple(
             cls(

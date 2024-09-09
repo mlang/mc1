@@ -1,6 +1,6 @@
 #include "dag.hpp"
 
-#include "bytes.hpp"
+#include "mlang/bytes.hpp"
 
 namespace MiniCollider {
 
