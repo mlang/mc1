@@ -26,7 +26,7 @@ std::optional<dag::op> dag::op::parse(std::span<const std::byte> &bytes)
   return std::nullopt;
 }
 
-std::optional<dag> dag::parse(std::span<const std::byte> bytes)
+std::optional<dag> dag::parse(std::span<const std::byte> &bytes)
 {
   if (auto n = get_value<unsigned short>(bytes)) {
     if (auto consts = get_values<float>(bytes, n.value())) {
@@ -41,13 +41,11 @@ std::optional<dag> dag::parse(std::span<const std::byte> bytes)
               ops.emplace_back(std::move(op.value()));
             }
 
-            if (bytes.empty()) {
-              return dag{
-                std::move(consts.value()),
-                std::move(ctrlvals.value()),
-                std::move(ops)
-              };
-            }
+            return dag{
+              std::move(consts.value()),
+              std::move(ctrlvals.value()),
+              std::move(ops)
+            };
           }
         }
       }

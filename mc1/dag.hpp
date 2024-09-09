@@ -16,11 +16,11 @@ struct dag final {
     char rate;
     std::vector<unsigned short> args;
 
-    static std::optional<op> parse(std::span<const std::byte> &bytes);
+    static std::optional<op> parse(std::span<const std::byte>&);
   };
   std::vector<op> ops;
 
-  static std::optional<dag> parse(std::span<const std::byte> bytes);
+  static std::optional<dag> parse(std::span<const std::byte>&);
 };
 
 std::ostream& operator<<(std::ostream&, const dag&);

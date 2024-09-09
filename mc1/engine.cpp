@@ -101,7 +101,7 @@ public:
       case 0: std::cout << "quit" << std::endl; break;
       case 1:
         if (auto dag = MiniCollider::dag::parse(view)) {
-          std::cout << dag.value();
+          if (view.empty()) std::cout << dag.value();
         }
         break;
       default:
@@ -125,12 +125,10 @@ int main(int argc, char *argv[])
   gcc.dump_to_file(".fast_sin.gimple", false);
   {
     auto result = gccjit::compile_shared(gcc);
-    auto fast_sin = gccjit::get_code<double(double)>(result, "fast_sin");
-    const auto diff = std::ranges::max(
-      sampled_interval(tau<double>, 48000) |
-      transform([fast_sin = *fast_sin](double phase) {
-        return std::abs(std::sin(phase) - fast_sin(phase));
-      })
+    auto sin = gccjit::get_code<double(double)>(result, "fast_sin");
+    const auto diff = std::ranges::max
+    ( sampled_interval(tau<double>, 48000)
+    | transform([sin=*sin](double x) { return std::abs(std::sin(x) - sin(x)); })
     );
     std::cout << "diff = " << diff << std::endl;
   }
