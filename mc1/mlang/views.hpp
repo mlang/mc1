@@ -5,7 +5,7 @@
 namespace mlang::views {
 
 template<typename T>
-auto sampled_interval(T period, size_t n)
+constexpr auto sampled_interval(T period, size_t n)
 {
   return
     std::views::iota(size_t{}, n)

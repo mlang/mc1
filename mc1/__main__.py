@@ -7,24 +7,29 @@ import subprocess
 
 from mc1.dag import *
 
-if not os.path.isdir(".build/default"):
-    subprocess.run(["cmake", "--preset", "default"], check=True)
-subprocess.run(["cmake", "--build", "--preset", "default"], check=True)
+class Engine:
+    def __init__(self, port=5555):
+        self.port = port
+        self.udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-port = 5555
-engine = subprocess.Popen([".build/default/engine", str(port)])
+    @classmethod
+    def build(cls):
+        if not os.path.isdir(".build/default"):
+            subprocess.run(["cmake", "--preset", "default"], check=True)
+        subprocess.run(["cmake", "--build", "--preset", "default"], check=True)
 
-def cleanup_subprocess(process):
-    if is_running(process):
-        process.terminate()
-        process.wait()
+    def run(self):
+        self.process = subprocess.Popen([".build/default/engine", str(self.port)])
+        atexit.register(self.stop)
 
-atexit.register(cleanup_subprocess, engine)
+    def send(self, data):
+        return self.udp.sendto(bytes(data), ("localhost", self.port))
 
-udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    def stop(self):
+        if is_running(self.process):
+            self.process.terminate()
+            self.process.wait()
 
-def send(data):
-    return udp.sendto(bytes(data), ("localhost", port))
 
 def msg(id: int, content):
     return struct.pack('H', id) + bytes(content)
@@ -32,5 +37,9 @@ def msg(id: int, content):
 def is_running(process):
     return process.poll() is None
 
+
+Engine.build()
+dsp = Engine()
+dsp.run()
 
 code.interact(local=locals(), banner="", exitmsg="")

@@ -11,8 +11,46 @@ import struct
 __all__ = ('SinOsc', 'DAG')
 
 
-class _BroadcastInputs(metaclass=abc.ABCMeta):
-    """Expand list arguments to tuples of instances."""
+class _Node(metaclass=abc.ABCMeta):
+    @abc.abstractmethod
+    def address(self) -> int: pass
+
+    def __add__(self, other):  return Add(self, other)
+    def __radd__(self, other): return Add(other, self)
+    def __mul__(self, other):  return Mul(self, other)
+    def __rmul__(self, other): return Mul(other, self)
+    def __sub__(self, other):  return Sub(self, other)
+    def __rsub__(self, other): return Sub(other, self)
+
+
+class OpBase(_Node):
+    __slots__ = ('rate', 'args', '_index')
+
+    def __init__(self, rate, *args):
+        self.rate = rate
+        self.args = tuple(map(_convert, args))
+        print("index created for " + self.__class__.__name__)
+        self._index = _append(DAG._operations, self)
+
+    def address(self): return self._index
+
+    def __bytes__(self):
+        buf = io.BytesIO()
+        def pack(fmt, *args):
+            return buf.write(struct.pack(fmt, *args))
+        name = bytes(self.__class__.__name__, 'utf-8')
+        pack(f'{len(name)+1}p', name)
+
+        pack('c', self.rate.value)
+
+        pack('H', len(self.args))
+        for arg in self.args: pack('H', arg.address())
+
+        return buf.getvalue()
+
+
+class Op(OpBase):
+    __slots__ = ('inputRates')
 
     def __new__(cls, *args, **kwargs):
         sequence_types = (list, range, tuple)
@@ -33,34 +71,12 @@ class _BroadcastInputs(metaclass=abc.ABCMeta):
             ) for index in range(max(lengths))
         )
 
-
-class _Node(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def ref(self): pass
-
-    def __add__(self, other):  return Add(self, other)
-    def __radd__(self, other): return Add(other, self)
-    def __mul__(self, other):  return Mul(self, other)
-    def __rmul__(self, other): return Mul(other, self)
-    def __sub__(self, other):  return Sub(self, other)
-    def __rsub__(self, other): return Sub(other, self)
-
-
-class Op(_BroadcastInputs, _Node):
-    __slots__ = ('rate', 'inputRates', 'args', '_index')
-
     def __init__(self, rate, *args):
-        self.rate = rate
-        args = tuple(map(_convert, args))
-        self.inputRates = b''.join(arg.rate.value for arg in args)
-        self.args = [arg.ref() for arg in args]
-        self._index = _append(DAG._operations, self)
+        super().__init__(rate, *args)
+        self.inputRates = b''.join(arg.rate.value for arg in self.args)
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} {self.rate} {self.args!r}>"
-
-    def ref(self):
-        return {'node': self._index}
+        return f"<{self.__class__.__name__} {self.rate} {list(arg.address() for arg in self.args)}>"
 
 
 class Rate(enum.Enum):
@@ -71,7 +87,7 @@ class Rate(enum.Enum):
 
 class Const(_Node):
     __slots__ = ('_index')
-    rate = Rate.CONST
+    rate: Rate = Rate.CONST
 
     def __init__(self, value):
         value = float(value)
@@ -80,26 +96,21 @@ class Const(_Node):
         except ValueError:
             self._index = _append(DAG._constants, value)
 
-    def __float__(self):
-        return _constants[self._index]
-
-    def ref(self):
-        return {'const': self._index}
+    def __float__(self) -> float: return DAG._constants[self._index]
+    def address(self) -> int: return 0x8000 | self._index
 
 
-class Param(_Node):
-    __slots__ = ('name', '_index', '_ctrlindex')
-    args = []
-    rate = Rate.BLOCK
+class Param(OpBase):
+    __slots__ = ('name', '_ctrlindex')
 
     def __init__(self, name, *values):
+        super().__init__(Rate.BLOCK)
         self.name = name
-        self._index = _append(DAG._operations, self)
-        self._ctrlindex = DAG._controls.extend(values)
+        self._ctrlindex = _extend(DAG._controls, values)
         DAG._controlNames.append((name, self._ctrlindex))
 
-    def ref(self):
-        return {'node': self._index}
+    def __repr__(self):
+        return f"<{self.__class__.__name__} '{self.name}'>"
 
 
 class _BinOp(Op):
@@ -126,18 +137,19 @@ def _convert(x):
 
 
 class DAG:
-    _constants = []
-    _controls = []
-    _controlNames = []
-    _operations = []
+    _constants: list[float] = []
+    _controls: list[float] = []
+    _controlNames: list[tuple[str, int]] = []
+    _operations: list[OpBase] = []
     __slots__ = ('constants', 'controls', 'controlNames', 'operations')
 
     def __init__(self, func):
+        self._reset()
+
         def param(name, value):
             if not isinstance(value, (list, range, tuple)):
                 value = (value,)
             return Param(name, *value)
-        self._reset()
         func = _WrapDefaults(func, param)
         func()
         for slot in self.__slots__:
@@ -145,10 +157,8 @@ class DAG:
 
     @classmethod
     def _reset(cls):
-        cls._constants = []
-        cls._controls = []
-        cls._controlNames = []
-        cls._operations = []
+        for slot in cls.__slots__:
+            setattr(cls, f'_{slot}', [])
 
     def __bytes__(self):
         buf = io.BytesIO()
@@ -162,16 +172,7 @@ class DAG:
         pack('f'*len(self.controls), *self.controls)
 
         pack('H', len(self.operations))
-        for op in self.operations:
-            name = bytes(op.__class__.__name__, 'utf-8')
-            pack(f'{len(name)+1}p', name)
-
-            pack('c', op.rate.value)
-
-            pack('H', len(op.args))
-            for arg in op.args:
-                id = arg['node'] if 'node' in arg else arg['const'] + 0x8000
-                pack('H', id)
+        for op in self.operations: buf.write(bytes(op))
 
         return buf.getvalue()
 
@@ -181,14 +182,13 @@ class _WrapDefaults:
 
     def __init__(self, func, wrap=None):
         if not wrap:
-            def wrap(name, value):
-                return value
+            wrap = lambda name, value: value
 
         sig = inspect.signature(func)
         args = []
         kwargs = {}
     
-        for name, param in sig.parameters.items():
+        for param in sig.parameters.values():
             if param.default is param.empty:
                 raise ValueError(f"Parameter '{name}' has no default value")
             if param.kind in (param.POSITIONAL_OR_KEYWORD, param.POSITIONAL_ONLY):
@@ -204,13 +204,19 @@ class _WrapDefaults:
         return self.func(*self.args, **self.kwargs)
 
 
-def _append(lst, item) -> int:
+def _append(lst: list, item) -> int:
     index = len(lst)
     lst.append(item)
+    return index
+
+
+def _extend(lst: list, items: list) -> int:
+    index = len(lst)
+    lst.extend(items)
     return index
 
 
 @DAG
 def foo(freq=440, amp=0.1):
     sig = SinOsc.ar([freq, freq+1], 0)
-    return (SinOsc.ar(sig + freq, 0)[0] + SinOsc.ar(sig + freq, 0)[1]) * amp
+    (SinOsc.ar(sig + freq, 0)[0] + SinOsc.ar(sig + freq, 0)[1]) * amp

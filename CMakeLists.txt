@@ -9,3 +9,10 @@ pkg_check_modules(PipeWire REQUIRED IMPORTED_TARGET libpipewire-0.3)
 
 add_executable(engine mc1/dag.cpp mc1/engine.cpp)
 target_link_libraries(engine gccjit PkgConfig::PipeWire)
+
+enable_testing()
+add_test(
+  NAME mypy
+  COMMAND mypy -p mc1
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)

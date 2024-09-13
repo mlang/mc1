@@ -3,6 +3,7 @@
 #include <memory>
 #include <libgccjit++.h>
 
+#include <cassert>
 #include "views.hpp"
 
 namespace gccjit {
