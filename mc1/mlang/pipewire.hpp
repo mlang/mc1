@@ -26,20 +26,35 @@ filter_ptr make_filter(main_loop_ptr const &main_loop,
   void *data
 ) {
   auto ptr = pw_filter_new_simple(get_loop(main_loop), name, props, events, data);
-  if (!ptr) throw std::runtime_error("pw_filter_new_simple failed");
+  if (!ptr)
+    throw std::system_error(errno, std::system_category(), "pw_filter_new_simple");
   return { ptr, pw_filter_destroy };
 }
 
 template<typename T>
-T *add_port(filter_ptr const &filter,
-  enum pw_direction direction, enum pw_filter_port_flags flags,
-  pw_properties *props, std::vector<const spa_pod *> params = {}
-) {
-  return static_cast<T *>(
-    pw_filter_add_port(filter.get(),
-      direction, flags, sizeof(T), props, params.data(), params.size()
-    )
-  );
+using port_ptr = std::unique_ptr<T, void(*)(T*)>;
+
+template<typename T>
+port_ptr<T> make_port
+( filter_ptr const &filter
+, enum pw_direction direction, enum pw_filter_port_flags flags
+, pw_properties *props, std::vector<const spa_pod *> params = {}
+)
+{
+  auto const placement = static_cast<T *>(pw_filter_add_port(filter.get(),
+    direction, flags, sizeof(T), props, params.data(), params.size()
+  ));
+  if (!placement)
+    throw std::system_error(errno, std::system_category(), "pw_filter_add_port");
+  new(placement)T{};
+  return { placement,
+    [](T* port)
+    {
+      port->~T();
+      if (const int result = pw_filter_remove_port(port))
+        throw std::system_error(-result, std::generic_category(), "pw_filter_remove_port");
+    }
+  };
 }
 
 std::error_code connect(filter_ptr const& filter,
@@ -81,25 +96,27 @@ process(std::index_sequence<Is...>,
     }...
   };
   assert(std::size(proc) > span.size());
-  proc[span.size()](obj, std::move(span), std::forward<Args>(args)...);
+  proc[span.size()](obj, span, std::forward<Args>(args)...);
 }
 
 template<typename T>
-void process_port(T *port, spa_io_position &position)
+void process_port(port_ptr<T> const &port, spa_io_position &position)
 {
-  const auto sample_count = position.clock.duration;
-  float *const buffer = static_cast<float *>(
-    pw_filter_get_dsp_buffer(port, sample_count)
+  auto const sample_count = position.clock.duration;
+  auto const buffer = static_cast<float *>(
+    pw_filter_get_dsp_buffer(port.get(), sample_count)
   );
   assert(buffer);
-  auto span = std::span(buffer, sample_count);
-  process(std::make_index_sequence<1024>{}, *port, std::move(span), position);
+  auto const span = std::span(buffer, sample_count);
+  process(std::make_index_sequence<1024>{}, *port, span, position);
 }
 
-template<typename Derived> class make_filter_events
+template<typename Derived>
+class make_filter_events
 {
   static void do_process(void *data, spa_io_position *position)
   { static_cast<Derived *>(data)->process(*position); }
+
 protected:
   static constexpr pw_filter_events filter_events = {
     PW_VERSION_FILTER_EVENTS,

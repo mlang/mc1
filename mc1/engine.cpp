@@ -27,22 +27,29 @@ namespace {
 class osc final {
   double phase;
 public:
+  std::shared_ptr<double(double)> sin {
+    static_cast<double(*)(double)>(std::sin), [](double(*)(double)) {}
+  };
+
   template<size_t Size>
   void process(std::span<float, Size> buffer, spa_io_position &position)
   {
     const double diff = tau<decltype(phase)> * 440 / position.clock.rate.denom;
     for (auto &sample: buffer) {
-      sample = std::sin(phase) * 0.2;
+      sample = (*sin)(phase) * 0.2;
       phase += diff;
       while (phase >= tau<decltype(phase)>) phase -= tau<decltype(phase)>;
     }
   }
 };
 
-class engine final : mlang::pipewire::make_filter_events<engine> {
+class engine final : mlang::pipewire::make_filter_events<engine>
+{
   mlang::pipewire::main_loop_ptr main_loop;
   mlang::pipewire::filter_ptr filter;
-  osc *out;
+  mlang::pipewire::port_ptr<osc> out;
+  gccjit::context gcc;
+  boost::asio::thread_pool compiler;
 
   static pw_properties *filter_props() {
     return pw_properties_new(
@@ -73,8 +80,20 @@ public:
   engine()
   : main_loop{mlang::pipewire::make_main_loop()}
   , filter{mlang::pipewire::make_filter(main_loop, "dsp", filter_props(), &filter_events, this)}
-  , out{mlang::pipewire::add_port<osc>(filter, PW_DIRECTION_OUTPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS, filter_props())}
-  { new(out)osc{}; }
+  , out{mlang::pipewire::make_port<osc>(filter, PW_DIRECTION_OUTPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS, filter_props())}
+  , gcc{gccjit::context::acquire()}
+  , compiler{1}
+  {
+    gcc.set_int_option(GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL, 3);
+    gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
+    gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_SUMMARY, true);
+    make_tabled_function(gcc, "fast_sin", tau<double>, 256, std::sin);
+    auto result = gccjit::compile_shared(gcc);
+    out->sin = gccjit::get_code<double(double)>(result, "fast_sin");
+    gcc.dump_to_file(".fast_sin.gimple", false);
+  }
+
+  ~engine() { gcc.release(); }
 
   std::error_code connect()
   { return mlang::pipewire::connect(filter, PW_FILTER_FLAG_RT_PROCESS); }
@@ -95,18 +114,31 @@ public:
     }
   }
 
-  void packet_received(std::span<const std::byte> view) {
-    if (auto i = mlang::get_value<unsigned short>(view)) {
+  void packet_received(std::span<const std::byte> bytes)
+  {
+    if (auto i = mlang::get_value<unsigned short>(bytes)) {
       switch (*i) {
       case 0: std::cout << "quit" << std::endl; break;
       case 1:
-        if (auto dag = MiniCollider::dag::parse(view)) {
-          if (view.empty()) std::cout << dag.value();
+        if (auto dag = MiniCollider::dag::parse(bytes)) {
+          if (bytes.empty()) {
+            post(compiler, [dag = std::move(dag.value()), this]()
+            {
+              compile_synth(std::move(dag));
+            });
+          }
         }
         break;
       default:
         std::cout << *i << std::endl;
       }
+    }
+  }
+
+  void compile_synth(MiniCollider::dag dag)
+  {
+    std::cout << dag;
+    for (auto const &op: dag.ops) {
     }
   }
 };
@@ -117,40 +149,24 @@ public:
 int main(int argc, char *argv[])
 {
   pw_init(&argc, &argv);
-  auto gcc = gccjit::context::acquire();
-  gcc.set_int_option(GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL, 3);
-  gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
-  gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_SUMMARY, true);
-  make_tabled_function(gcc, "fast_sin", tau<double>, 256, std::sin);
-  gcc.dump_to_file(".fast_sin.gimple", false);
-  {
-    auto result = gccjit::compile_shared(gcc);
-    auto sin = gccjit::get_code<double(double)>(result, "fast_sin");
-    const auto diff = std::ranges::max
-    ( sampled_interval(tau<double>, 48000)
-    | transform([sin=*sin](double x) { return std::abs(std::sin(x) - sin(x)); })
-    );
-    std::cout << "diff = " << diff << std::endl;
-  }
-
-  gcc.release();
-
-
   boost::asio::io_context io;
-  engine world;
-
-  if (auto errc = world.connect()) {
-    std::cerr << errc.message() << std::endl;
-    return EXIT_FAILURE;
-  }
 
   {
-    udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
-    co_spawn(io, world.udp_server(std::move(socket)), detached);
-  }
-  co_spawn(io, world.pipewire(), detached);
+    engine world;
 
-  io.run();
+    if (auto errc = world.connect()) {
+      std::cerr << errc.message() << std::endl;
+      return EXIT_FAILURE;
+    }
+
+    {
+      udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
+      co_spawn(io, world.udp_server(std::move(socket)), detached);
+    }
+    co_spawn(io, world.pipewire(), detached);
+
+    io.run();
+  }
 
   pw_deinit();
 

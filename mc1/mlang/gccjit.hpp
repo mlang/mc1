@@ -43,7 +43,7 @@ template<typename Signature>
 std::shared_ptr<Signature>
 get_code(std::shared_ptr<gcc_jit_result> result, const char *name)
 {
-  auto * const ptr = reinterpret_cast<Signature *>(
+  auto const ptr = reinterpret_cast<Signature *>(
     gcc_jit_result_get_code(result.get(), name)
   );
   return { std::move(result), ptr };
