@@ -75,6 +75,9 @@ class engine final : mlang::pipewire::make_filter_events<engine>
     std::cout << position.clock.rate.num << '/' << position.clock.rate.denom << std::endl;
     mlang::pipewire::process_port(out, position);
   }
+  void state_changed(pw_filter_state old, pw_filter_state now, const char *error)
+  {
+  }
 
 public:
   engine()

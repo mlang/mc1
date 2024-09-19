@@ -1,8 +1,12 @@
+// A minimalistic "library" to parse data from bytes without UB.
+
 #pragma once
 
 #include <cstring>
 #include <optional>
 #include <span>
+#include <string>
+#include <vector>
 
 namespace mlang {
 
@@ -37,12 +41,16 @@ std::optional<std::vector<T>> get_values(std::span<const std::byte> &span, size_
 inline std::optional<std::string>
 get_pstring(std::span<const std::byte> &span)
 {
-  if (auto n = get_value<unsigned char>(span)) {
-    if (auto chars = get_values<char>(span, *n)) {
-      return std::string{chars->begin(), chars->end()};
-    }
-  }
-  return std::nullopt;
+  auto const size = get_value<unsigned char>(span);
+  if (!size || size.value() > span.size()) return std::nullopt;
+
+  std::optional<std::string> result(std::in_place,
+    std::string::size_type(size.value()), std::string::value_type(0)
+  );
+  std::memcpy(result->data(), span.data(), size.value());
+  span = span.subspan(size.value());
+
+  return result;
 }
 
 }

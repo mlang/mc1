@@ -11,8 +11,6 @@ add_executable(engine mc1/dag.cpp mc1/engine.cpp)
 target_link_libraries(engine gccjit PkgConfig::PipeWire)
 
 enable_testing()
-add_test(
-  NAME mypy
-  COMMAND mypy -p mc1
+add_test(NAME mypy COMMAND mypy -p mc1
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )

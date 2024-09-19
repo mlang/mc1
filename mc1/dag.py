@@ -29,7 +29,6 @@ class OpBase(_Node):
     def __init__(self, rate, *args):
         self.rate = rate
         self.args = tuple(map(_convert, args))
-        print("index created for " + self.__class__.__name__)
         self._index = _append(DAG._operations, self)
 
     def address(self): return self._index
@@ -126,7 +125,7 @@ class Sub(_BinOp): pass
 
 class SinOsc(Op):
     @classmethod
-    def ar(cls, freq, phase):
+    def ar(cls, freq, phase=0):
         return cls(Rate.AUDIO, freq, phase)
 
 

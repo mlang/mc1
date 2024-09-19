@@ -41,17 +41,21 @@ port_ptr<T> make_port
 , pw_properties *props, std::vector<const spa_pod *> params = {}
 )
 {
-  auto const placement = static_cast<T *>(pw_filter_add_port(filter.get(),
-    direction, flags, sizeof(T), props, params.data(), params.size()
-  ));
+  auto const placement = static_cast<T *>(
+    pw_filter_add_port(filter.get(),
+      direction, flags, sizeof(T), props, params.data(), params.size()
+    )
+  );
   if (!placement)
     throw std::system_error(errno, std::system_category(), "pw_filter_add_port");
   new(placement)T{};
-  return { placement,
+  return {
+    placement,
     [](T* port)
     {
       port->~T();
-      if (const int result = pw_filter_remove_port(port))
+      int const result = pw_filter_remove_port(port);
+      if (result < 0)
         throw std::system_error(-result, std::generic_category(), "pw_filter_remove_port");
     }
   };
@@ -60,7 +64,7 @@ port_ptr<T> make_port
 std::error_code connect(filter_ptr const& filter,
   enum pw_filter_flags flags, std::vector<const spa_pod *> params = {}
 ) {
-  const int result = pw_filter_connect(filter.get(),
+  int const result = pw_filter_connect(filter.get(),
     flags, params.data(), params.size()
   );
   if (result < 0) return { -result, std::generic_category() };
@@ -116,13 +120,21 @@ class make_filter_events
 {
   static void do_process(void *data, spa_io_position *position)
   { static_cast<Derived *>(data)->process(*position); }
+  static void do_state_changed(void *data, pw_filter_state old, pw_filter_state now, const char *error)
+  { static_cast<Derived *>(data)->state_changed(old, now, error); }
 
 protected:
   static constexpr pw_filter_events filter_events = {
     PW_VERSION_FILTER_EVENTS,
-    nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+    nullptr,
+    make_filter_events::do_state_changed,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
     make_filter_events::do_process,
-    nullptr, nullptr
+    nullptr,
+    nullptr
   };
 };
 
