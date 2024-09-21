@@ -3,7 +3,7 @@ import time
 
 from mc1.dag import *
 from mc1.engine import Engine
-from mc1.message import quit, compile
+from mc1.message import Quit, Compile
 
 
 Engine.build()
@@ -15,6 +15,6 @@ code.interact(
     banner="""MiniCollider
 
 Example:
-    dsp.send(compile(lambda freq=440: SinOsc.ar(freq) * 0.1))""",
+    dsp.send(Compile(lambda freq=440: SinOsc.ar(freq) * 0.1))""",
     exitmsg=""
 )

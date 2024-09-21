@@ -28,11 +28,11 @@ std::optional<dag::op> dag::op::parse(std::span<const std::byte> &bytes)
 
 std::optional<dag> dag::parse(std::span<const std::byte> &bytes)
 {
-  if (auto n = get_value<unsigned short>(bytes)) {
+  if (auto n = get_value<const unsigned short>(bytes)) {
     if (auto consts = get_values<float>(bytes, n.value())) {
-      if (auto nctrlvals = get_value<unsigned short>(bytes)) {
+      if (auto nctrlvals = get_value<const unsigned short>(bytes)) {
         if (auto ctrlvals = get_values<float>(bytes, nctrlvals.value())) {
-          if (auto nops = get_value<unsigned short>(bytes)) {
+          if (auto nops = get_value<const unsigned short>(bytes)) {
             std::vector<op> ops;
             ops.reserve(nops.value());
             for (int i = 0; i != nops.value(); i++) {

@@ -1,12 +1,11 @@
 """A DSL to describe and serialize signal graphs."""
 
-# {{{ Imports
 import abc
 import enum
 import inspect
 import io
 import struct
-# }}}
+
 
 __all__ = ('SinOsc', 'DAG')
 
