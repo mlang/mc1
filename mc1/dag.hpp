@@ -6,6 +6,9 @@
 #include <span>
 #include <vector>
 
+
+#include <nlohmann/json.hpp>
+
 namespace MiniCollider {
 
 struct dag final {
@@ -22,6 +25,9 @@ struct dag final {
 
   static std::optional<dag> parse(std::span<const std::byte>&);
 };
+
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(dag::op, name, rate, args)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(dag, constants, controls, ops)
 
 std::ostream& operator<<(std::ostream&, const dag&);
 

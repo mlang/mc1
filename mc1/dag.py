@@ -83,6 +83,9 @@ class Rate(enum.Enum):
     CONST = b'c'
 
 
+class Flags(enum.IntFlag):
+    CONST = 0x8000
+
 class Const(_Node):
     __slots__ = ('_index')
     rate: Rate = Rate.CONST
@@ -95,7 +98,7 @@ class Const(_Node):
             self._index = _append(DAG._constants, value)
 
     def __float__(self) -> float: return DAG._constants[self._index]
-    def address(self) -> int: return 0x8000 | self._index
+    def address(self) -> int: return Flags.CONST | self._index
 
 
 class Param(OpBase):
@@ -129,9 +132,7 @@ class SinOsc(Op):
 
 
 def _convert(x):
-    if isinstance(x, _Node):
-        return x
-    return Const(x)
+    return x if isinstance(x, _Node) else Const(x)
 
 
 class DAG:
