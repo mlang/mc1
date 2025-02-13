@@ -8,6 +8,46 @@
 
 namespace gccjit {
 
+rvalue assume_aligned(rvalue ptr, int alignment)
+{
+  context gcc = ptr.get_context();
+  return gcc.new_cast(
+    gcc.get_builtin_function("__builtin_assume_aligned")(
+      gcc.new_cast(ptr, gcc.get_type(GCC_JIT_TYPE_VOID).get_pointer()),
+      gcc.new_rvalue(gcc.get_int_type<size_t>(), alignment)
+    ),
+    ptr.get_type()
+  );
+}
+
+type new_function_ptr_type (
+  type return_type, std::vector<type> &args, int is_variadic = 0,
+  location loc = location()
+)
+{
+  context gcc = return_type.get_context();
+  return gcc_jit_context_new_function_ptr_type(
+    gcc.get_inner_context (),
+    loc.get_inner_location (),
+    return_type.get_inner_type (),
+    args.size (), reinterpret_cast<gcc_jit_type **> (args.data()),
+    is_variadic
+  );
+}
+
+rvalue new_call_through_ptr (
+  rvalue fn_ptr, std::vector<rvalue> &args, location loc = location()
+)
+{
+  context gcc = fn_ptr.get_context();
+  return gcc_jit_context_new_call_through_ptr(
+    gcc.get_inner_context (),
+    loc.get_inner_location (),
+    fn_ptr.get_inner_rvalue (),
+    args.size(), reinterpret_cast<gcc_jit_rvalue **> (args.data())
+  );
+}
+
 template<typename T>
 inline constexpr std::optional<gcc_jit_types> type_v = std::nullopt;
 #define TYPE_V(type, TYPE) template<>         \
