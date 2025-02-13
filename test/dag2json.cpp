@@ -4,17 +4,31 @@
 #include <span>
 #include <vector>
 
-int main()
+using std::as_bytes, std::span, std::vector;
+using std::cin, std::cout, std::istream, std::istreambuf_iterator, std::ostream;
+using nlohmann::json;
+
+namespace {
+
+bool dag2json(istream& in, ostream& out)
 {
-  auto data = std::vector(std::istreambuf_iterator<char>(std::cin),
-                          std::istreambuf_iterator<char>());
-  auto bytes = std::as_bytes(std::span(data));
+  auto data = vector(istreambuf_iterator(in), istreambuf_iterator<char>());
+  auto bytes = as_bytes(span(data));
 
   if (auto dag = MiniCollider::dag::parse(bytes)) {
-    std::cout << nlohmann::json(dag.value());
+    if (bytes.empty()) {
+      out << json(dag.value());
 
-    return EXIT_SUCCESS;
+      return true;
+    }
   }
 
-  return EXIT_FAILURE;
+  return false;
+}
+
+}
+
+int main()
+{
+  return dag2json(cin, cout)? EXIT_SUCCESS: EXIT_FAILURE;
 }
