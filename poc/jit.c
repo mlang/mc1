@@ -422,7 +422,7 @@ struct dag graph = {
 
 typedef struct Opcode Opcode;
 
-typedef void (*opcode_init_fn)(const Opcode *op, gcc_jit_context *ctx);
+typedef void (*opcode_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_state);
 typedef gcc_jit_type *(*make_state_type_fn)(const Opcode *op, gcc_jit_context *ctx);
 typedef void (*emit_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_block *entry, gcc_jit_lvalue *lv_state_field);
 
@@ -515,6 +515,7 @@ static int register_opcode(Opcode op)
 struct sinosc_priv {
     gcc_jit_field *fld_phase;
     gcc_jit_struct *st_sinosc;
+    gcc_jit_function *proc;
 };
 
 static gcc_jit_type *sinosc_make_state_type(const Opcode *op, gcc_jit_context *ctx)
@@ -545,6 +546,104 @@ static void sinosc_emit_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_blo
     gcc_jit_block_add_assignment(entry, NULL, lv_phase, c_0_f);
 }
 
+static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_state)
+{
+    struct sinosc_priv *p = (struct sinosc_priv *)op->priv;
+    if (p->proc)
+        return;
+
+    gcc_jit_type *t_void   = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_VOID);
+    gcc_jit_type *t_size_t = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_SIZE_T);
+    gcc_jit_type *t_float  = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+
+    gcc_jit_type *t_float_ptr = gcc_jit_type_get_pointer(t_float);
+    gcc_jit_type *t_state_ptr = gcc_jit_type_get_pointer(t_state);
+
+    gcc_jit_rvalue *c_0_size  = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 0);
+    gcc_jit_rvalue *c_BS_size = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, (long)BS_V);
+
+    assert(p->fld_phase);
+
+    /* External: float sinf(float) */
+    gcc_jit_param *p_sinf_x = gcc_jit_context_new_param(ctx, NULL, t_float, "x");
+    gcc_jit_function *fn_sinf =
+        gcc_jit_context_new_function(ctx, NULL,
+                                     GCC_JIT_FUNCTION_IMPORTED,
+                                     t_float, "sinf",
+                                     1, &p_sinf_x, 0);
+
+    /* void sinosc_process_bba(state*, out*, freq, phase_offset) */
+    gcc_jit_param *p_ps_state =
+        gcc_jit_context_new_param(ctx, NULL, t_state_ptr, "state");
+    gcc_jit_param *p_ps_output =
+        gcc_jit_context_new_param(ctx, NULL, t_float_ptr, "output");
+    gcc_jit_param *p_ps_freq =
+        gcc_jit_context_new_param(ctx, NULL, t_float, "frequency");
+    gcc_jit_param *p_ps_off =
+        gcc_jit_context_new_param(ctx, NULL, t_float, "phase_offset");
+
+    gcc_jit_param *ps_params[] = { p_ps_state, p_ps_output, p_ps_freq, p_ps_off };
+
+    p->proc =
+        gcc_jit_context_new_function(ctx, NULL, GCC_JIT_FUNCTION_INTERNAL,
+                                     t_void, "sinosc_process_bba",
+                                     4, ps_params, 0);
+
+    gcc_jit_block *entry     = gcc_jit_function_new_block(p->proc, "entry");
+    gcc_jit_block *loop_cond = gcc_jit_function_new_block(p->proc, "loop_cond");
+    gcc_jit_block *loop_body = gcc_jit_function_new_block(p->proc, "loop_body");
+    gcc_jit_block *loop_inc  = gcc_jit_function_new_block(p->proc, "loop_inc");
+    gcc_jit_block *done      = gcc_jit_function_new_block(p->proc, "done");
+
+    gcc_jit_lvalue *lv_phase =
+        gcc_jit_function_new_local(p->proc, NULL, t_float, "phase");
+    gcc_jit_lvalue *lv_i =
+        gcc_jit_function_new_local(p->proc, NULL, t_size_t, "i");
+
+    gcc_jit_lvalue *lv_state_phase =
+        gcc_jit_lvalue_access_field(
+            gcc_jit_rvalue_dereference(gcc_jit_param_as_rvalue(p_ps_state), NULL),
+            NULL, p->fld_phase);
+
+    gcc_jit_block_add_assignment(entry, NULL, lv_phase, gcc_jit_lvalue_as_rvalue(lv_state_phase));
+    gcc_jit_block_add_assignment(entry, NULL, lv_i, c_0_size);
+    gcc_jit_block_end_with_jump(entry, NULL, loop_cond);
+
+    gcc_jit_rvalue *cond =
+        gcc_jit_context_new_comparison(ctx, NULL, GCC_JIT_COMPARISON_LT,
+                                       gcc_jit_lvalue_as_rvalue(lv_i),
+                                       c_BS_size);
+    gcc_jit_block_end_with_conditional(loop_cond, NULL, cond, loop_body, done);
+
+    /* out[i] = sinf(phase + phase_offset); */
+    gcc_jit_rvalue *phase_plus_off =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_PLUS, t_float,
+                                      gcc_jit_lvalue_as_rvalue(lv_phase),
+                                      gcc_jit_param_as_rvalue(p_ps_off));
+
+    gcc_jit_rvalue *call_sinf =
+        gcc_jit_context_new_call(ctx, NULL, fn_sinf, 1, &phase_plus_off);
+
+    gcc_jit_lvalue *lv_out_i =
+        gcc_jit_context_new_array_access(ctx, NULL,
+                                         gcc_jit_param_as_rvalue(p_ps_output),
+                                         gcc_jit_lvalue_as_rvalue(lv_i));
+    gcc_jit_block_add_assignment(loop_body, NULL, lv_out_i, call_sinf);
+    gcc_jit_block_end_with_jump(loop_body, NULL, loop_inc);
+
+    gcc_jit_rvalue *i_next =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_PLUS, t_size_t,
+                                      gcc_jit_lvalue_as_rvalue(lv_i),
+                                      gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 1));
+    gcc_jit_block_add_assignment(loop_inc, NULL, lv_i, i_next);
+    gcc_jit_block_end_with_jump(loop_inc, NULL, loop_cond);
+
+    gcc_jit_block_add_assignment(done, NULL, lv_state_phase, gcc_jit_lvalue_as_rvalue(lv_phase));
+    gcc_jit_block_end_with_void_return(done, NULL);
+
+    (void)p_ps_freq;
+}
+
 /* Call once before build_module */
 static void register_builtin_opcodes(void)
 {
@@ -553,7 +652,7 @@ static void register_builtin_opcodes(void)
     register_opcode((Opcode){
         .name = "SinOsc_bba",
         .priv = &sinosc_p,
-        .init_fn = NULL,
+        .init_fn = sinosc_init,
         .make_state_type = sinosc_make_state_type,
         .emit_init = sinosc_emit_init
     });
@@ -595,11 +694,6 @@ gcc_jit_result *build_module(const struct dag *g)
     }
     for (size_t i = 0; i < g->nVertices; i++)
         ops[i] = find_opcode(g->vertices, i);
-
-    for (size_t i = 0; i < g->nVertices; i++) {
-        if (ops[i]->init_fn)
-            ops[i]->init_fn(ops[i], ctx);
-    }
 
     gcc_jit_field **fields = NULL;
     size_t n_fields = 0;
@@ -652,6 +746,14 @@ gcc_jit_result *build_module(const struct dag *g)
     gcc_jit_struct *st_state =
         gcc_jit_context_new_struct_type(ctx, NULL, "state", (int)n_fields, fields);
     gcc_jit_type *t_state = gcc_jit_struct_as_type(st_state);
+
+    for (size_t i = 0; i < g->nVertices; i++) {
+        if (ops[i]->init_fn) {
+            gcc_jit_field *f = field_for_vertex[i];
+            gcc_jit_type *t_state_i = f ? gcc_jit_field_get_type(f) : NULL;
+            ops[i]->init_fn(ops[i], ctx, t_state_i);
+        }
+    }
 
     gcc_jit_lvalue *gv_s = gcc_jit_context_new_global(ctx, NULL, GCC_JIT_GLOBAL_INTERNAL, t_state, "s");
 
