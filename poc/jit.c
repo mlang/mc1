@@ -24,6 +24,7 @@ gcc_jit_rvalue *decay_array_to_pointer(gcc_jit_context *ctx, gcc_jit_lvalue *lva
     gcc_jit_type *t_size_t = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_SIZE_T);
     return gcc_jit_lvalue_get_address(gcc_jit_context_new_array_access(ctx, NULL, gcc_jit_lvalue_as_rvalue(lvalue), gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 0)), NULL);
 }
+/* This is a blueprint/PoC which we aim to generate from a descriptor */
 
 gcc_jit_result *build_sine_object(void)
 {
@@ -378,6 +379,8 @@ gcc_jit_result *build_sine_object(void)
     gcc_jit_context_release(ctx);
     return res;
 }
+
+/* ------------------------------------------------------------------------- */
 
 /* --- Graph descriptor --- */
 
