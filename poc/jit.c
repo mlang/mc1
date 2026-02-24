@@ -533,20 +533,18 @@ static int register_opcode(Opcode op)
 }
 
 static gcc_jit_rvalue *const_emit_proc(
-    const Opcode *op,
+    const Opcode *,
     const struct dag *graph,
     size_t vertex_index,
     gcc_jit_context *ctx,
-    gcc_jit_function *fn_process,
-    gcc_jit_block *entry,
-    gcc_jit_lvalue *lv_state_field,
-    struct Arg *args, size_t n_args,
+    gcc_jit_function *,
+    gcc_jit_block *,
+    gcc_jit_lvalue *,
+    struct Arg *, size_t,
     char out_rate
 )
 {
-    (void)op; (void)fn_process; (void)entry; (void)lv_state_field;
-    (void)args; (void)n_args; (void)out_rate;
-
+    assert(out_rate == 'b');
     const struct vertex *v = &graph->vertices[vertex_index];
     assert(v->nArgs == 1);
 
