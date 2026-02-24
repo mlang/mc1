@@ -791,10 +791,133 @@ static gcc_jit_rvalue *sinosc_emit_proc(
     return decay_array_to_pointer(ctx, lv_buf);
 }
 
+/* Mul: out[a] = in[a] * scalar[b] */
+struct mul_priv {
+    gcc_jit_function *proc;
+};
+
+static void mul_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_state, unsigned int sample_rate)
+{
+    (void)t_state;
+    (void)sample_rate;
+
+    struct mul_priv *p = (struct mul_priv *)op->priv;
+    if (p->proc)
+        return;
+
+    gcc_jit_type *t_void   = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_VOID);
+    gcc_jit_type *t_size_t = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_SIZE_T);
+    gcc_jit_type *t_float  = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+
+    gcc_jit_type *t_float_ptr       = gcc_jit_type_get_pointer(t_float);
+    gcc_jit_type *t_const_float_ptr = gcc_jit_type_get_pointer(gcc_jit_type_get_const(t_float));
+
+    gcc_jit_rvalue *c_0_size  = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 0);
+    gcc_jit_rvalue *c_BS_size = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, (long)BS_V);
+
+    /* void mul_process_aba(float *r, const float *a, float b) */
+    gcc_jit_param *p_r = gcc_jit_context_new_param(ctx, NULL, t_float_ptr, "r");
+    gcc_jit_param *p_a = gcc_jit_context_new_param(ctx, NULL, t_const_float_ptr, "a");
+    gcc_jit_param *p_b = gcc_jit_context_new_param(ctx, NULL, t_float, "b");
+    gcc_jit_param *params[] = { p_r, p_a, p_b };
+
+    p->proc =
+        gcc_jit_context_new_function(ctx, NULL, GCC_JIT_FUNCTION_INTERNAL,
+                                     t_void, "mul_process_aba",
+                                     3, params, 0);
+
+    gcc_jit_block *entry = gcc_jit_function_new_block(p->proc, "entry");
+    gcc_jit_block *cond  = gcc_jit_function_new_block(p->proc, "cond");
+    gcc_jit_block *body  = gcc_jit_function_new_block(p->proc, "body");
+    gcc_jit_block *inc   = gcc_jit_function_new_block(p->proc, "inc");
+    gcc_jit_block *done  = gcc_jit_function_new_block(p->proc, "done");
+
+    gcc_jit_lvalue *lv_i = gcc_jit_function_new_local(p->proc, NULL, t_size_t, "i");
+    gcc_jit_block_add_assignment(entry, NULL, lv_i, c_0_size);
+    gcc_jit_block_end_with_jump(entry, NULL, cond);
+
+    gcc_jit_rvalue *cnd =
+        gcc_jit_context_new_comparison(ctx, NULL, GCC_JIT_COMPARISON_LT,
+                                       gcc_jit_lvalue_as_rvalue(lv_i), c_BS_size);
+    gcc_jit_block_end_with_conditional(cond, NULL, cnd, body, done);
+
+    gcc_jit_lvalue *lv_r_i =
+        gcc_jit_context_new_array_access(ctx, NULL,
+                                         gcc_jit_param_as_rvalue(p_r),
+                                         gcc_jit_lvalue_as_rvalue(lv_i));
+    gcc_jit_lvalue *lv_a_i =
+        gcc_jit_context_new_array_access(ctx, NULL,
+                                         gcc_jit_param_as_rvalue(p_a),
+                                         gcc_jit_lvalue_as_rvalue(lv_i));
+
+    gcc_jit_rvalue *mul =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_MULT, t_float,
+                                      gcc_jit_lvalue_as_rvalue(lv_a_i),
+                                      gcc_jit_param_as_rvalue(p_b));
+    gcc_jit_block_add_assignment(body, NULL, lv_r_i, mul);
+    gcc_jit_block_end_with_jump(body, NULL, inc);
+
+    gcc_jit_rvalue *i_next =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_PLUS, t_size_t,
+                                      gcc_jit_lvalue_as_rvalue(lv_i),
+                                      gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 1));
+    gcc_jit_block_add_assignment(inc, NULL, lv_i, i_next);
+    gcc_jit_block_end_with_jump(inc, NULL, cond);
+
+    gcc_jit_block_end_with_void_return(done, NULL);
+}
+
+static gcc_jit_rvalue *mul_emit_proc(
+    const Opcode *op,
+    const struct dag *graph,
+    size_t vertex_index,
+    gcc_jit_context *ctx,
+    gcc_jit_function *fn_process,
+    gcc_jit_block *entry,
+    gcc_jit_lvalue *lv_state_field,
+    gcc_jit_rvalue *rv_controls,
+    struct Arg *args, size_t n_args,
+    char out_rate
+)
+{
+    (void)graph;
+    (void)lv_state_field;
+    (void)rv_controls;
+
+    assert(out_rate == 'a');
+    assert(n_args == 2);
+    assert(args[0].rate == 'a');
+    assert(args[1].rate == 'b');
+
+    struct mul_priv *p = (struct mul_priv *)op->priv;
+    assert(p && p->proc);
+
+    gcc_jit_type *t_float = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+    gcc_jit_type *t_float_array_BS =
+        gcc_jit_context_new_array_type(ctx, NULL, t_float, (int)BS_V);
+
+    char name[32];
+    snprintf(name, sizeof(name), "e%zu", vertex_index);
+    gcc_jit_lvalue *lv_buf =
+        gcc_jit_function_new_local(fn_process, NULL, t_float_array_BS, name);
+
+    gcc_jit_rvalue *call_args[] = {
+        decay_array_to_pointer(ctx, lv_buf),
+        args[0].rv,
+        args[1].rv
+    };
+
+    gcc_jit_block_add_eval(entry, NULL,
+        gcc_jit_context_new_call(ctx, NULL, p->proc, 3, call_args));
+
+    return decay_array_to_pointer(ctx, lv_buf);
+}
+
 /* Call once before build_module */
 static void register_builtin_opcodes(void)
 {
     static struct sinosc_priv sinosc_p = {0};
+    static struct mul_priv mul_p = {0};
 
     register_opcode((Opcode){
         .name = "SinOsc_bba",
@@ -806,10 +929,11 @@ static void register_builtin_opcodes(void)
     });
     register_opcode((Opcode){
         .name = "Mul_aba",
-        .priv = NULL,
-        .init_fn = NULL,
+        .priv = &mul_p,
+        .init_fn = mul_init,
         .make_state_type = NULL,
-        .emit_init = NULL
+        .emit_init = NULL,
+        .emit_proc = mul_emit_proc
     });
     register_opcode((Opcode){
         .name = "Const_b",
