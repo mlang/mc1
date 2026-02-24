@@ -442,11 +442,31 @@ static int opcode_cmp_by_name(const void *a, const void *b)
     return strcmp(oa->name, ob->name);
 }
 
-static const Opcode *find_opcode(const char *name)
+static const Opcode *find_opcode(const struct vertex *v, size_t i)
 {
-    if (!g_opcodes || g_n_opcodes == 0) return NULL;
-    Opcode key = { .name = name };
-    return (const Opcode *)bsearch(&key, g_opcodes, g_n_opcodes, sizeof(Opcode), opcode_cmp_by_name);
+    if (!g_opcodes || g_n_opcodes == 0) {
+        fprintf(stderr, "opcode registry is empty\n");
+        exit(1);
+    }
+
+    char *key_name = mangle(v, i);
+    if (!key_name) {
+        fprintf(stderr, "failed to mangle opcode name for vertex %zu\n", i);
+        exit(1);
+    }
+
+    Opcode key = { .name = key_name };
+    const Opcode *res =
+        (const Opcode *)bsearch(&key, g_opcodes, g_n_opcodes, sizeof(Opcode), opcode_cmp_by_name);
+
+    if (!res) {
+        fprintf(stderr, "opcode not found: %s\n", key_name);
+        free(key_name);
+        exit(1);
+    }
+
+    free(key_name);
+    return res;
 }
 
 static int register_opcode(Opcode op)
@@ -578,13 +598,7 @@ gcc_jit_result *build_module(const struct dag *g)
         }
 
         const struct vertex *v = &g->vertices[i];
-        const Opcode *op = find_opcode(v->name);
-        if (!op) {
-            gcc_jit_context_release(ctx);
-            free(fields);
-            free(field_for_vertex);
-            return NULL;
-        }
+        const Opcode *op = find_opcode(g->vertices, i);
 
         if (op->make_state_type) {
             gcc_jit_type *t_state_i = op->make_state_type(op, ctx);
@@ -627,8 +641,7 @@ gcc_jit_result *build_module(const struct dag *g)
 
     for (size_t i = 0; i < g->nVertices; i++) {
         const struct vertex *v = &g->vertices[i];
-        const Opcode *op = find_opcode(v->name);
-        if (!op) continue;
+        const Opcode *op = find_opcode(g->vertices, i);
 
         gcc_jit_field *f = field_for_vertex[i];
         if (f && op->emit_init) {
