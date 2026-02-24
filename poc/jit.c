@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static const float PI_F = 3.14f;
 static const float SAMPLE_RATE_F = 44100.0f;
@@ -433,8 +434,59 @@ void register_opcode(const char *name)
 
 gcc_jit_result *build_module(const struct dag *g)
 {
-  // ...
-  return NULL;
+    gcc_jit_context *ctx = gcc_jit_context_acquire();
+    if (!ctx) { fprintf(stderr, "failed to acquire jit context\n"); exit(1); }
+
+    gcc_jit_field **fields = NULL;
+    size_t n_fields = 0;
+
+    for (size_t i = 0; i < g->nVertices; i++) {
+        const struct vertex *v = &g->vertices[i];
+        Opcode *op = find_opcode(v->name);
+        if (!op) {
+            gcc_jit_context_release(ctx);
+            free(fields);
+            return NULL;
+        }
+
+        if (op->make_state_type) {
+            gcc_jit_type *t_state_i = op->make_state_type(op, ctx);
+            if (!t_state_i) {
+                gcc_jit_context_release(ctx);
+                free(fields);
+                return NULL;
+            }
+
+            char fname[32];
+            snprintf(fname, sizeof(fname), "e%zu", i);
+
+            gcc_jit_field *f = gcc_jit_context_new_field(ctx, NULL, t_state_i, fname);
+
+            gcc_jit_field **new_fields = realloc(fields, (n_fields + 1) * sizeof(*new_fields));
+            if (!new_fields) {
+                gcc_jit_context_release(ctx);
+                free(fields);
+                return NULL;
+            }
+            fields = new_fields;
+            fields[n_fields++] = f;
+        }
+    }
+
+    gcc_jit_struct *st_state =
+        gcc_jit_context_new_struct_type(ctx, NULL, "state", (int)n_fields, fields);
+    gcc_jit_type *t_state = gcc_jit_struct_as_type(st_state);
+
+    (void)gcc_jit_context_new_global(ctx, NULL, GCC_JIT_GLOBAL_INTERNAL, t_state, "s");
+
+    free(fields);
+
+    gcc_jit_result *res = gcc_jit_context_compile(ctx);
+    if (!res)
+        die(ctx, "JIT compile failed");
+
+    gcc_jit_context_release(ctx);
+    return res;
 }
 
 /* --- */
