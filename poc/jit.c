@@ -1217,7 +1217,21 @@ int main() {
     /* --- */
     register_builtin_opcodes();
     r = build_module(&graph, 44100u);
+
     init = gcc_jit_result_get_code(r, "init");
+    void (*process2)(const float*, const float*, size_t, float*, size_t) =
+        gcc_jit_result_get_code(r, "process");
+
     init();
+
+    float controls2[1] = { 440.0f };
+    for (size_t n = 0; n < 10; n++) {
+        float out2[BS_V];
+        process2(controls2, NULL, 0, out2, 1);
+        for (size_t i = 0; i < BS_V; i++) {
+            printf("%f\n", out2[i]);
+        }
+    }
+
     gcc_jit_result_release(r);
 }
