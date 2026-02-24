@@ -379,7 +379,7 @@ gcc_jit_result *build_sine_object(void)
     return res;
 }
 
-/* --- */
+/* --- Graph descriptor --- */
 
 struct vertex
 {
@@ -458,8 +458,6 @@ static int register_opcode(Opcode op)
     qsort(g_opcodes, g_n_opcodes, sizeof(Opcode), opcode_cmp_by_name);
     return 1;
 }
-
-/* --- Example opcode implementations (state type only) --- */
 
 /* SinOsc: has per-instance state { float phase; } */
 struct sinosc_priv {
@@ -635,5 +633,7 @@ int main() {
    /* --- */
    register_builtin_opcodes();
    r = build_module(&graph);
+   init = gcc_jit_result_get_code(r, "init");
+   init();
    gcc_jit_result_release(r);
 }
