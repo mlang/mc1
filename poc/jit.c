@@ -714,6 +714,49 @@ static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_
     gcc_jit_block_end_with_void_return(done, NULL);
 }
 
+static gcc_jit_rvalue *sinosc_emit_proc(
+    const Opcode *op,
+    const struct dag *graph,
+    size_t vertex_index,
+    gcc_jit_context *ctx,
+    gcc_jit_function *fn_process,
+    gcc_jit_block *entry,
+    gcc_jit_lvalue *lv_state_field,
+    struct Arg *args, size_t n_args,
+    char out_rate
+)
+{
+    (void)graph;
+    assert(out_rate == 'a');
+    assert(n_args == 2);
+
+    struct sinosc_priv *p = (struct sinosc_priv *)op->priv;
+    assert(p && p->proc);
+
+    gcc_jit_type *t_float = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+    gcc_jit_type *t_float_array_BS =
+        gcc_jit_context_new_array_type(ctx, NULL, t_float, (int)BS_V);
+
+    char name[32];
+    snprintf(name, sizeof(name), "e%zu", vertex_index);
+    gcc_jit_lvalue *lv_buf =
+        gcc_jit_function_new_local(fn_process, NULL, t_float_array_BS, name);
+
+    gcc_jit_rvalue *rv_state_ptr = gcc_jit_lvalue_get_address(lv_state_field, NULL);
+
+    gcc_jit_rvalue *call_args[] = {
+        rv_state_ptr,
+        decay_array_to_pointer(ctx, lv_buf),
+        args[0].rv,
+        args[1].rv
+    };
+
+    gcc_jit_block_add_eval(entry, NULL,
+        gcc_jit_context_new_call(ctx, NULL, p->proc, 4, call_args));
+
+    return decay_array_to_pointer(ctx, lv_buf);
+}
+
 /* Call once before build_module */
 static void register_builtin_opcodes(void)
 {
@@ -724,7 +767,8 @@ static void register_builtin_opcodes(void)
         .priv = &sinosc_p,
         .init_fn = sinosc_init,
         .make_state_type = sinosc_make_state_type,
-        .emit_init = sinosc_emit_init
+        .emit_init = sinosc_emit_init,
+        .emit_proc = sinosc_emit_proc
     });
     register_opcode((Opcode){
         .name = "Mul_aba",
