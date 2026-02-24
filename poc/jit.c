@@ -464,7 +464,10 @@ static char *mangle(const struct vertex *v, size_t i)
     const struct vertex *cur = &v[i];
 
     size_t name_len = strlen(cur->name);
+
     size_t n_in = cur->nArgs;
+    if (strcmp(cur->name, "Const") == 0 || strcmp(cur->name, "Control") == 0)
+        n_in = 0;
 
     /* "<name>" + "_" + <n_in chars> + <1 out char> + "\0" */
     size_t len = name_len + 1 + n_in + 1 + 1;
