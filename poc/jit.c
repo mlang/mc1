@@ -442,6 +442,36 @@ static int opcode_cmp_by_name(const void *a, const void *b)
     return strcmp(oa->name, ob->name);
 }
 
+static char *mangle(const struct vertex *v, size_t i)
+{
+    const struct vertex *cur = &v[i];
+
+    size_t name_len = strlen(cur->name);
+
+    size_t n_in = cur->nArgs;
+    if (strcmp(cur->name, "Const") == 0 || strcmp(cur->name, "Control") == 0)
+        n_in = 0;
+
+    /* "<name>" + "_" + <n_in chars> + <1 out char> + "\0" */
+    size_t len = name_len + 1 + n_in + 1 + 1;
+
+    char *s = (char *)malloc(len);
+    if (!s) return NULL;
+
+    memcpy(s, cur->name, name_len);
+    s[name_len] = '_';
+
+    for (size_t k = 0; k < n_in; k++) {
+        size_t arg_i = cur->args[k];
+        s[name_len + 1 + k] = v[arg_i].rate;
+    }
+
+    s[name_len + 1 + n_in] = cur->rate;
+    s[name_len + 1 + n_in + 1] = '\0';
+
+    return s;
+}
+
 static const Opcode *find_opcode(const struct vertex *v, size_t i)
 {
     if (!g_opcodes || g_n_opcodes == 0) {
@@ -477,36 +507,6 @@ static int register_opcode(Opcode op)
     g_opcodes[g_n_opcodes++] = op;
     qsort(g_opcodes, g_n_opcodes, sizeof(Opcode), opcode_cmp_by_name);
     return 1;
-}
-
-static char *mangle(const struct vertex *v, size_t i)
-{
-    const struct vertex *cur = &v[i];
-
-    size_t name_len = strlen(cur->name);
-
-    size_t n_in = cur->nArgs;
-    if (strcmp(cur->name, "Const") == 0 || strcmp(cur->name, "Control") == 0)
-        n_in = 0;
-
-    /* "<name>" + "_" + <n_in chars> + <1 out char> + "\0" */
-    size_t len = name_len + 1 + n_in + 1 + 1;
-
-    char *s = (char *)malloc(len);
-    if (!s) return NULL;
-
-    memcpy(s, cur->name, name_len);
-    s[name_len] = '_';
-
-    for (size_t k = 0; k < n_in; k++) {
-        size_t arg_i = cur->args[k];
-        s[name_len + 1 + k] = v[arg_i].rate;
-    }
-
-    s[name_len + 1 + n_in] = cur->rate;
-    s[name_len + 1 + n_in + 1] = '\0';
-
-    return s;
 }
 
 /* SinOsc: has per-instance state { float phase; } */
