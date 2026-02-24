@@ -422,12 +422,14 @@ struct dag graph = {
 
 typedef struct Opcode Opcode;
 
+typedef void (*opcode_init_fn)(const Opcode *op, gcc_jit_context *ctx);
 typedef gcc_jit_type *(*make_state_type_fn)(const Opcode *op, gcc_jit_context *ctx);
 typedef void (*emit_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_block *entry, gcc_jit_lvalue *lv_state_field);
 
 struct Opcode {
     const char *name;
     void *priv;                         /* private per-opcode data */
+    opcode_init_fn init_fn;             /* optional (may be NULL); called before anything else */
     make_state_type_fn make_state_type; /* optional (may be NULL) */
     emit_init_fn emit_init;             /* optional (may be NULL) */
 };
@@ -551,24 +553,28 @@ static void register_builtin_opcodes(void)
     register_opcode((Opcode){
         .name = "SinOsc_bba",
         .priv = &sinosc_p,
+        .init_fn = NULL,
         .make_state_type = sinosc_make_state_type,
         .emit_init = sinosc_emit_init
     });
     register_opcode((Opcode){
         .name = "Mul_aba",
         .priv = NULL,
+        .init_fn = NULL,
         .make_state_type = NULL,
         .emit_init = NULL
     });
     register_opcode((Opcode){
         .name = "Const_b",
         .priv = NULL,
+        .init_fn = NULL,
         .make_state_type = NULL,
         .emit_init = NULL
     });
     register_opcode((Opcode){
         .name = "Control_b",
         .priv = NULL,
+        .init_fn = NULL,
         .make_state_type = NULL,
         .emit_init = NULL
     });
@@ -582,11 +588,25 @@ gcc_jit_result *build_module(const struct dag *g)
     gcc_jit_context_set_bool_option(ctx, GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, 1);
     gcc_jit_context_set_bool_option(ctx, GCC_JIT_BOOL_OPTION_DUMP_GENERATED_CODE, 1);
 
+    const Opcode **ops = (const Opcode **)calloc(g->nVertices, sizeof(*ops));
+    if (!ops) {
+        gcc_jit_context_release(ctx);
+        return NULL;
+    }
+    for (size_t i = 0; i < g->nVertices; i++)
+        ops[i] = find_opcode(g->vertices, i);
+
+    for (size_t i = 0; i < g->nVertices; i++) {
+        if (ops[i]->init_fn)
+            ops[i]->init_fn(ops[i], ctx);
+    }
+
     gcc_jit_field **fields = NULL;
     size_t n_fields = 0;
     gcc_jit_field **field_for_vertex = (gcc_jit_field **)calloc(g->nVertices, sizeof(*field_for_vertex));
     if (!field_for_vertex) {
         gcc_jit_context_release(ctx);
+        free(ops);
         return NULL;
     }
 
@@ -598,12 +618,13 @@ gcc_jit_result *build_module(const struct dag *g)
         }
 
         const struct vertex *v = &g->vertices[i];
-        const Opcode *op = find_opcode(g->vertices, i);
+        const Opcode *op = ops[i];
 
         if (op->make_state_type) {
             gcc_jit_type *t_state_i = op->make_state_type(op, ctx);
             if (!t_state_i) {
                 gcc_jit_context_release(ctx);
+                free(ops);
                 free(fields);
                 free(field_for_vertex);
                 return NULL;
@@ -617,6 +638,7 @@ gcc_jit_result *build_module(const struct dag *g)
             gcc_jit_field **new_fields = realloc(fields, (n_fields + 1) * sizeof(*new_fields));
             if (!new_fields) {
                 gcc_jit_context_release(ctx);
+                free(ops);
                 free(fields);
                 free(field_for_vertex);
                 return NULL;
@@ -641,7 +663,7 @@ gcc_jit_result *build_module(const struct dag *g)
 
     for (size_t i = 0; i < g->nVertices; i++) {
         const struct vertex *v = &g->vertices[i];
-        const Opcode *op = find_opcode(g->vertices, i);
+        const Opcode *op = ops[i];
 
         gcc_jit_field *f = field_for_vertex[i];
         if (f && op->emit_init) {
@@ -654,6 +676,7 @@ gcc_jit_result *build_module(const struct dag *g)
 
     free(fields);
     free(field_for_vertex);
+    free(ops);
 
     gcc_jit_result *res = gcc_jit_context_compile(ctx);
     if (!res)
