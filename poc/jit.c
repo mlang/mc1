@@ -417,19 +417,85 @@ struct dag graph = {
   .nVertices = 5
 };
 
-struct Opcode
-7
+/* --- Opcode registry (sorted array + bsearch) --- */
+
+typedef struct Opcode Opcode;
+
+typedef gcc_jit_type *(*make_state_type_fn)(const Opcode *op, gcc_jit_context *ctx);
+
+struct Opcode {
     const char *name;
-    /* ... */
+    void *priv;                         /* private per-opcode data */
+    make_state_type_fn make_state_type; /* optional (may be NULL) */
 };
 
-const Opcode *opcodes = NULL;
+static Opcode *g_opcodes = NULL;
+static size_t g_n_opcodes = 0;
 
-void register_opcode(const char *name)
+static int opcode_cmp_by_name(const void *a, const void *b)
 {
-    Opcode *opcode = malloc(sizeof(struct Opcode));
-    opcode.name = name;
-    /* ... */
+    const Opcode *oa = (const Opcode *)a;
+    const Opcode *ob = (const Opcode *)b;
+    return strcmp(oa->name, ob->name);
+}
+
+static const Opcode *find_opcode(const char *name)
+{
+    if (!g_opcodes || g_n_opcodes == 0) return NULL;
+    Opcode key = { .name = name };
+    return (const Opcode *)bsearch(&key, g_opcodes, g_n_opcodes, sizeof(Opcode), opcode_cmp_by_name);
+}
+
+static int register_opcode(Opcode op)
+{
+    Opcode *new_ops = (Opcode *)realloc(g_opcodes, (g_n_opcodes + 1) * sizeof(*new_ops));
+    if (!new_ops) return 0;
+    g_opcodes = new_ops;
+    g_opcodes[g_n_opcodes++] = op;
+    qsort(g_opcodes, g_n_opcodes, sizeof(Opcode), opcode_cmp_by_name);
+    return 1;
+}
+
+/* --- Example opcode implementations (state type only) --- */
+
+/* SinOsc: has per-instance state { float phase; } */
+struct sinosc_priv {
+    gcc_jit_field *fld_phase;
+    gcc_jit_struct *st_sinosc;
+};
+
+static gcc_jit_type *sinosc_make_state_type(const Opcode *op, gcc_jit_context *ctx)
+{
+    struct sinosc_priv *p = (struct sinosc_priv *)op->priv;
+
+    if (!p->fld_phase) {
+        gcc_jit_type *t_float = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+        p->fld_phase = gcc_jit_context_new_field(ctx, NULL, t_float, "phase");
+    }
+    if (!p->st_sinosc) {
+        p->st_sinosc = gcc_jit_context_new_struct_type(ctx, NULL, "sinosc_state", 1, &p->fld_phase);
+    }
+    return gcc_jit_struct_as_type(p->st_sinosc);
+}
+
+/* Mul: no state */
+struct mul_priv { int dummy; };
+
+/* Const / Control / Param etc: no state */
+struct nostate_priv { int dummy; };
+
+/* Call once before build_module */
+static void register_builtin_opcodes(void)
+{
+    static struct sinosc_priv sinosc_p = {0};
+    static struct mul_priv mul_p = {0};
+    static struct nostate_priv nostate_p = {0};
+
+    register_opcode((Opcode){ .name = "SinOsc",   .priv = &sinosc_p,  .make_state_type = sinosc_make_state_type });
+    register_opcode((Opcode){ .name = "Mul",      .priv = &mul_p,     .make_state_type = NULL });
+    register_opcode((Opcode){ .name = "Const",    .priv = &nostate_p, .make_state_type = NULL });
+    register_opcode((Opcode){ .name = "Control",  .priv = &nostate_p, .make_state_type = NULL });
+    register_opcode((Opcode){ .name = "Param",    .priv = &nostate_p, .make_state_type = NULL });
 }
 
 gcc_jit_result *build_module(const struct dag *g)
@@ -442,7 +508,7 @@ gcc_jit_result *build_module(const struct dag *g)
 
     for (size_t i = 0; i < g->nVertices; i++) {
         const struct vertex *v = &g->vertices[i];
-        Opcode *op = find_opcode(v->name);
+        const Opcode *op = find_opcode(v->name);
         if (!op) {
             gcc_jit_context_release(ctx);
             free(fields);
