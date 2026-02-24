@@ -422,7 +422,7 @@ struct dag graph = {
 
 typedef struct Opcode Opcode;
 
-typedef void (*opcode_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_state);
+typedef void (*opcode_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_state, unsigned int sample_rate);
 typedef gcc_jit_type *(*make_state_type_fn)(const Opcode *op, gcc_jit_context *ctx);
 typedef void (*emit_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_block *entry, gcc_jit_lvalue *lv_state_field);
 
@@ -546,7 +546,7 @@ static void sinosc_emit_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_blo
     gcc_jit_block_add_assignment(entry, NULL, lv_phase, c_0_f);
 }
 
-static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_state)
+static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_state, unsigned int sample_rate)
 {
     struct sinosc_priv *p = (struct sinosc_priv *)op->priv;
     if (p->proc)
@@ -561,6 +561,13 @@ static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_
 
     gcc_jit_rvalue *c_0_size  = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 0);
     gcc_jit_rvalue *c_BS_size = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, (long)BS_V);
+
+    gcc_jit_rvalue *c_2_f =
+        gcc_jit_context_new_rvalue_from_double(ctx, t_float, 2.0);
+    gcc_jit_rvalue *c_PI =
+        gcc_jit_context_new_rvalue_from_double(ctx, t_float, PI_F);
+    gcc_jit_rvalue *c_SR =
+        gcc_jit_context_new_rvalue_from_double(ctx, t_float, (double)sample_rate);
 
     assert(p->fld_phase);
 
@@ -597,6 +604,8 @@ static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_
 
     gcc_jit_lvalue *lv_phase =
         gcc_jit_function_new_local(p->proc, NULL, t_float, "phase");
+    gcc_jit_lvalue *lv_inc =
+        gcc_jit_function_new_local(p->proc, NULL, t_float, "phase_increment");
     gcc_jit_lvalue *lv_i =
         gcc_jit_function_new_local(p->proc, NULL, t_size_t, "i");
 
@@ -606,6 +615,18 @@ static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_
             NULL, p->fld_phase);
 
     gcc_jit_block_add_assignment(entry, NULL, lv_phase, gcc_jit_lvalue_as_rvalue(lv_state_phase));
+
+    gcc_jit_rvalue *two_pi =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_MULT, t_float,
+                                      c_2_f, c_PI);
+    gcc_jit_rvalue *num =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_MULT, t_float,
+                                      two_pi, gcc_jit_param_as_rvalue(p_ps_freq));
+    gcc_jit_rvalue *inc =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_DIVIDE, t_float,
+                                      num, c_SR);
+    gcc_jit_block_add_assignment(entry, NULL, lv_inc, inc);
+
     gcc_jit_block_add_assignment(entry, NULL, lv_i, c_0_size);
     gcc_jit_block_end_with_jump(entry, NULL, loop_cond);
 
@@ -629,6 +650,13 @@ static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_
                                          gcc_jit_param_as_rvalue(p_ps_output),
                                          gcc_jit_lvalue_as_rvalue(lv_i));
     gcc_jit_block_add_assignment(loop_body, NULL, lv_out_i, call_sinf);
+
+    gcc_jit_rvalue *phase_next =
+        gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_PLUS, t_float,
+                                      gcc_jit_lvalue_as_rvalue(lv_phase),
+                                      gcc_jit_lvalue_as_rvalue(lv_inc));
+    gcc_jit_block_add_assignment(loop_body, NULL, lv_phase, phase_next);
+
     gcc_jit_block_end_with_jump(loop_body, NULL, loop_inc);
 
     gcc_jit_rvalue *i_next =
@@ -640,8 +668,6 @@ static void sinosc_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_type *t_
 
     gcc_jit_block_add_assignment(done, NULL, lv_state_phase, gcc_jit_lvalue_as_rvalue(lv_phase));
     gcc_jit_block_end_with_void_return(done, NULL);
-
-    (void)p_ps_freq;
 }
 
 /* Call once before build_module */
@@ -679,7 +705,7 @@ static void register_builtin_opcodes(void)
     });
 }
 
-gcc_jit_result *build_module(const struct dag *g)
+gcc_jit_result *build_module(const struct dag *g, unsigned int sample_rate)
 {
     gcc_jit_context *ctx = gcc_jit_context_acquire();
     if (!ctx) { fprintf(stderr, "failed to acquire jit context\n"); exit(1); }
@@ -744,7 +770,7 @@ gcc_jit_result *build_module(const struct dag *g)
         }
 
         if (op->init_fn)
-            op->init_fn(op, ctx, t_state_i);
+            op->init_fn(op, ctx, t_state_i, sample_rate);
     }
 
     gcc_jit_struct *st_state =
@@ -802,7 +828,7 @@ int main() {
 
     /* --- */
     register_builtin_opcodes();
-    r = build_module(&graph);
+    r = build_module(&graph, 44100u);
     init = gcc_jit_result_get_code(r, "init");
     init();
     gcc_jit_result_release(r);
