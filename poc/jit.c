@@ -529,25 +529,25 @@ static void register_builtin_opcodes(void)
     static struct sinosc_priv sinosc_p = {0};
 
     register_opcode((Opcode){
-        .name = "SinOsc",
+        .name = "SinOsc_bba",
         .priv = &sinosc_p,
         .make_state_type = sinosc_make_state_type,
         .emit_init = sinosc_emit_init
     });
     register_opcode((Opcode){
-        .name = "Mul",
+        .name = "Mul_aba",
         .priv = NULL,
         .make_state_type = NULL,
         .emit_init = NULL
     });
     register_opcode((Opcode){
-        .name = "Const",
+        .name = "Const_b",
         .priv = NULL,
         .make_state_type = NULL,
         .emit_init = NULL
     });
     register_opcode((Opcode){
-        .name = "Control",
+        .name = "Control_b",
         .priv = NULL,
         .make_state_type = NULL,
         .emit_init = NULL
