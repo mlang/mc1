@@ -478,12 +478,6 @@ static gcc_jit_type *sinosc_make_state_type(const Opcode *op, gcc_jit_context *c
     return gcc_jit_struct_as_type(p->st_sinosc);
 }
 
-/* Mul: no state */
-struct mul_priv { int dummy; };
-
-/* Const / Control / Param etc: no state */
-struct nostate_priv { int dummy; };
-
 /* Call once before build_module */
 static void register_builtin_opcodes(void)
 {
@@ -587,5 +581,10 @@ int main() {
            printf("%f\n", out[i]);
        }
    }
+   gcc_jit_result_release(r);
+
+   /* --- */
+   register_builtin_opcodes();
+   r = build_module(&graph);
    gcc_jit_result_release(r);
 }
