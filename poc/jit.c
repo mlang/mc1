@@ -532,7 +532,7 @@ gcc_jit_result *build_module(const struct dag *g)
     gcc_jit_context *ctx = gcc_jit_context_acquire();
     if (!ctx) { fprintf(stderr, "failed to acquire jit context\n"); exit(1); }
 
-    gcc_jit_context_set_bool_option(ctx, GCC_JIT_BOOL_OPTION_DUMP_INITIAL_TREE, 1);
+    gcc_jit_context_set_bool_option(ctx, GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, 1);
     gcc_jit_context_set_bool_option(ctx, GCC_JIT_BOOL_OPTION_DUMP_GENERATED_CODE, 1);
 
     gcc_jit_field **fields = NULL;
