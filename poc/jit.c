@@ -450,6 +450,7 @@ typedef gcc_jit_rvalue *(*emit_proc_fn)(
 struct Opcode {
     const char *name;
     void *priv;                         /* private per-opcode data */
+    int special_indices;                /* if true, vertex args are indices (not dependency vertex indices) */
     opcode_init_fn init_fn;             /* optional (may be NULL); called before anything else */
     make_state_type_fn make_state_type; /* optional (may be NULL) */
     emit_init_fn emit_init;             /* optional (may be NULL) */
@@ -542,13 +543,14 @@ static gcc_jit_rvalue *const_emit_proc(
     gcc_jit_block *,
     gcc_jit_lvalue *,
     gcc_jit_rvalue *rv_controls,
-    struct Arg *, size_t,
+    struct Arg *, size_t n_args,
     char out_rate
 )
 {
     (void)rv_controls;
 
     assert(out_rate == 'b');
+    assert(n_args == 0);
     const struct vertex *v = &graph->vertices[vertex_index];
     assert(v->nArgs == 1);
 
@@ -568,11 +570,12 @@ static gcc_jit_rvalue *control_emit_proc(
     gcc_jit_block *,
     gcc_jit_lvalue *,
     gcc_jit_rvalue *rv_controls,
-    struct Arg *, size_t,
+    struct Arg *, size_t n_args,
     char out_rate
 )
 {
     assert(out_rate == 'b');
+    assert(n_args == 0);
     const struct vertex *v = &graph->vertices[vertex_index];
     assert(v->nArgs == 1);
 
@@ -922,6 +925,7 @@ static void register_builtin_opcodes(void)
     register_opcode((Opcode){
         .name = "SinOsc_bba",
         .priv = &sinosc_p,
+        .special_indices = 0,
         .init_fn = sinosc_init,
         .make_state_type = sinosc_make_state_type,
         .emit_init = sinosc_emit_init,
@@ -930,6 +934,7 @@ static void register_builtin_opcodes(void)
     register_opcode((Opcode){
         .name = "Mul_aba",
         .priv = &mul_p,
+        .special_indices = 0,
         .init_fn = mul_init,
         .make_state_type = NULL,
         .emit_init = NULL,
@@ -938,6 +943,7 @@ static void register_builtin_opcodes(void)
     register_opcode((Opcode){
         .name = "Const_b",
         .priv = NULL,
+        .special_indices = 1,
         .init_fn = NULL,
         .make_state_type = NULL,
         .emit_init = NULL,
@@ -946,6 +952,7 @@ static void register_builtin_opcodes(void)
     register_opcode((Opcode){
         .name = "Control_b",
         .priv = NULL,
+        .special_indices = 1,
         .init_fn = NULL,
         .make_state_type = NULL,
         .emit_init = NULL,
@@ -1045,6 +1052,139 @@ gcc_jit_result *build_module(const struct dag *g, unsigned int sample_rate)
     }
 
     gcc_jit_block_end_with_void_return(init_entry, NULL);
+
+    // -------------------------------------------------------------------------
+    // process(const float *controls, const float *in, size_t inC,
+    //         float *out, size_t outC)
+    // -------------------------------------------------------------------------
+    gcc_jit_type *t_size_t = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_SIZE_T);
+    gcc_jit_type *t_float  = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+    gcc_jit_type *t_float_ptr = gcc_jit_type_get_pointer(t_float);
+    gcc_jit_type *t_const_float_ptr = gcc_jit_type_get_pointer(gcc_jit_type_get_const(t_float));
+
+    gcc_jit_param *p_controls =
+        gcc_jit_context_new_param(ctx, NULL, t_const_float_ptr, "controls");
+    gcc_jit_param *p_in =
+        gcc_jit_context_new_param(ctx, NULL, t_const_float_ptr, "in");
+    gcc_jit_param *p_inC =
+        gcc_jit_context_new_param(ctx, NULL, t_size_t, "inC");
+    gcc_jit_param *p_out =
+        gcc_jit_context_new_param(ctx, NULL, t_float_ptr, "out");
+    gcc_jit_param *p_outC =
+        gcc_jit_context_new_param(ctx, NULL, t_size_t, "outC");
+
+    gcc_jit_param *proc_params[] = { p_controls, p_in, p_inC, p_out, p_outC };
+
+    gcc_jit_function *fn_process =
+        gcc_jit_context_new_function(ctx, NULL, GCC_JIT_FUNCTION_EXPORTED,
+                                     t_void, "process",
+                                     5, proc_params, 0);
+    {
+        (void)p_in; (void)p_inC; (void)p_outC;
+
+        gcc_jit_block *entry = gcc_jit_function_new_block(fn_process, "entry");
+        gcc_jit_block *copy_cond = gcc_jit_function_new_block(fn_process, "copy_cond");
+        gcc_jit_block *copy_body = gcc_jit_function_new_block(fn_process, "copy_body");
+        gcc_jit_block *copy_inc  = gcc_jit_function_new_block(fn_process, "copy_inc");
+        gcc_jit_block *done      = gcc_jit_function_new_block(fn_process, "done");
+
+        gcc_jit_rvalue **values = (gcc_jit_rvalue **)calloc(g->nVertices, sizeof(*values));
+        char *rates = (char *)calloc(g->nVertices, sizeof(*rates));
+        if (!values || !rates) {
+            gcc_jit_context_release(ctx);
+            free(values);
+            free(rates);
+            free(fields);
+            free(field_for_vertex);
+            free(ops);
+            return NULL;
+        }
+
+        for (size_t i = 0; i < g->nVertices; i++) {
+            const struct vertex *v = &g->vertices[i];
+            const Opcode *op = ops[i];
+
+            struct Arg *a = NULL;
+            size_t n_args = v->nArgs;
+
+            if (op->special_indices) {
+                a = NULL;
+                n_args = 0;
+            } else if (n_args) {
+                a = (struct Arg *)calloc(n_args, sizeof(*a));
+                if (!a) {
+                    gcc_jit_context_release(ctx);
+                    free(values);
+                    free(rates);
+                    free(fields);
+                    free(field_for_vertex);
+                    free(ops);
+                    return NULL;
+                }
+                for (size_t k = 0; k < n_args; k++) {
+                    size_t src = v->args[k];
+                    a[k].rv = values[src];
+                    a[k].rate = rates[src];
+                }
+            }
+
+            gcc_jit_lvalue *lv_state_field = NULL;
+            gcc_jit_field *f = field_for_vertex[i];
+            if (f)
+                lv_state_field = gcc_jit_lvalue_access_field(gv_s, NULL, f);
+
+            gcc_jit_rvalue *rv =
+                op->emit_proc(op, g, i, ctx, fn_process, entry,
+                              lv_state_field,
+                              gcc_jit_param_as_rvalue(p_controls),
+                              a, n_args,
+                              v->rate);
+
+            values[i] = rv;
+            rates[i] = v->rate;
+
+            free(a);
+        }
+
+        gcc_jit_rvalue *c_0_size  = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 0);
+        gcc_jit_rvalue *c_BS_size = gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, (long)BS_V);
+
+        assert(g->nVertices > 0);
+        size_t out_v = g->nVertices - 1;
+        assert(rates[out_v] == 'a');
+
+        gcc_jit_lvalue *lv_i = gcc_jit_function_new_local(fn_process, NULL, t_size_t, "i");
+        gcc_jit_block_add_assignment(entry, NULL, lv_i, c_0_size);
+        gcc_jit_block_end_with_jump(entry, NULL, copy_cond);
+
+        gcc_jit_rvalue *cnd =
+            gcc_jit_context_new_comparison(ctx, NULL, GCC_JIT_COMPARISON_LT,
+                                           gcc_jit_lvalue_as_rvalue(lv_i), c_BS_size);
+        gcc_jit_block_end_with_conditional(copy_cond, NULL, cnd, copy_body, done);
+
+        gcc_jit_lvalue *lv_out_i =
+            gcc_jit_context_new_array_access(ctx, NULL,
+                                             gcc_jit_param_as_rvalue(p_out),
+                                             gcc_jit_lvalue_as_rvalue(lv_i));
+        gcc_jit_lvalue *lv_src_i =
+            gcc_jit_context_new_array_access(ctx, NULL,
+                                             values[out_v],
+                                             gcc_jit_lvalue_as_rvalue(lv_i));
+        gcc_jit_block_add_assignment(copy_body, NULL, lv_out_i, gcc_jit_lvalue_as_rvalue(lv_src_i));
+        gcc_jit_block_end_with_jump(copy_body, NULL, copy_inc);
+
+        gcc_jit_rvalue *i_next =
+            gcc_jit_context_new_binary_op(ctx, NULL, GCC_JIT_BINARY_OP_PLUS, t_size_t,
+                                          gcc_jit_lvalue_as_rvalue(lv_i),
+                                          gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, 1));
+        gcc_jit_block_add_assignment(copy_inc, NULL, lv_i, i_next);
+        gcc_jit_block_end_with_jump(copy_inc, NULL, copy_cond);
+
+        gcc_jit_block_end_with_void_return(done, NULL);
+
+        free(values);
+        free(rates);
+    }
 
     free(fields);
     free(field_for_vertex);
