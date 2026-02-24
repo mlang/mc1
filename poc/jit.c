@@ -993,7 +993,6 @@ gcc_jit_result *build_module(const struct dag *g, unsigned int sample_rate)
             free(mn);
         }
 
-        const struct vertex *v = &g->vertices[i];
         const Opcode *op = ops[i];
 
         gcc_jit_type *t_state_i = NULL;
@@ -1042,7 +1041,6 @@ gcc_jit_result *build_module(const struct dag *g, unsigned int sample_rate)
     gcc_jit_block *init_entry = gcc_jit_function_new_block(fn_init, "entry");
 
     for (size_t i = 0; i < g->nVertices; i++) {
-        const struct vertex *v = &g->vertices[i];
         const Opcode *op = ops[i];
 
         gcc_jit_field *f = field_for_vertex[i];
@@ -1199,7 +1197,7 @@ gcc_jit_result *build_module(const struct dag *g, unsigned int sample_rate)
     return res;
 }
 
-int main() {
+void blueprint() {
     gcc_jit_result *r = build_sine_object();
     void (*init)(void) = gcc_jit_result_get_code(r, "init");
     void (*process)(const float*, const float*, size_t, float*, size_t) =
@@ -1215,22 +1213,25 @@ int main() {
     }
     gcc_jit_result_release(r);
 
-    /* --- */
-    register_builtin_opcodes();
-    r = build_module(&graph, 44100u);
+}
 
-    init = gcc_jit_result_get_code(r, "init");
-    void (*process2)(const float*, const float*, size_t, float*, size_t) =
+int main() {
+    blueprint();
+    register_builtin_opcodes();
+    gcc_jit_result *r = build_module(&graph, 44100u);
+
+    void (*init)() = gcc_jit_result_get_code(r, "init");
+    void (*process)(const float*, const float*, size_t, float*, size_t) =
         gcc_jit_result_get_code(r, "process");
 
     init();
 
-    float controls2[1] = { 440.0f };
+    float controls[1] = { 440.0f };
     for (size_t n = 0; n < 10; n++) {
-        float out2[BS_V];
-        process2(controls2, NULL, 0, out2, 1);
+        float out[BS_V];
+        process(controls, NULL, 0, out, 1);
         for (size_t i = 0; i < BS_V; i++) {
-            printf("%f\n", out2[i]);
+            printf("%f\n", out[i]);
         }
     }
 
