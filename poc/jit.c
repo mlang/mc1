@@ -1,4 +1,5 @@
 #include <libgccjit.h>
+#include <assert.h>
 #include <math.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -485,9 +486,7 @@ static void sinosc_emit_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_blo
     struct sinosc_priv *p = (struct sinosc_priv *)op->priv;
     gcc_jit_type *t_float = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
 
-    if (!p->fld_phase) {
-        p->fld_phase = gcc_jit_context_new_field(ctx, NULL, t_float, "phase");
-    }
+    assert(p->fld_phase);
 
     gcc_jit_lvalue *lv_phase =
         gcc_jit_lvalue_access_field(lv_state_field, NULL, p->fld_phase);
@@ -616,8 +615,6 @@ gcc_jit_result *build_module(const struct dag *g)
     gcc_jit_context_release(ctx);
     return res;
 }
-
-/* --- */
 
 int main() {
    gcc_jit_result *r = build_sine_object();
