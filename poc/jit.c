@@ -417,7 +417,7 @@ struct dag graph = {
   .nVertices = 5
 };
 
-/* --- Opcode registry (sorted array + bsearch) --- */
+/* --- Opcode registry --- */
 
 typedef struct Opcode Opcode;
 
@@ -488,14 +488,27 @@ struct nostate_priv { int dummy; };
 static void register_builtin_opcodes(void)
 {
     static struct sinosc_priv sinosc_p = {0};
-    static struct mul_priv mul_p = {0};
-    static struct nostate_priv nostate_p = {0};
 
-    register_opcode((Opcode){ .name = "SinOsc",   .priv = &sinosc_p,  .make_state_type = sinosc_make_state_type });
-    register_opcode((Opcode){ .name = "Mul",      .priv = &mul_p,     .make_state_type = NULL });
-    register_opcode((Opcode){ .name = "Const",    .priv = &nostate_p, .make_state_type = NULL });
-    register_opcode((Opcode){ .name = "Control",  .priv = &nostate_p, .make_state_type = NULL });
-    register_opcode((Opcode){ .name = "Param",    .priv = &nostate_p, .make_state_type = NULL });
+    register_opcode((Opcode){
+        .name = "SinOsc",
+        .priv = &sinosc_p,
+        .make_state_type = sinosc_make_state_type
+    });
+    register_opcode((Opcode){
+        .name = "Mul",
+        .priv = NULL,
+        .make_state_type = NULL
+    });
+    register_opcode((Opcode){
+        .name = "Const",
+        .priv = NULL,
+        .make_state_type = NULL
+    });
+    register_opcode((Opcode){
+        .name = "Control",
+        .priv = NULL,
+        .make_state_type = NULL
+    });
 }
 
 gcc_jit_result *build_module(const struct dag *g)
