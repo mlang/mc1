@@ -459,6 +459,33 @@ static int register_opcode(Opcode op)
     return 1;
 }
 
+static char *mangle(const struct vertex *v, size_t i)
+{
+    const struct vertex *cur = &v[i];
+
+    size_t name_len = strlen(cur->name);
+    size_t n_in = cur->nArgs;
+
+    /* "<name>" + "_" + <n_in chars> + <1 out char> + "\0" */
+    size_t len = name_len + 1 + n_in + 1 + 1;
+
+    char *s = (char *)malloc(len);
+    if (!s) return NULL;
+
+    memcpy(s, cur->name, name_len);
+    s[name_len] = '_';
+
+    for (size_t k = 0; k < n_in; k++) {
+        size_t arg_i = cur->args[k];
+        s[name_len + 1 + k] = v[arg_i].rate;
+    }
+
+    s[name_len + 1 + n_in] = cur->rate;
+    s[name_len + 1 + n_in + 1] = '\0';
+
+    return s;
+}
+
 /* SinOsc: has per-instance state { float phase; } */
 struct sinosc_priv {
     gcc_jit_field *fld_phase;
@@ -541,6 +568,12 @@ gcc_jit_result *build_module(const struct dag *g)
     }
 
     for (size_t i = 0; i < g->nVertices; i++) {
+        char *mn = mangle(g->vertices, i);
+        if (mn) {
+            printf("%s\n", mn);
+            free(mn);
+        }
+
         const struct vertex *v = &g->vertices[i];
         const Opcode *op = find_opcode(v->name);
         if (!op) {
