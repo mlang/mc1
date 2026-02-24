@@ -442,6 +442,7 @@ typedef gcc_jit_rvalue *(*emit_proc_fn)(
     gcc_jit_function *fn_process,
     gcc_jit_block *entry,
     gcc_jit_lvalue *lv_state_field,
+    gcc_jit_rvalue *rv_controls,
     struct Arg *args, size_t n_args,
     char out_rate
 );
@@ -540,10 +541,13 @@ static gcc_jit_rvalue *const_emit_proc(
     gcc_jit_function *,
     gcc_jit_block *,
     gcc_jit_lvalue *,
+    gcc_jit_rvalue *rv_controls,
     struct Arg *, size_t,
     char out_rate
 )
 {
+    (void)rv_controls;
+
     assert(out_rate == 'b');
     const struct vertex *v = &graph->vertices[vertex_index];
     assert(v->nArgs == 1);
@@ -553,6 +557,33 @@ static gcc_jit_rvalue *const_emit_proc(
 
     gcc_jit_type *t_float = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
     return gcc_jit_context_new_rvalue_from_double(ctx, t_float, (double)value);
+}
+
+static gcc_jit_rvalue *control_emit_proc(
+    const Opcode *,
+    const struct dag *graph,
+    size_t vertex_index,
+    gcc_jit_context *ctx,
+    gcc_jit_function *,
+    gcc_jit_block *,
+    gcc_jit_lvalue *,
+    gcc_jit_rvalue *rv_controls,
+    struct Arg *, size_t,
+    char out_rate
+)
+{
+    assert(out_rate == 'b');
+    const struct vertex *v = &graph->vertices[vertex_index];
+    assert(v->nArgs == 1);
+
+    gcc_jit_type *t_size_t = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_SIZE_T);
+    gcc_jit_rvalue *idx =
+        gcc_jit_context_new_rvalue_from_long(ctx, t_size_t, (long)v->args[0]);
+
+    gcc_jit_lvalue *lv =
+        gcc_jit_context_new_array_access(ctx, NULL, rv_controls, idx);
+
+    return gcc_jit_lvalue_as_rvalue(lv);
 }
 
 /* SinOsc: has per-instance state { float phase; } */
@@ -722,11 +753,14 @@ static gcc_jit_rvalue *sinosc_emit_proc(
     gcc_jit_function *fn_process,
     gcc_jit_block *entry,
     gcc_jit_lvalue *lv_state_field,
+    gcc_jit_rvalue *rv_controls,
     struct Arg *args, size_t n_args,
     char out_rate
 )
 {
     (void)graph;
+    (void)rv_controls;
+
     assert(out_rate == 'a');
     assert(n_args == 2);
 
@@ -790,7 +824,8 @@ static void register_builtin_opcodes(void)
         .priv = NULL,
         .init_fn = NULL,
         .make_state_type = NULL,
-        .emit_init = NULL
+        .emit_init = NULL,
+        .emit_proc = control_emit_proc
     });
 }
 
