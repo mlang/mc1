@@ -429,12 +429,28 @@ typedef void (*opcode_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_t
 typedef gcc_jit_type *(*make_state_type_fn)(const Opcode *op, gcc_jit_context *ctx);
 typedef void (*emit_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_block *entry, gcc_jit_lvalue *lv_state_field);
 
+struct Arg {
+    gcc_jit_rvalue *rv; /* scalar float or float* depending on rate */
+    char rate;
+};
+
+typedef gcc_jit_rvalue *(*emit_proc_fn)(
+    const Opcode *op,
+    gcc_jit_context *ctx,
+    gcc_jit_function *fn_process,
+    gcc_jit_block *entry,
+    gcc_jit_lvalue *lv_state_field,
+    struct Arg *args, size_t n_args,
+    char out_rate
+);
+
 struct Opcode {
     const char *name;
     void *priv;                         /* private per-opcode data */
     opcode_init_fn init_fn;             /* optional (may be NULL); called before anything else */
     make_state_type_fn make_state_type; /* optional (may be NULL) */
     emit_init_fn emit_init;             /* optional (may be NULL) */
+    emit_proc_fn emit_proc;             /* optional (may be NULL) */
 };
 
 static Opcode *g_opcodes = NULL;
