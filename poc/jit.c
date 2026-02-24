@@ -422,11 +422,13 @@ struct dag graph = {
 typedef struct Opcode Opcode;
 
 typedef gcc_jit_type *(*make_state_type_fn)(const Opcode *op, gcc_jit_context *ctx);
+typedef void (*emit_init_fn)(const Opcode *op, gcc_jit_context *ctx, gcc_jit_block *entry, gcc_jit_lvalue *lv_state_field);
 
 struct Opcode {
     const char *name;
     void *priv;                         /* private per-opcode data */
     make_state_type_fn make_state_type; /* optional (may be NULL) */
+    emit_init_fn emit_init;             /* optional (may be NULL) */
 };
 
 static Opcode *g_opcodes = NULL;
@@ -478,6 +480,22 @@ static gcc_jit_type *sinosc_make_state_type(const Opcode *op, gcc_jit_context *c
     return gcc_jit_struct_as_type(p->st_sinosc);
 }
 
+static void sinosc_emit_init(const Opcode *op, gcc_jit_context *ctx, gcc_jit_block *entry, gcc_jit_lvalue *lv_state_field)
+{
+    struct sinosc_priv *p = (struct sinosc_priv *)op->priv;
+    gcc_jit_type *t_float = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+
+    if (!p->fld_phase) {
+        p->fld_phase = gcc_jit_context_new_field(ctx, NULL, t_float, "phase");
+    }
+
+    gcc_jit_lvalue *lv_phase =
+        gcc_jit_lvalue_access_field(lv_state_field, NULL, p->fld_phase);
+
+    gcc_jit_rvalue *c_0_f = gcc_jit_context_new_rvalue_from_double(ctx, t_float, 0.0);
+    gcc_jit_block_add_assignment(entry, NULL, lv_phase, c_0_f);
+}
+
 /* Call once before build_module */
 static void register_builtin_opcodes(void)
 {
@@ -486,22 +504,26 @@ static void register_builtin_opcodes(void)
     register_opcode((Opcode){
         .name = "SinOsc",
         .priv = &sinosc_p,
-        .make_state_type = sinosc_make_state_type
+        .make_state_type = sinosc_make_state_type,
+        .emit_init = sinosc_emit_init
     });
     register_opcode((Opcode){
         .name = "Mul",
         .priv = NULL,
-        .make_state_type = NULL
+        .make_state_type = NULL,
+        .emit_init = NULL
     });
     register_opcode((Opcode){
         .name = "Const",
         .priv = NULL,
-        .make_state_type = NULL
+        .make_state_type = NULL,
+        .emit_init = NULL
     });
     register_opcode((Opcode){
         .name = "Control",
         .priv = NULL,
-        .make_state_type = NULL
+        .make_state_type = NULL,
+        .emit_init = NULL
     });
 }
 
@@ -515,6 +537,11 @@ gcc_jit_result *build_module(const struct dag *g)
 
     gcc_jit_field **fields = NULL;
     size_t n_fields = 0;
+    gcc_jit_field **field_for_vertex = (gcc_jit_field **)calloc(g->nVertices, sizeof(*field_for_vertex));
+    if (!field_for_vertex) {
+        gcc_jit_context_release(ctx);
+        return NULL;
+    }
 
     for (size_t i = 0; i < g->nVertices; i++) {
         const struct vertex *v = &g->vertices[i];
@@ -522,6 +549,7 @@ gcc_jit_result *build_module(const struct dag *g)
         if (!op) {
             gcc_jit_context_release(ctx);
             free(fields);
+            free(field_for_vertex);
             return NULL;
         }
 
@@ -530,6 +558,7 @@ gcc_jit_result *build_module(const struct dag *g)
             if (!t_state_i) {
                 gcc_jit_context_release(ctx);
                 free(fields);
+                free(field_for_vertex);
                 return NULL;
             }
 
@@ -542,10 +571,12 @@ gcc_jit_result *build_module(const struct dag *g)
             if (!new_fields) {
                 gcc_jit_context_release(ctx);
                 free(fields);
+                free(field_for_vertex);
                 return NULL;
             }
             fields = new_fields;
             fields[n_fields++] = f;
+            field_for_vertex[i] = f;
         }
     }
 
@@ -553,9 +584,30 @@ gcc_jit_result *build_module(const struct dag *g)
         gcc_jit_context_new_struct_type(ctx, NULL, "state", (int)n_fields, fields);
     gcc_jit_type *t_state = gcc_jit_struct_as_type(st_state);
 
-    (void)gcc_jit_context_new_global(ctx, NULL, GCC_JIT_GLOBAL_INTERNAL, t_state, "s");
+    gcc_jit_lvalue *gv_s = gcc_jit_context_new_global(ctx, NULL, GCC_JIT_GLOBAL_INTERNAL, t_state, "s");
+
+    gcc_jit_type *t_void = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_VOID);
+    gcc_jit_function *fn_init =
+        gcc_jit_context_new_function(ctx, NULL, GCC_JIT_FUNCTION_EXPORTED,
+                                     t_void, "init", 0, NULL, 0);
+    gcc_jit_block *init_entry = gcc_jit_function_new_block(fn_init, "entry");
+
+    for (size_t i = 0; i < g->nVertices; i++) {
+        const struct vertex *v = &g->vertices[i];
+        const Opcode *op = find_opcode(v->name);
+        if (!op) continue;
+
+        gcc_jit_field *f = field_for_vertex[i];
+        if (f && op->emit_init) {
+            gcc_jit_lvalue *lv_s_field = gcc_jit_lvalue_access_field(gv_s, NULL, f);
+            op->emit_init(op, ctx, init_entry, lv_s_field);
+        }
+    }
+
+    gcc_jit_block_end_with_void_return(init_entry, NULL);
 
     free(fields);
+    free(field_for_vertex);
 
     gcc_jit_result *res = gcc_jit_context_compile(ctx);
     if (!res)
