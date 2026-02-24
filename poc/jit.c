@@ -436,6 +436,8 @@ struct Arg {
 
 typedef gcc_jit_rvalue *(*emit_proc_fn)(
     const Opcode *op,
+    const struct dag *graph,
+    size_t vertex_index,
     gcc_jit_context *ctx,
     gcc_jit_function *fn_process,
     gcc_jit_block *entry,
@@ -528,6 +530,31 @@ static int register_opcode(Opcode op)
     g_opcodes[g_n_opcodes++] = op;
     qsort(g_opcodes, g_n_opcodes, sizeof(Opcode), opcode_cmp_by_name);
     return 1;
+}
+
+static gcc_jit_rvalue *const_emit_proc(
+    const Opcode *op,
+    const struct dag *graph,
+    size_t vertex_index,
+    gcc_jit_context *ctx,
+    gcc_jit_function *fn_process,
+    gcc_jit_block *entry,
+    gcc_jit_lvalue *lv_state_field,
+    struct Arg *args, size_t n_args,
+    char out_rate
+)
+{
+    (void)op; (void)fn_process; (void)entry; (void)lv_state_field;
+    (void)args; (void)n_args; (void)out_rate;
+
+    const struct vertex *v = &graph->vertices[vertex_index];
+    assert(v->nArgs == 1);
+
+    size_t const_index = v->args[0];
+    float value = graph->constants[const_index];
+
+    gcc_jit_type *t_float = gcc_jit_context_get_type(ctx, GCC_JIT_TYPE_FLOAT);
+    return gcc_jit_context_new_rvalue_from_double(ctx, t_float, (double)value);
 }
 
 /* SinOsc: has per-instance state { float phase; } */
@@ -713,7 +740,8 @@ static void register_builtin_opcodes(void)
         .priv = NULL,
         .init_fn = NULL,
         .make_state_type = NULL,
-        .emit_init = NULL
+        .emit_init = NULL,
+        .emit_proc = const_emit_proc
     });
     register_opcode((Opcode){
         .name = "Control_b",
