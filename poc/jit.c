@@ -785,25 +785,25 @@ gcc_jit_result *build_module(const struct dag *g)
 }
 
 int main() {
-   gcc_jit_result *r = build_sine_object();
-   void (*init)(void) = gcc_jit_result_get_code(r, "init");
-   void (*process)(const float*, const float*, size_t, float*, size_t) =
-       gcc_jit_result_get_code(r, "process");
-   init();
-   float controls[1] = { 440.0f };
-   for (size_t n = 0; n < 10; n++) {
-       float out[BS_V];
-       process(controls, NULL, 0, out, 1);
-       for (size_t i = 0; i < BS_V; i++) {
-           printf("%f\n", out[i]);
-       }
-   }
-   gcc_jit_result_release(r);
+    gcc_jit_result *r = build_sine_object();
+    void (*init)(void) = gcc_jit_result_get_code(r, "init");
+    void (*process)(const float*, const float*, size_t, float*, size_t) =
+        gcc_jit_result_get_code(r, "process");
+    init();
+    float controls[1] = { 440.0f };
+    for (size_t n = 0; n < 10; n++) {
+        float out[BS_V];
+        process(controls, NULL, 0, out, 1);
+        for (size_t i = 0; i < BS_V; i++) {
+            printf("%f\n", out[i]);
+        }
+    }
+    gcc_jit_result_release(r);
 
-   /* --- */
-   register_builtin_opcodes();
-   r = build_module(&graph);
-   init = gcc_jit_result_get_code(r, "init");
-   init();
-   gcc_jit_result_release(r);
+    /* --- */
+    register_builtin_opcodes();
+    r = build_module(&graph);
+    init = gcc_jit_result_get_code(r, "init");
+    init();
+    gcc_jit_result_release(r);
 }
