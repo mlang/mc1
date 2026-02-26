@@ -131,9 +131,8 @@ class Registry
 
   using SpecialEntries = std::vector<SpecialEntry>;
   using Entries = std::vector<Entry>;
-  using Maker = std::variant<SpecialEntries, Entries>;
 
-  std::unordered_map<std::string, Maker> maker;
+  std::unordered_map<std::string, std::variant<SpecialEntries, Entries>> maker;
 
   template<class T>
   static std::unique_ptr<Opcode> make_nongraph(
