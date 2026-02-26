@@ -323,11 +323,11 @@ int main()
   Graph g{
     .constants = {0.0f, 0.2f},
     .vertices = {
-      Vertex{.name="Control", .rate='b', .args={0}},
-      Vertex{.name="Const",   .rate='b', .args={0}},
-      Vertex{.name="SinOsc",  .rate='a', .args={0, 1}},
-      Vertex{.name="Const",   .rate='b', .args={1}},
-      Vertex{.name="Mul",     .rate='a', .args={2, 3}},
+      {"Control", 'b', {0}},
+      {"Const",   'b', {0}},
+      {"SinOsc",  'a', {0, 1}},
+      {"Const",   'b', {1}},
+      {"Mul",    'a',  {2, 3}},
     }
   };
 
