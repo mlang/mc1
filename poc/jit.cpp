@@ -180,6 +180,11 @@ class Registry
   }
 
 public:
+  Registry()
+  {
+    emplace<Const>("Const", "b");
+  }
+
   bool is_nongraph_args(std::string const& name) const
   {
     auto it = maker.find(name);
@@ -278,9 +283,34 @@ public:
   }
 };
 
+gcc_jit_result *compile(const Graph &g)
+{
+  auto gcc = gccjit::context::acquire();
+  Registry opcodes;
+  std::vector<std::unique_ptr<Opcode>> ops;
+  ops.reserve(g.vertices.size());
+  for (size_t i = 0; i < g.vertices.size(); i++) {
+    auto &vertex = g.vertices[i];
+    auto sig = opcodes.compute_signature(g, i);
+    if (opcodes.is_nongraph_args(vertex.name)) {
+      ops.push_back(opcodes.create(gcc, vertex.name, sig, i, vertex.args));
+      continue;
+    }
+    std::vector<Opcode*> args;
+    for (auto arg: vertex.args) {
+      args.push_back(ops[arg].get());
+    }
+    ops.push_back(opcodes.create(gcc, vertex.name, sig, i, args));
+  }
+  // init
+  // process
+  gcc_jit_result *result = gcc.compile();
+  gcc.release();
+  return result;
+}
+
 int main()
 {
   Registry opcodes;
-  opcodes.emplace<Const>("Const", "b");
   assert(opcodes.is_nongraph_args("Const"));
 }
