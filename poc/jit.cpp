@@ -62,7 +62,7 @@ public:
   }
 
   virtual void emit_init(gccjit::block) {};
-  virtual void emit_proc(const Graph &) = 0;
+  virtual void emit_proc(const Graph &, gccjit::function, gccjit::block) = 0;
 };
 
 class NonGraphArgs : public Opcode
@@ -109,10 +109,24 @@ class Const : public NonGraphArgs
 public:
   using NonGraphArgs::NonGraphArgs;
 
-  void emit_proc(const Graph &g) override
+  void emit_proc(const Graph &g, gccjit::function, gccjit::block) override
   {
     assert(args.size() == 1);
     rvalue = new_float(g.constants[args.front()]);
+  }
+};
+
+class Control : public NonGraphArgs
+{
+public:
+  using NonGraphArgs::NonGraphArgs;
+
+  void emit_proc(const Graph &g, gccjit::function f, gccjit::block) override
+  {
+    assert(args.size() == 1);
+    auto controls = f.get_param(0);
+    auto index = gcc.new_rvalue(gcc.get_type(GCC_JIT_TYPE_SIZE_T), long(args.front()));
+    rvalue = gcc.new_array_access(controls, index);
   }
 };
 
@@ -184,6 +198,7 @@ public:
   Registry()
   {
     emplace<Const>("Const", "b");
+    emplace<Control>("Control", "b");
   }
 
   bool is_nongraph_args(std::string const& name) const
@@ -300,10 +315,12 @@ gcc_jit_result *compile(const Graph &g)
     }
     std::vector<Opcode*> args;
     for (auto arg: vertex.args) {
+      assert(arg < i);
       args.push_back(ops[arg].get());
     }
     ops.push_back(opcodes.create(gcc, vertex.name, sig, i, args));
   }
+
   std::vector<gccjit::param> init_args{};
   auto fn_init = gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
     gcc.get_type(GCC_JIT_TYPE_VOID), "init", init_args, 0
@@ -313,6 +330,8 @@ gcc_jit_result *compile(const Graph &g)
   init_entry.end_with_return();
 
   // process
+  // ...
+
   gcc_jit_result *result = gcc.compile();
   gcc.release();
   return result;
@@ -327,7 +346,7 @@ int main()
       {"Const",   'b', {0}},
       {"SinOsc",  'a', {0, 1}},
       {"Const",   'b', {1}},
-      {"Mul",    'a',  {2, 3}},
+      {"Mul",     'a', {2, 3}},
     }
   };
 
