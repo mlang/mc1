@@ -61,6 +61,7 @@ public:
     return rvalue;
   }
 
+  virtual void emit_init(gccjit::block) {};
   virtual void emit_proc(const Graph &) = 0;
 };
 
@@ -286,6 +287,7 @@ public:
 gcc_jit_result *compile(const Graph &g)
 {
   auto gcc = gccjit::context::acquire();
+  gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
   Registry opcodes;
   std::vector<std::unique_ptr<Opcode>> ops;
   ops.reserve(g.vertices.size());
@@ -302,7 +304,14 @@ gcc_jit_result *compile(const Graph &g)
     }
     ops.push_back(opcodes.create(gcc, vertex.name, sig, i, args));
   }
-  // init
+  std::vector<gccjit::param> init_args{};
+  auto fn_init = gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
+    gcc.get_type(GCC_JIT_TYPE_VOID), "init", init_args, 0
+  );
+  auto init_entry = fn_init.new_block("entry");
+  for (auto &op: ops) op->emit_init(init_entry);
+  init_entry.end_with_return();
+
   // process
   gcc_jit_result *result = gcc.compile();
   gcc.release();
