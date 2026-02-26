@@ -1,3 +1,4 @@
+#include <cassert>
 #include <memory>
 #include <regex>
 #include <string_view>
@@ -8,12 +9,32 @@
 
 #include <libgccjit++.h>
 
+struct Vertex
+{
+  std::string name;
+  char rate;
+  std::vector<size_t> args;
+};
+
+struct Graph
+{
+  std::vector<float> constants;
+  std::vector<Vertex> vertices;
+};
+
 class Opcode
 {
 protected:
-  gccjit::context gcc;
+  mutable gccjit::context gcc;
   std::string name, sig;
   size_t vertex_index;
+  gccjit::rvalue rvalue;
+
+  gccjit::rvalue new_float(float value) const
+  {
+    auto type = gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    return gcc.new_rvalue(type, static_cast<double>(value));
+  }
 
 public:
   Opcode(
@@ -25,10 +46,19 @@ public:
   : gcc{gcc},
     name{std::move(name)},
     sig{std::move(sig)},
-    vertex_index{vertex_index}
+    vertex_index{vertex_index},
+    rvalue{}
   {}
 
   virtual ~Opcode() = default;
+
+  gccjit::rvalue get_rvalue() const
+  {
+    assert(rvalue.get_inner_rvalue() != nullptr);
+    return rvalue;
+  }
+
+  virtual void emit_proc(const Graph &) = 0;
 };
 
 class NonGraphArgs : public Opcode
@@ -70,10 +100,16 @@ public:
   {}
 };
 
-class Test final : public GraphArgs
+class Const : public NonGraphArgs
 {
 public:
-  using GraphArgs::GraphArgs;
+  using NonGraphArgs::NonGraphArgs;
+
+  void emit_proc(const Graph &g) override
+  {
+    assert(args.size() == 1);
+    rvalue = new_float(g.constants[args.front()]);
+  }
 };
 
 class Registry
@@ -175,5 +211,5 @@ public:
 int main()
 {
   Registry opcodes;
-  opcodes.emplace<Test>("foo", ".*");
+  opcodes.emplace<Const>("Const", "b");
 }
