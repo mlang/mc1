@@ -119,12 +119,21 @@ class Registry
   using make_nongraph_fn = std::unique_ptr<Opcode>(gccjit::context,std::string,std::string,size_t,nongraph_args_t);
   using make_graph_fn = std::unique_ptr<Opcode>(gccjit::context,std::string,std::string,size_t,graph_args_t);
 
-  struct Entry {
+  struct SpecialEntry {
     std::regex sig_re;
-    std::variant<make_nongraph_fn*, make_graph_fn*> make_fn;
+    make_nongraph_fn *make_fn;
   };
 
-  std::unordered_map<std::string, std::vector<Entry>> maker;
+  struct Entry {
+    std::regex sig_re;
+    make_graph_fn *make_fn;
+  };
+
+  using SpecialEntries = std::vector<SpecialEntry>;
+  using Entries = std::vector<Entry>;
+  using Maker = std::variant<SpecialEntries, Entries>;
+
+  std::unordered_map<std::string, Maker> maker;
 
   template<class T>
   static std::unique_ptr<Opcode> make_nongraph(
@@ -138,12 +147,29 @@ class Registry
   )
   { return std::make_unique<T>(gcc, name, sig, vertex_index, std::move(args)); }
 
+  SpecialEntry const* find_special_entry(std::string const& name, std::string const& sig) const
+  {
+    auto it = maker.find(name);
+    if (it == maker.end()) return nullptr;
+    auto const* entries = std::get_if<SpecialEntries>(&it->second);
+    if (!entries) return nullptr;
+
+    for (auto const& e : *entries) {
+      if (std::regex_match(sig, e.sig_re))
+        return &e;
+    }
+
+    return nullptr;
+  }
+
   Entry const* find_entry(std::string const& name, std::string const& sig) const
   {
     auto it = maker.find(name);
     if (it == maker.end()) return nullptr;
+    auto const* entries = std::get_if<Entries>(&it->second);
+    if (!entries) return nullptr;
 
-    for (auto const& e : it->second) {
+    for (auto const& e : *entries) {
       if (std::regex_match(sig, e.sig_re))
         return &e;
     }
@@ -152,11 +178,11 @@ class Registry
   }
 
 public:
-  bool is_nongraph_args(std::string const& name, std::string const& sig) const
+  bool is_nongraph_args(std::string const& name) const
   {
-    auto const* e = find_entry(name, sig);
-    if (!e) throw std::runtime_error("Not found");
-    return std::get_if<make_nongraph_fn*>(&e->make_fn) != nullptr;
+    auto it = maker.find(name);
+    if (it == maker.end()) throw std::runtime_error("Not found");
+    return std::holds_alternative<SpecialEntries>(it->second);
   }
 
   std::unique_ptr<Opcode> create(
@@ -167,11 +193,10 @@ public:
     nongraph_args_t args
   )
   {
-    auto const* e = find_entry(name, sig);
+    auto const* e = find_special_entry(name, sig);
     if (!e) throw std::runtime_error("Not found");
 
-    auto *fn = std::get<make_nongraph_fn*>(e->make_fn);
-    return fn(gcc, std::move(name), std::move(sig), vertex_index, std::move(args));
+    return e->make_fn(gcc, std::move(name), std::move(sig), vertex_index, std::move(args));
   }
 
   std::unique_ptr<Opcode> create(
@@ -185,26 +210,37 @@ public:
     auto const* e = find_entry(name, sig);
     if (!e) throw std::runtime_error("Not found");
 
-    auto *fn = std::get<make_graph_fn*>(e->make_fn);
-    return fn(gcc, std::move(name), std::move(sig), vertex_index, std::move(args));
+    return e->make_fn(gcc, std::move(name), std::move(sig), vertex_index, std::move(args));
   }
 
   template<class T>
   requires SpecialIndices<T>
   void emplace(std::string name, std::string sig_regex)
   {
-    maker[std::move(name)].push_back(
-      Entry{std::regex(std::move(sig_regex)), &make_nongraph<T>}
-    );
+    auto &v = maker[std::move(name)];
+    if (auto *entries = std::get_if<SpecialEntries>(&v)) {
+      entries->push_back(SpecialEntry{std::regex(std::move(sig_regex)), &make_nongraph<T>});
+      return;
+    }
+    if (std::holds_alternative<Entries>(v))
+      throw std::runtime_error("Registry name already used for graph-args opcode");
+
+    v = SpecialEntries{ SpecialEntry{std::regex(std::move(sig_regex)), &make_nongraph<T>} };
   }
 
   template<class T>
   requires (!SpecialIndices<T>)
   void emplace(std::string name, std::string sig_regex)
   {
-    maker[std::move(name)].push_back(
-      Entry{std::regex(std::move(sig_regex)), &make_graph<T>}
-    );
+    auto &v = maker[std::move(name)];
+    if (auto *entries = std::get_if<Entries>(&v)) {
+      entries->push_back(Entry{std::regex(std::move(sig_regex)), &make_graph<T>});
+      return;
+    }
+    if (std::holds_alternative<SpecialEntries>(v))
+      throw std::runtime_error("Registry name already used for special-indices opcode");
+
+    v = Entries{ Entry{std::regex(std::move(sig_regex)), &make_graph<T>} };
   }
 };
 
