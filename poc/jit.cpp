@@ -216,30 +216,44 @@ public:
   requires SpecialIndices<T>
   void emplace(std::string name, std::string sig_regex)
   {
-    auto &v = maker[std::move(name)];
+    auto it = maker.find(name);
+    if (it == maker.end()) {
+      maker.emplace(
+        std::move(name),
+        SpecialEntries{ SpecialEntry{std::regex(std::move(sig_regex)), &make_nongraph<T>} }
+      );
+      return;
+    }
+
+    auto &v = it->second;
     if (auto *entries = std::get_if<SpecialEntries>(&v)) {
       entries->push_back(SpecialEntry{std::regex(std::move(sig_regex)), &make_nongraph<T>});
       return;
     }
-    if (std::holds_alternative<Entries>(v))
-      throw std::runtime_error("Registry name already used for graph-args opcode");
 
-    v = SpecialEntries{ SpecialEntry{std::regex(std::move(sig_regex)), &make_nongraph<T>} };
+    throw std::runtime_error("Registry name already used for graph-args opcode");
   }
 
   template<class T>
   requires (!SpecialIndices<T>)
   void emplace(std::string name, std::string sig_regex)
   {
-    auto &v = maker[std::move(name)];
+    auto it = maker.find(name);
+    if (it == maker.end()) {
+      maker.emplace(
+        std::move(name),
+        Entries{ Entry{std::regex(std::move(sig_regex)), &make_graph<T>} }
+      );
+      return;
+    }
+
+    auto &v = it->second;
     if (auto *entries = std::get_if<Entries>(&v)) {
       entries->push_back(Entry{std::regex(std::move(sig_regex)), &make_graph<T>});
       return;
     }
-    if (std::holds_alternative<SpecialEntries>(v))
-      throw std::runtime_error("Registry name already used for special-indices opcode");
 
-    v = Entries{ Entry{std::regex(std::move(sig_regex)), &make_graph<T>} };
+    throw std::runtime_error("Registry name already used for special-indices opcode");
   }
 };
 
