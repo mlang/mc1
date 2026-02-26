@@ -320,6 +320,17 @@ gcc_jit_result *compile(const Graph &g)
 
 int main()
 {
-  Registry opcodes;
-  assert(opcodes.is_nongraph_args("Const"));
+  Graph g{
+    .constants = {0.0f, 0.2f},
+    .vertices = {
+      Vertex{.name="Control", .rate='b', .args={0}},
+      Vertex{.name="Const",   .rate='b', .args={0}},
+      Vertex{.name="SinOsc",  .rate='a', .args={0, 1}},
+      Vertex{.name="Const",   .rate='b', .args={1}},
+      Vertex{.name="Mul",     .rate='a', .args={2, 3}},
+    }
+  };
+
+  gcc_jit_result *r = compile(g);
+  (void)r;
 }
