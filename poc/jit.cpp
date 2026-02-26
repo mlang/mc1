@@ -1,5 +1,6 @@
 #include <cassert>
 #include <memory>
+#include <print>
 #include <regex>
 #include <string_view>
 #include <type_traits>
@@ -51,6 +52,8 @@ public:
   {}
 
   virtual ~Opcode() = default;
+
+  char rate() const { return sig.back(); }
 
   gccjit::rvalue get_rvalue() const
   {
@@ -184,6 +187,24 @@ public:
     return std::holds_alternative<SpecialEntries>(it->second);
   }
 
+  std::string compute_signature(const Graph &g, size_t i) const
+  {
+    auto const &v = g.vertices.at(i);
+
+    size_t n_in = is_nongraph_args(v.name) ? 0 : v.args.size();
+
+    std::string sig;
+    sig.reserve(n_in + 1);
+
+    for (size_t k = 0; k < n_in; k++) {
+      size_t arg_i = v.args.at(k);
+      sig.push_back(g.vertices.at(arg_i).rate);
+    }
+
+    sig.push_back(v.rate);
+    return sig;
+  }
+
   std::unique_ptr<Opcode> create(
     gccjit::context gcc,
     std::string name,
@@ -261,4 +282,5 @@ int main()
 {
   Registry opcodes;
   opcodes.emplace<Const>("Const", "b");
+  assert(opcodes.is_nongraph_args("Const"));
 }
