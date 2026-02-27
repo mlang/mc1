@@ -10,25 +10,6 @@
 
 #include <libgccjit++.h>
 
-struct CacheKey {
-  std::string name;
-  std::string sig;
-  bool operator==(CacheKey const&) const = default;
-};
-
-struct CacheKeyHash {
-  size_t operator()(CacheKey const& k) const noexcept
-  {
-    return std::hash<std::string>{}(k.name) ^ (std::hash<std::string>{}(k.sig) << 1);
-  }
-};
-
-template<class T>
-using Cache = std::unordered_map<CacheKey, T, CacheKeyHash>;
-
-static Cache<gccjit::function> kernelCache;
-static Cache<gccjit::struct_> stateCache;
-
 struct Vertex
 {
   std::string name;
@@ -49,11 +30,14 @@ struct Context
   size_t block_size;
   Graph const& graph;
 
+  std::unordered_map<std::string, gccjit::function> kernelCache;
+
   Context(unsigned int sample_rate, size_t block_size, Graph const& graph)
   : gcc{gccjit::context::acquire()}
   , sample_rate{sample_rate}
   , block_size{block_size}
   , graph{graph}
+  , kernelCache{}
   {}
 
   ~Context() { gcc.release(); }
@@ -239,6 +223,8 @@ class Out final : public GraphArgs
 {
   gccjit::function kernel;
 
+  std::string kernel_name() const { return std::format("{}_{}", name, sig); }
+
   gccjit::function make_kernel() const
   {
     // Only support: Out baa
@@ -250,7 +236,7 @@ class Out final : public GraphArgs
     auto t_float_ptr = t_float.get_pointer();
     auto t_const_float_ptr = t_float.get_const().get_pointer();
 
-    auto fn_name = std::format("{}_{}", name, sig);
+    auto fn_name = kernel_name();
 
     // void Out_baa(float *dst, const float *src)
     auto p_dst = ctx.gcc.new_param(t_float_ptr, "dst");
@@ -273,12 +259,12 @@ class Out final : public GraphArgs
 
   gccjit::function get_or_make_kernel() const
   {
-    CacheKey key{name, sig};
-    if (auto it = kernelCache.find(key); it != kernelCache.end())
+    auto fn_name = kernel_name();
+    if (auto it = ctx.kernelCache.find(fn_name); it != ctx.kernelCache.end())
       return it->second;
 
     auto created = make_kernel();
-    kernelCache.emplace(std::move(key), created);
+    ctx.kernelCache.emplace(fn_name, created);
     return created;
   }
 
@@ -330,6 +316,8 @@ class BinOp final : public GraphArgs
   enum gcc_jit_binary_op op_kind;
   gccjit::function kernel;
 
+  std::string kernel_name() const { return std::format("{}_{}", name, sig); }
+
   static enum gcc_jit_binary_op kind_from_name(std::string const& opcode_name)
   {
     if (opcode_name.rfind("Mul", 0) == 0) return GCC_JIT_BINARY_OP_MULT;
@@ -354,7 +342,7 @@ class BinOp final : public GraphArgs
     auto t_float_ptr = t_float.get_pointer();
     auto t_const_float_ptr = t_float.get_const().get_pointer();
 
-    auto fn_name = std::format("{}_{}", name, sig);
+    auto fn_name = kernel_name();
 
     // void f(float *r, <a>, <b>) where <a>/<b> are float or float* depending
     gccjit::param p_r = ctx.gcc.new_param(t_float_ptr, "r");
@@ -389,12 +377,12 @@ class BinOp final : public GraphArgs
 
   gccjit::function get_or_make_kernel() const
   {
-    CacheKey key{name, sig};
-    if (auto it = kernelCache.find(key); it != kernelCache.end())
+    auto fn_name = kernel_name();
+    if (auto it = ctx.kernelCache.find(fn_name); it != ctx.kernelCache.end())
       return it->second;
 
     auto created = make_kernel();
-    kernelCache.emplace(std::move(key), created);
+    ctx.kernelCache.emplace(fn_name, created);
     return created;
   }
 
@@ -469,9 +457,6 @@ class Registry
 public:
   Registry()
   {
-    kernelCache.clear();
-    stateCache.clear();
-
     emplace<Const>("Const");
     emplace<Control>("Control");
     emplace<In>("In");
