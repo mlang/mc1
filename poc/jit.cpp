@@ -39,14 +39,14 @@ struct Context
   , block_size{block_size}
   , graph{graph}
   , kernelCache{}
-  , roundf{}
-  {
-    auto t_float = gcc.get_type(GCC_JIT_TYPE_FLOAT);
-    auto roundf_args = std::vector{ gcc.new_param(t_float, "x") };
-    roundf = gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
-      t_float, "roundf", roundf_args, 0
-    );
-  }
+  , roundf{[&]{
+      auto t_float = gcc.get_type(GCC_JIT_TYPE_FLOAT);
+      auto args = std::vector{ gcc.new_param(t_float, "x") };
+      return gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
+        t_float, "roundf", args, 0
+      );
+    }()}
+  {}
 
   ~Context() { gcc.release(); }
 
