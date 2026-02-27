@@ -31,7 +31,7 @@ struct Context
   Graph const& graph;
 
   std::unordered_map<std::string, gccjit::function> kernelCache;
-  gccjit::function fn_roundf;
+  gccjit::function roundf;
 
   Context(unsigned int sample_rate, size_t block_size, Graph const& graph)
   : gcc{gccjit::context::acquire()}
@@ -39,11 +39,11 @@ struct Context
   , block_size{block_size}
   , graph{graph}
   , kernelCache{}
-  , fn_roundf{}
+  , roundf{}
   {
     auto t_float = gcc.get_type(GCC_JIT_TYPE_FLOAT);
     auto roundf_args = std::vector{ gcc.new_param(t_float, "x") };
-    fn_roundf = gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
+    roundf = gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
       t_float, "roundf", roundf_args, 0
     );
   }
@@ -207,17 +207,11 @@ public:
     auto t_float   = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
     auto abus = f.get_param(1);
-
-    // roundf(arg0) -> size_t index
-    auto idx_f = args[0]->get_rvalue();
-
-    auto idx_rf = ctx.gcc.new_call(ctx.fn_roundf, { idx_f });
-    auto idx = ctx.gcc.new_cast(idx_rf, t_size_t);
+    auto idx = ctx.gcc.new_cast(ctx.roundf(args[0]->get_rvalue()), t_size_t);
 
     auto c_bs = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
-    auto off = ctx.gcc.new_binary_op(GCC_JIT_BINARY_OP_MULT, t_size_t, idx, c_bs);
 
-    rvalue = ctx.gcc.new_array_access(abus, off).get_address();
+    rvalue = ctx.gcc.new_array_access(abus, idx * c_bs).get_address();
   }
 };
 
@@ -288,15 +282,10 @@ public:
 
     auto abus = f.get_param(1);
 
-    // roundf(arg0) -> size_t index
-    auto idx_f = args[0]->get_rvalue();
-
-    auto idx_rf = ctx.gcc.new_call(ctx.fn_roundf, { idx_f });
-    auto idx = ctx.gcc.new_cast(idx_rf, t_size_t);
+    auto idx = ctx.gcc.new_cast(ctx.roundf(args[0]->get_rvalue()), t_size_t);
 
     auto c_bs = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
-    auto off = ctx.gcc.new_binary_op(GCC_JIT_BINARY_OP_MULT, t_size_t, idx, c_bs);
-    auto dst = ctx.gcc.new_array_access(abus, off).get_address();
+    auto dst = ctx.gcc.new_array_access(abus, idx * c_bs).get_address();
 
     auto src = args[1]->get_rvalue();
     b.add_eval(kernel(dst, src));
