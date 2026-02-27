@@ -60,6 +60,8 @@ protected:
     return ctx.gcc.new_rvalue(type, static_cast<double>(value));
   }
 
+  std::string kernel_name() const { return std::format("{}_{}", name, sig); }
+
   void loop(gccjit::function fn, gccjit::block entry, auto &&body_fn) const
   {
     auto t_size_t = ctx.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
@@ -223,8 +225,6 @@ class Out final : public GraphArgs
 {
   gccjit::function kernel;
 
-  std::string kernel_name() const { return std::format("{}_{}", name, sig); }
-
   gccjit::function make_kernel() const
   {
     // Only support: Out baa
@@ -315,8 +315,6 @@ class BinOp final : public GraphArgs
 {
   enum gcc_jit_binary_op op_kind;
   gccjit::function kernel;
-
-  std::string kernel_name() const { return std::format("{}_{}", name, sig); }
 
   static enum gcc_jit_binary_op kind_from_name(std::string const& opcode_name)
   {
