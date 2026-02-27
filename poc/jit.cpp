@@ -42,24 +42,24 @@ struct Graph
   std::vector<Vertex> vertices;
 };
 
-struct Compiler
+struct Context
 {
   gccjit::context gcc;
   unsigned int sample_rate;
   size_t block_size;
   Graph const& graph;
 
-  Compiler(unsigned int sample_rate, size_t block_size, Graph const& graph)
+  Context(unsigned int sample_rate, size_t block_size, Graph const& graph)
   : gcc{gccjit::context::acquire()}
   , sample_rate{sample_rate}
   , block_size{block_size}
   , graph{graph}
   {}
 
-  ~Compiler() { gcc.release(); }
+  ~Context() { gcc.release(); }
 
-  Compiler(Compiler const&) = delete;
-  Compiler& operator=(Compiler const&) = delete;
+  Context(Context const&) = delete;
+  Context& operator=(Context const&) = delete;
 };
 
 struct Result
@@ -99,23 +99,23 @@ struct Result
 class Opcode
 {
 protected:
-  Compiler const& c;
+  Context &ctx;
   std::string name, sig;
   size_t vertex_index;
   gccjit::rvalue rvalue;
 
   gccjit::rvalue new_float(float value) const
   {
-    auto type = c.gcc.get_type(GCC_JIT_TYPE_FLOAT);
-    return c.gcc.new_rvalue(type, static_cast<double>(value));
+    auto type = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    return ctx.gcc.new_rvalue(type, static_cast<double>(value));
   }
 
   void loop(gccjit::function fn, gccjit::block entry, auto &&body_fn) const
   {
-    auto t_size_t = c.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
+    auto t_size_t = ctx.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
 
-    auto c_0_size  = c.gcc.zero(t_size_t);
-    auto c_BS_size = c.gcc.new_rvalue(t_size_t, long(c.block_size));
+    auto c_0_size  = ctx.gcc.zero(t_size_t);
+    auto c_BS_size = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
 
     auto cond  = fn.new_block("cond");
     auto body  = fn.new_block("body");
@@ -126,13 +126,13 @@ protected:
     entry.add_assignment(lv_i, c_0_size);
     entry.end_with_jump(cond);
 
-    auto cnd = c.gcc.new_comparison(GCC_JIT_COMPARISON_LT, lv_i, c_BS_size);
+    auto cnd = ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LT, lv_i, c_BS_size);
     cond.end_with_conditional(cnd, body, done);
 
     body_fn(body, lv_i);
     body.end_with_jump(inc);
 
-    auto i_next = c.gcc.new_binary_op(GCC_JIT_BINARY_OP_PLUS, t_size_t, lv_i, c.gcc.one(t_size_t));
+    auto i_next = ctx.gcc.new_binary_op(GCC_JIT_BINARY_OP_PLUS, t_size_t, lv_i, ctx.gcc.one(t_size_t));
     inc.add_assignment(lv_i, i_next);
     inc.end_with_jump(cond);
 
@@ -141,10 +141,11 @@ protected:
 
 public:
   Opcode(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index
   )
-  : c{c}, name{std::move(name)}, sig{std::move(sig)}, vertex_index{vertex_index}
+  : ctx{ctx}
+  , name{std::move(name)}, sig{std::move(sig)}, vertex_index{vertex_index}
   , rvalue{}
   {}
 
@@ -176,11 +177,11 @@ protected:
 
 public:
   NonGraphArgs(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     std::vector<size_t> args
   )
-  : Opcode(c, std::move(name), std::move(sig), vertex_index)
+  : Opcode(ctx, std::move(name), std::move(sig), vertex_index)
   , args{std::move(args)}
   {}
 };
@@ -194,11 +195,11 @@ protected:
 
 public:
   GraphArgs(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     std::vector<Opcode*> args
   )
-  : Opcode(c, std::move(name), std::move(sig), vertex_index)
+  : Opcode(ctx, std::move(name), std::move(sig), vertex_index)
   , args{std::move(args)}
   {}
 };
@@ -211,7 +212,7 @@ public:
   void emit_proc(gccjit::function, gccjit::block) override
   {
     assert(args.size() == 1);
-    rvalue = new_float(c.graph.constants[args.front()]);
+    rvalue = new_float(ctx.graph.constants[args.front()]);
   }
 };
 
@@ -224,8 +225,8 @@ public:
   {
     assert(args.size() == 1);
     auto controls = f.get_param(0);
-    auto index = c.gcc.new_rvalue(c.gcc.get_type(GCC_JIT_TYPE_SIZE_T), long(args.front()));
-    rvalue = c.gcc.new_array_access(controls, index);
+    auto index = ctx.gcc.new_rvalue(ctx.gcc.get_type(GCC_JIT_TYPE_SIZE_T), long(args.front()));
+    rvalue = ctx.gcc.new_array_access(controls, index);
   }
 };
 
@@ -233,11 +234,11 @@ class In final : public GraphArgs
 {
 public:
   In(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     std::vector<Opcode*> args
   )
-  : GraphArgs(c, std::move(name), std::move(sig), vertex_index, std::move(args))
+  : GraphArgs(ctx, std::move(name), std::move(sig), vertex_index, std::move(args))
   {}
 
   void emit_proc(gccjit::function f, gccjit::block) override
@@ -245,26 +246,26 @@ public:
     assert(sig == "ba");
     assert(args.size() == 1);
 
-    auto t_size_t  = c.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
-    auto t_float   = c.gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    auto t_size_t  = ctx.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
+    auto t_float   = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
     auto abus = f.get_param(1);
 
     // roundf(arg0) -> size_t index
     auto idx_f = args[0]->get_rvalue();
 
-    auto roundf_args = std::vector{ c.gcc.new_param(t_float, "x") };
-    auto fn_roundf = c.gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
+    auto roundf_args = std::vector{ ctx.gcc.new_param(t_float, "x") };
+    auto fn_roundf = ctx.gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
       t_float, "roundf", roundf_args, 0
     );
 
-    auto idx_rf = c.gcc.new_call(fn_roundf, { idx_f });
-    auto idx = c.gcc.new_cast(idx_rf, t_size_t);
+    auto idx_rf = ctx.gcc.new_call(fn_roundf, { idx_f });
+    auto idx = ctx.gcc.new_cast(idx_rf, t_size_t);
 
-    auto c_bs = c.gcc.new_rvalue(t_size_t, long(c.block_size));
-    auto off = c.gcc.new_binary_op(GCC_JIT_BINARY_OP_MULT, t_size_t, idx, c_bs);
+    auto c_bs = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
+    auto off = ctx.gcc.new_binary_op(GCC_JIT_BINARY_OP_MULT, t_size_t, idx, c_bs);
 
-    rvalue = c.gcc.new_array_access(abus, off).get_address();
+    rvalue = ctx.gcc.new_array_access(abus, off).get_address();
   }
 };
 
@@ -277,8 +278,8 @@ class Out final : public GraphArgs
     // Only support: Out baa
     if (sig != "baa") return {};
 
-    auto t_void   = c.gcc.get_type(GCC_JIT_TYPE_VOID);
-    auto t_float  = c.gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    auto t_void   = ctx.gcc.get_type(GCC_JIT_TYPE_VOID);
+    auto t_float  = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
     auto t_float_ptr = t_float.get_pointer();
     auto t_const_float_ptr = t_float.get_const().get_pointer();
@@ -286,17 +287,17 @@ class Out final : public GraphArgs
     auto fn_name = std::format("{}_{}", name, sig);
 
     // void Out_baa(float *dst, const float *src)
-    auto p_dst = c.gcc.new_param(t_float_ptr, "dst");
-    auto p_src = c.gcc.new_param(t_const_float_ptr, "src");
+    auto p_dst = ctx.gcc.new_param(t_float_ptr, "dst");
+    auto p_src = ctx.gcc.new_param(t_const_float_ptr, "src");
     auto params = std::vector{p_dst, p_src};
-    auto kernel = c.gcc.new_function(GCC_JIT_FUNCTION_INTERNAL,
+    auto kernel = ctx.gcc.new_function(GCC_JIT_FUNCTION_INTERNAL,
       t_void, fn_name, params, 0
     );
     {
       auto entry = kernel.new_block("entry");
       loop(kernel, entry, [&](gccjit::block body, gccjit::lvalue lv_i) {
-        auto dst_i = c.gcc.new_array_access(p_dst, lv_i);
-        auto src_i = c.gcc.new_array_access(p_src, lv_i);
+        auto dst_i = ctx.gcc.new_array_access(p_dst, lv_i);
+        auto src_i = ctx.gcc.new_array_access(p_src, lv_i);
         body.add_assignment(dst_i, src_i);
       });
     }
@@ -317,11 +318,11 @@ class Out final : public GraphArgs
 
 public:
   Out(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     std::vector<Opcode*> args
   )
-  : GraphArgs(c, std::move(name), std::move(sig), vertex_index, std::move(args))
+  : GraphArgs(ctx, std::move(name), std::move(sig), vertex_index, std::move(args))
   , kernel{get_or_make_kernel()}
   {}
 
@@ -330,29 +331,29 @@ public:
     assert(sig == "baa");
     assert(args.size() == 2);
 
-    auto t_size_t  = c.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
-    auto t_float   = c.gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    auto t_size_t  = ctx.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
+    auto t_float   = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
     auto abus = f.get_param(1);
 
     // roundf(arg0) -> size_t index
     auto idx_f = args[0]->get_rvalue();
 
-    auto roundf_args = std::vector{ c.gcc.new_param(t_float, "x") };
-    auto fn_roundf = c.gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
+    auto roundf_args = std::vector{ ctx.gcc.new_param(t_float, "x") };
+    auto fn_roundf = ctx.gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
       t_float, "roundf", roundf_args, 0
     );
 
-    auto idx_rf = c.gcc.new_call(fn_roundf, { idx_f });
-    auto idx = c.gcc.new_cast(idx_rf, t_size_t);
+    auto idx_rf = ctx.gcc.new_call(fn_roundf, { idx_f });
+    auto idx = ctx.gcc.new_cast(idx_rf, t_size_t);
 
-    auto c_bs = c.gcc.new_rvalue(t_size_t, long(c.block_size));
-    auto off = c.gcc.new_binary_op(GCC_JIT_BINARY_OP_MULT, t_size_t, idx, c_bs);
-    auto dst = c.gcc.new_array_access(abus, off).get_address();
+    auto c_bs = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
+    auto off = ctx.gcc.new_binary_op(GCC_JIT_BINARY_OP_MULT, t_size_t, idx, c_bs);
+    auto dst = ctx.gcc.new_array_access(abus, off).get_address();
 
     auto src = args[1]->get_rvalue();
     auto call_args = std::vector{ dst, src };
-    b.add_eval(c.gcc.new_call(kernel, call_args));
+    b.add_eval(ctx.gcc.new_call(kernel, call_args));
 
     rvalue = src;
   }
@@ -381,8 +382,8 @@ class BinOp final : public GraphArgs
   {
     if (sig == "bbb") return {};
 
-    auto t_void   = c.gcc.get_type(GCC_JIT_TYPE_VOID);
-    auto t_float  = c.gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    auto t_void   = ctx.gcc.get_type(GCC_JIT_TYPE_VOID);
+    auto t_float  = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
     auto t_float_ptr = t_float.get_pointer();
     auto t_const_float_ptr = t_float.get_const().get_pointer();
@@ -390,30 +391,30 @@ class BinOp final : public GraphArgs
     auto fn_name = std::format("{}_{}", name, sig);
 
     // void f(float *r, <a>, <b>) where <a>/<b> are float or float* depending
-    gccjit::param p_r = c.gcc.new_param(t_float_ptr, "r");
+    gccjit::param p_r = ctx.gcc.new_param(t_float_ptr, "r");
     gccjit::type t_a = (sig[0] == 'a') ? t_const_float_ptr : t_float;
     gccjit::type t_b = (sig[1] == 'a') ? t_const_float_ptr : t_float;
-    gccjit::param p_a = c.gcc.new_param(t_a, "a");
-    gccjit::param p_b = c.gcc.new_param(t_b, "b");
+    gccjit::param p_a = ctx.gcc.new_param(t_a, "a");
+    gccjit::param p_b = ctx.gcc.new_param(t_b, "b");
 
     std::vector<gccjit::param> params{p_r, p_a, p_b};
-    auto kernel = c.gcc.new_function(GCC_JIT_FUNCTION_INTERNAL, t_void, fn_name, params, 0);
+    auto kernel = ctx.gcc.new_function(GCC_JIT_FUNCTION_INTERNAL, t_void, fn_name, params, 0);
 
     auto entry = kernel.new_block("entry");
     loop(kernel, entry, [&](gccjit::block body, gccjit::lvalue lv_i) {
-      auto lv_r_i = c.gcc.new_array_access(p_r, lv_i);
+      auto lv_r_i = ctx.gcc.new_array_access(p_r, lv_i);
 
       gccjit::rvalue ra =
         (sig[0] == 'a')
-          ? c.gcc.new_array_access(p_a, lv_i)
+          ? ctx.gcc.new_array_access(p_a, lv_i)
           : p_a;
 
       gccjit::rvalue rb =
         (sig[1] == 'a')
-          ? c.gcc.new_array_access(p_b, lv_i)
+          ? ctx.gcc.new_array_access(p_b, lv_i)
           : p_b;
 
-      auto expr = c.gcc.new_binary_op(op_kind, t_float, ra, rb);
+      auto expr = ctx.gcc.new_binary_op(op_kind, t_float, ra, rb);
       body.add_assignment(lv_r_i, expr);
     });
 
@@ -433,11 +434,11 @@ class BinOp final : public GraphArgs
 
 public:
   BinOp(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     std::vector<Opcode*> args
   )
-  : GraphArgs(c, std::move(name), std::move(sig), vertex_index, std::move(args))
+  : GraphArgs(ctx, std::move(name), std::move(sig), vertex_index, std::move(args))
   , op_kind{kind_from_name(this->name)}
   , kernel{get_or_make_kernel()}
   {}
@@ -448,12 +449,12 @@ public:
     assert(sig.size() == 3);
     assert(is_sig_supported(sig));
 
-    auto t_float = c.gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    auto t_float = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
     if (sig == "bbb") {
       assert(rate() == 'b');
       auto lv_tmp = f.new_local(t_float, std::format("e{}", vertex_index));
-      auto expr = c.gcc.new_binary_op(op_kind,
+      auto expr = ctx.gcc.new_binary_op(op_kind,
         t_float, args[0]->get_rvalue(), args[1]->get_rvalue()
       );
       b.add_assignment(lv_tmp, expr);
@@ -463,7 +464,7 @@ public:
 
     assert(rate() == 'a');
 
-    auto t_float_array_BS = c.gcc.new_array_type(t_float, int(c.block_size));
+    auto t_float_array_BS = ctx.gcc.new_array_type(t_float, int(ctx.block_size));
     auto lv_buf = f.new_local(t_float_array_BS, std::format("e{}", vertex_index).c_str());
 
     std::vector<gccjit::rvalue> call_args{
@@ -471,7 +472,7 @@ public:
       args[0]->get_rvalue(),
       args[1]->get_rvalue()
     };
-    b.add_eval(c.gcc.new_call(kernel, call_args));
+    b.add_eval(ctx.gcc.new_call(kernel, call_args));
     rvalue = get_address_of_first_array_element(lv_buf);
   }
 };
@@ -480,24 +481,24 @@ class Registry
 {
   using nongraph_args_t = std::vector<size_t>;
   using graph_args_t = std::vector<Opcode*>;
-  using make_nongraph_fn = std::unique_ptr<Opcode>(Compiler const&,std::string,std::string,size_t,nongraph_args_t);
-  using make_graph_fn = std::unique_ptr<Opcode>(Compiler const&,std::string,std::string,size_t,graph_args_t);
+  using make_nongraph_fn = std::unique_ptr<Opcode>(Context &,std::string,std::string,size_t,nongraph_args_t);
+  using make_graph_fn = std::unique_ptr<Opcode>(Context &,std::string,std::string,size_t,graph_args_t);
 
   std::unordered_map<std::string, std::variant<make_nongraph_fn*, make_graph_fn*>> maker;
 
   template<class T> static std::unique_ptr<Opcode> make_nongraph(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     nongraph_args_t args
   )
-  { return std::make_unique<T>(c, name, sig, vertex_index, std::move(args)); }
+  { return std::make_unique<T>(ctx, name, sig, vertex_index, std::move(args)); }
 
   template<class T> static std::unique_ptr<Opcode> make_graph(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     graph_args_t args
   )
-  { return std::make_unique<T>(c, name, sig, vertex_index, std::move(args)); }
+  { return std::make_unique<T>(ctx, name, sig, vertex_index, std::move(args)); }
 
 public:
   Registry()
@@ -543,7 +544,7 @@ public:
   }
 
   std::unique_ptr<Opcode> create(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     nongraph_args_t args
   )
@@ -552,11 +553,11 @@ public:
     if (iter == maker.end()) throw std::runtime_error("Not found");
 
     auto *fn = std::get<make_nongraph_fn *>(iter->second);
-    return fn(c, std::move(name), std::move(sig), vertex_index, std::move(args));
+    return fn(ctx, std::move(name), std::move(sig), vertex_index, std::move(args));
   }
 
   std::unique_ptr<Opcode> create(
-    Compiler const& c,
+    Context &ctx,
     std::string name, std::string sig, size_t vertex_index,
     graph_args_t args
   )
@@ -565,7 +566,7 @@ public:
     if (iter == maker.end()) throw std::runtime_error("Not found");
 
     auto *fn = std::get<make_graph_fn *>(iter->second);
-    return fn(c, std::move(name), std::move(sig), vertex_index, std::move(args));
+    return fn(ctx, std::move(name), std::move(sig), vertex_index, std::move(args));
   }
 
   template<SpecialIndices T> void emplace(std::string name)
@@ -585,8 +586,8 @@ public:
 
 Result compile(const Graph &g, unsigned int sample_rate, size_t block_size)
 {
-  Compiler compiler{sample_rate, block_size, g};
-  compiler.gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
+  Context ctx{sample_rate, block_size, g};
+  ctx.gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
   Registry opcodes;
   std::vector<std::unique_ptr<Opcode>> ops;
   ops.reserve(g.vertices.size());
@@ -594,7 +595,7 @@ Result compile(const Graph &g, unsigned int sample_rate, size_t block_size)
     auto &vertex = g.vertices[i];
     auto sig = opcodes.compute_signature(g, i);
     if (opcodes.is_nongraph_args(vertex.name)) {
-      ops.push_back(opcodes.create(compiler, vertex.name, sig, i, vertex.args));
+      ops.push_back(opcodes.create(ctx, vertex.name, sig, i, vertex.args));
       continue;
     }
     std::vector<Opcode*> args;
@@ -602,12 +603,12 @@ Result compile(const Graph &g, unsigned int sample_rate, size_t block_size)
       assert(arg < i);
       args.push_back(ops[arg].get());
     }
-    ops.push_back(opcodes.create(compiler, vertex.name, sig, i, std::move(args)));
+    ops.push_back(opcodes.create(ctx, vertex.name, sig, i, std::move(args)));
   }
 
   std::vector<gccjit::param> init_args{};
-  auto init = compiler.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
-    compiler.gcc.get_type(GCC_JIT_TYPE_VOID), "init", init_args, 0
+  auto init = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
+    ctx.gcc.get_type(GCC_JIT_TYPE_VOID), "init", init_args, 0
   );
   {
     auto entry = init.new_block("entry");
@@ -615,19 +616,19 @@ Result compile(const Graph &g, unsigned int sample_rate, size_t block_size)
     entry.end_with_return();
   }
 
-  auto t_void  = compiler.gcc.get_type(GCC_JIT_TYPE_VOID);
-  auto t_float = compiler.gcc.get_type(GCC_JIT_TYPE_FLOAT);
+  auto t_void  = ctx.gcc.get_type(GCC_JIT_TYPE_VOID);
+  auto t_float = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
   auto t_const_float_ptr = t_float.get_const().get_pointer();
   auto t_float_ptr = t_float.get_pointer();
 
   // process(const float *controls, float *abus)
   auto process_args = std::vector{
-    compiler.gcc.new_param(t_const_float_ptr, "controls"),
-    compiler.gcc.new_param(t_float_ptr, "abus"),
+    ctx.gcc.new_param(t_const_float_ptr, "controls"),
+    ctx.gcc.new_param(t_float_ptr, "abus"),
   };
 
-  auto process = compiler.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
+  auto process = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
     t_void, "process", process_args, 0
   );
   {
@@ -636,7 +637,7 @@ Result compile(const Graph &g, unsigned int sample_rate, size_t block_size)
     entry.end_with_return();
   }
 
-  return Result{compiler.gcc.compile()};
+  return Result{ctx.gcc.compile()};
 }
 
 int main()
@@ -655,5 +656,6 @@ int main()
   constexpr size_t BS_V = 128;
 
   auto r = compile(g, 44100u, BS_V);
-  (void)r;
+
+  r.init();
 }
