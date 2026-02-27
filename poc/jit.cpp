@@ -2,9 +2,9 @@
 #include <cmath>
 #include <memory>
 #include <stdexcept>
-#include <string_view>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <variant>
 #include <vector>
 
@@ -655,7 +655,7 @@ int main()
 
   constexpr size_t BS_V = 128;
 
-  auto r = compile(g, 44100u, BS_V);
+  auto r = compile(g, 44100, BS_V);
 
   r.init();
 }
