@@ -31,6 +31,7 @@ struct Context
   Graph const& graph;
 
   std::unordered_map<std::string, gccjit::function> kernelCache;
+  gccjit::function fn_roundf;
 
   Context(unsigned int sample_rate, size_t block_size, Graph const& graph)
   : gcc{gccjit::context::acquire()}
@@ -38,7 +39,14 @@ struct Context
   , block_size{block_size}
   , graph{graph}
   , kernelCache{}
-  {}
+  , fn_roundf{}
+  {
+    auto t_float = gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    auto roundf_args = std::vector{ gcc.new_param(t_float, "x") };
+    fn_roundf = gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
+      t_float, "roundf", roundf_args, 0
+    );
+  }
 
   ~Context() { gcc.release(); }
 
@@ -203,12 +211,7 @@ public:
     // roundf(arg0) -> size_t index
     auto idx_f = args[0]->get_rvalue();
 
-    auto roundf_args = std::vector{ ctx.gcc.new_param(t_float, "x") };
-    auto fn_roundf = ctx.gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
-      t_float, "roundf", roundf_args, 0
-    );
-
-    auto idx_rf = ctx.gcc.new_call(fn_roundf, { idx_f });
+    auto idx_rf = ctx.gcc.new_call(ctx.fn_roundf, { idx_f });
     auto idx = ctx.gcc.new_cast(idx_rf, t_size_t);
 
     auto c_bs = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
@@ -288,12 +291,7 @@ public:
     // roundf(arg0) -> size_t index
     auto idx_f = args[0]->get_rvalue();
 
-    auto roundf_args = std::vector{ ctx.gcc.new_param(t_float, "x") };
-    auto fn_roundf = ctx.gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
-      t_float, "roundf", roundf_args, 0
-    );
-
-    auto idx_rf = ctx.gcc.new_call(fn_roundf, { idx_f });
+    auto idx_rf = ctx.gcc.new_call(ctx.fn_roundf, { idx_f });
     auto idx = ctx.gcc.new_cast(idx_rf, t_size_t);
 
     auto c_bs = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
