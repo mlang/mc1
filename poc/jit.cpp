@@ -44,10 +44,56 @@ struct Graph
 
 struct Compiler
 {
-  gccjit::context &gcc;
+  gccjit::context gcc;
   unsigned int sample_rate;
   size_t block_size;
   Graph const& graph;
+
+  Compiler(unsigned int sample_rate, size_t block_size, Graph const& graph)
+  : gcc{gccjit::context::acquire()}
+  , sample_rate{sample_rate}
+  , block_size{block_size}
+  , graph{graph}
+  {}
+
+  ~Compiler() { gcc.release(); }
+
+  Compiler(Compiler const&) = delete;
+  Compiler& operator=(Compiler const&) = delete;
+};
+
+struct Result
+{
+  using init_fn_t = void (*)();
+  using process_fn_t = void (*)(const float *, float *);
+
+  gcc_jit_result *r{};
+  init_fn_t init{};
+  process_fn_t process{};
+
+  explicit Result(gcc_jit_result *r)
+  : r{r}
+  , init{reinterpret_cast<init_fn_t>(gcc_jit_result_get_code(r, "init"))}
+  , process{reinterpret_cast<process_fn_t>(gcc_jit_result_get_code(r, "process"))}
+  {}
+
+  ~Result() { if (r) gcc_jit_result_release(r); }
+
+  Result(Result const&) = delete;
+  Result& operator=(Result const&) = delete;
+
+  Result(Result &&o) noexcept
+  : r{o.r}, init{o.init}, process{o.process}
+  { o.r = nullptr; o.init = nullptr; o.process = nullptr; }
+
+  Result& operator=(Result &&o) noexcept
+  {
+    if (this == &o) return *this;
+    if (r) gcc_jit_result_release(r);
+    r = o.r; init = o.init; process = o.process;
+    o.r = nullptr; o.init = nullptr; o.process = nullptr;
+    return *this;
+  }
 };
 
 class Opcode
@@ -537,11 +583,10 @@ public:
   }
 };
 
-gcc_jit_result *compile(const Graph &g, unsigned int sample_rate, size_t block_size)
+Result compile(const Graph &g, unsigned int sample_rate, size_t block_size)
 {
-  auto gcc = gccjit::context::acquire();
-  gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
-  Compiler compiler{gcc, sample_rate, block_size, g};
+  Compiler compiler{sample_rate, block_size, g};
+  compiler.gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
   Registry opcodes;
   std::vector<std::unique_ptr<Opcode>> ops;
   ops.reserve(g.vertices.size());
@@ -561,8 +606,8 @@ gcc_jit_result *compile(const Graph &g, unsigned int sample_rate, size_t block_s
   }
 
   std::vector<gccjit::param> init_args{};
-  auto init = gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
-    gcc.get_type(GCC_JIT_TYPE_VOID), "init", init_args, 0
+  auto init = compiler.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
+    compiler.gcc.get_type(GCC_JIT_TYPE_VOID), "init", init_args, 0
   );
   {
     auto entry = init.new_block("entry");
@@ -570,19 +615,19 @@ gcc_jit_result *compile(const Graph &g, unsigned int sample_rate, size_t block_s
     entry.end_with_return();
   }
 
-  auto t_void  = gcc.get_type(GCC_JIT_TYPE_VOID);
-  auto t_float = gcc.get_type(GCC_JIT_TYPE_FLOAT);
+  auto t_void  = compiler.gcc.get_type(GCC_JIT_TYPE_VOID);
+  auto t_float = compiler.gcc.get_type(GCC_JIT_TYPE_FLOAT);
 
   auto t_const_float_ptr = t_float.get_const().get_pointer();
   auto t_float_ptr = t_float.get_pointer();
 
   // process(const float *controls, float *abus)
   auto process_args = std::vector{
-    gcc.new_param(t_const_float_ptr, "controls"),
-    gcc.new_param(t_float_ptr, "abus"),
+    compiler.gcc.new_param(t_const_float_ptr, "controls"),
+    compiler.gcc.new_param(t_float_ptr, "abus"),
   };
 
-  auto process = gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
+  auto process = compiler.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
     t_void, "process", process_args, 0
   );
   {
@@ -591,9 +636,7 @@ gcc_jit_result *compile(const Graph &g, unsigned int sample_rate, size_t block_s
     entry.end_with_return();
   }
 
-  gcc_jit_result *result = gcc.compile();
-  gcc.release();
-  return result;
+  return Result{compiler.gcc.compile()};
 }
 
 int main()
@@ -611,6 +654,6 @@ int main()
 
   constexpr size_t BS_V = 128;
 
-  gcc_jit_result *r = compile(g, 44100u, BS_V);
+  auto r = compile(g, 44100u, BS_V);
   (void)r;
 }
