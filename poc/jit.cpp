@@ -304,8 +304,7 @@ public:
     auto dst = ctx.gcc.new_array_access(abus, off).get_address();
 
     auto src = args[1]->get_rvalue();
-    auto call_args = std::vector{ dst, src };
-    b.add_eval(ctx.gcc.new_call(kernel, call_args));
+    b.add_eval(kernel(dst, src));
 
     rvalue = src;
   }
@@ -418,13 +417,9 @@ public:
 
     auto t_float_array_BS = ctx.gcc.new_array_type(t_float, int(ctx.block_size));
     auto lv_buf = f.new_local(t_float_array_BS, std::format("e{}", vertex_index).c_str());
+    auto dst = get_address_of_first_array_element(lv_buf);
 
-    std::vector<gccjit::rvalue> call_args{
-      get_address_of_first_array_element(lv_buf),
-      args[0]->get_rvalue(),
-      args[1]->get_rvalue()
-    };
-    b.add_eval(ctx.gcc.new_call(kernel, call_args));
+    b.add_eval(kernel(dst, args[0]->get_rvalue(), args[1]->get_rvalue()));
     rvalue = get_address_of_first_array_element(lv_buf);
   }
 };
