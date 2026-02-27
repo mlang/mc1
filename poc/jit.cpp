@@ -44,30 +44,19 @@ struct Context
 
   Context(Context const&) = delete;
   Context& operator=(Context const&) = delete;
-};
 
-class Opcode
-{
-protected:
-  Context &ctx;
-  std::string name, sig;
-  size_t vertex_index;
-  gccjit::rvalue rvalue;
-
-  gccjit::rvalue new_float(float value) const
+  gccjit::rvalue new_float(float value)
   {
-    auto type = ctx.gcc.get_type(GCC_JIT_TYPE_FLOAT);
-    return ctx.gcc.new_rvalue(type, static_cast<double>(value));
+    auto type = gcc.get_type(GCC_JIT_TYPE_FLOAT);
+    return gcc.new_rvalue(type, static_cast<double>(value));
   }
 
-  std::string kernel_name() const { return std::format("{}_{}", name, sig); }
-
-  void loop(gccjit::function fn, gccjit::block entry, auto &&body_fn) const
+  void loop(gccjit::function fn, gccjit::block entry, auto &&body_fn)
   {
-    auto t_size_t = ctx.gcc.get_type(GCC_JIT_TYPE_SIZE_T);
+    auto t_size_t = gcc.get_type(GCC_JIT_TYPE_SIZE_T);
 
-    auto c_0_size  = ctx.gcc.zero(t_size_t);
-    auto c_BS_size = ctx.gcc.new_rvalue(t_size_t, long(ctx.block_size));
+    auto c_0_size  = gcc.zero(t_size_t);
+    auto c_BS_size = gcc.new_rvalue(t_size_t, long(block_size));
 
     auto cond  = fn.new_block("cond");
     auto body  = fn.new_block("body");
@@ -78,24 +67,32 @@ protected:
     entry.add_assignment(lv_i, c_0_size);
     entry.end_with_jump(cond);
 
-    auto cnd = ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LT, lv_i, c_BS_size);
+    auto cnd = gcc.new_comparison(GCC_JIT_COMPARISON_LT, lv_i, c_BS_size);
     cond.end_with_conditional(cnd, body, done);
 
     body_fn(body, lv_i);
     body.end_with_jump(inc);
 
-    auto i_next = ctx.gcc.new_binary_op(GCC_JIT_BINARY_OP_PLUS, t_size_t, lv_i, ctx.gcc.one(t_size_t));
+    auto i_next = gcc.new_binary_op(GCC_JIT_BINARY_OP_PLUS, t_size_t, lv_i, gcc.one(t_size_t));
     inc.add_assignment(lv_i, i_next);
     inc.end_with_jump(cond);
 
     done.end_with_return();
   }
+};
+
+class Opcode
+{
+protected:
+  Context &ctx;
+  std::string name, sig;
+  size_t vertex_index;
+  gccjit::rvalue rvalue;
+
+  std::string kernel_name() const { return std::format("{}_{}", name, sig); }
 
 public:
-  Opcode(
-    Context &ctx,
-    std::string name, std::string sig, size_t vertex_index
-  )
+  Opcode(Context &ctx, std::string name, std::string sig, size_t vertex_index)
   : ctx{ctx}
   , name{std::move(name)}, sig{std::move(sig)}, vertex_index{vertex_index}
   , rvalue{}
@@ -164,7 +161,7 @@ public:
   void emit_proc(gccjit::function, gccjit::block) override
   {
     assert(args.size() == 1);
-    rvalue = new_float(ctx.graph.constants[args.front()]);
+    rvalue = ctx.new_float(ctx.graph.constants[args.front()]);
   }
 };
 
@@ -247,7 +244,7 @@ class Out final : public GraphArgs
     );
     {
       auto entry = kernel.new_block("entry");
-      loop(kernel, entry, [&](gccjit::block body, gccjit::lvalue lv_i) {
+      ctx.loop(kernel, entry, [&](gccjit::block body, gccjit::lvalue lv_i) {
         auto dst_i = ctx.gcc.new_array_access(p_dst, lv_i);
         auto src_i = ctx.gcc.new_array_access(p_src, lv_i);
         body.add_assignment(dst_i, src_i);
@@ -352,7 +349,7 @@ class BinOp final : public GraphArgs
     auto kernel = ctx.gcc.new_function(GCC_JIT_FUNCTION_INTERNAL, t_void, fn_name, params, 0);
 
     auto entry = kernel.new_block("entry");
-    loop(kernel, entry, [&](gccjit::block body, gccjit::lvalue lv_i) {
+    ctx.loop(kernel, entry, [&](gccjit::block body, gccjit::lvalue lv_i) {
       auto lv_r_i = ctx.gcc.new_array_access(p_r, lv_i);
 
       gccjit::rvalue ra =
