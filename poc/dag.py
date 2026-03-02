@@ -14,13 +14,14 @@ class Rate(enum.Enum):
     BLOCK = b'b'
 
 class _Node:
-    __slots__ = ('rate', 'num_out', 'args', 'index')
+    __slots__ = ('rate', 'num_out', 'args', '_index')
 
     def __init__(self, rate, num_out, *args):
         self.rate = rate
         self.num_out = num_out
         self.args = args
-        self.index = _append(DAG._operations, self)
+        self._index = len(DAG._operations)
+        DAG._operations.append(self)
 
     def __add__(self, other):  return Add(self, other)
     def __radd__(self, other): return Add(other, self)
@@ -53,7 +54,8 @@ class Const(_Node):
         try:
             cindex = DAG._constants.index(value)
         except ValueError:
-            cindex = _append(DAG._constants, value)
+            cindex = len(DAG._constants)
+            DAG._constants.append(value)
         super().__init__(Rate.BLOCK, 1, cindex)
 
     def __float__(self) -> float: return DAG._constants[self.args[0]]
@@ -64,7 +66,8 @@ class Control(_Node):
 
     def __init__(self, name, *values):
         self.name = name
-        cindex = _extend(DAG._controls, values)
+        cindex = len(DAG._controls)
+        DAG._controls.extend(values)
         DAG._controlNames.append((name, cindex))
         super().__init__(Rate.BLOCK, len(values), cindex)
 
@@ -94,7 +97,7 @@ class _GraphArgs(_Node):
         )
 
     def __init__(self, rate, num_out, *args):
-        super().__init__(rate, num_out, *[_convert(arg).index for arg in args])
+        super().__init__(rate, num_out, *[_convert(arg)._index for arg in args])
 
 
 class _BinOp(_GraphArgs):
@@ -185,18 +188,6 @@ class _WrapDefaults:
 
     def __call__(self):
         return self.func(*self.args, **self.kwargs)
-
-
-def _append(lst: list, item) -> int:
-    index = len(lst)
-    lst.append(item)
-    return index
-
-
-def _extend(lst: list, items: list) -> int:
-    index = len(lst)
-    lst.extend(items)
-    return index
 
 
 @DAG
