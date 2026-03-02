@@ -30,11 +30,10 @@ class _Node:
     def __sub__(self, other):  return Sub(self, other)
     def __rsub__(self, other): return Sub(other, self)
 
-
     def __bytes__(self):
         buf = io.BytesIO()
-        def pack(fmt, *args):
-            return buf.write(struct.pack(fmt, *args))
+        pack = lambda fmt, *args: buf.write(struct.pack(fmt, *args))
+
         name = bytes(self.__class__.__name__, 'utf-8')
         pack(f'{len(name)+1}p', name)
 
@@ -43,9 +42,13 @@ class _Node:
         pack('N', self.num_out)
 
         pack('N', len(self.args))
-        for arg in self.args: pack('N', arg)
+        for arg in self.args:
+            pack('N', arg if isinstance(arg, int) else arg._index)
 
         return buf.getvalue()
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {', '.join(repr(arg) for arg in self.args)}>"
 
 
 class Const(_Node):
@@ -60,6 +63,9 @@ class Const(_Node):
 
     def __float__(self) -> float: return DAG._constants[self.args[0]]
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {float(self)}>"
+
 
 class Control(_Node):
     __slots__ = ('name')
@@ -70,7 +76,6 @@ class Control(_Node):
         DAG._controls.extend(values)
         DAG._controlNames.append((name, cindex))
         super().__init__(Rate.BLOCK, len(values), cindex)
-
 
     def __repr__(self):
         return f"<{self.__class__.__name__} '{self.name}'>"
@@ -97,7 +102,7 @@ class _GraphArgs(_Node):
         )
 
     def __init__(self, rate, num_out, *args):
-        super().__init__(rate, num_out, *[_convert(arg)._index for arg in args])
+        super().__init__(rate, num_out, *map(_convert, args))
 
 
 class _BinOp(_GraphArgs):
