@@ -48,7 +48,7 @@ class _Node:
         return buf.getvalue()
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} {', '.join(repr(arg) for arg in self.args)}>"
+        return f"<{self.__class__.__name__} {self.args!r}>"
 
 
 class Const(_Node):
