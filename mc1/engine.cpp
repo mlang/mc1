@@ -5,10 +5,10 @@
 #include <boost/asio.hpp>
 
 #include "mlang/bytes.hpp"
+#include "compiler.hpp"
 #include "dag.hpp"
 #include "mlang/gccjit.hpp"
 #include "mlang/math.hpp"
-#include "mlang/pipewire.hpp"
 
 using boost::asio::ip::udp;
 using boost::asio::awaitable;
@@ -20,89 +20,26 @@ using boost::asio::use_awaitable;
 using mlang::numbers::tau;
 using std::views::transform;
 using mlang::views::sampled_interval;
-namespace pipewire = mlang::pipewire;
 
+namespace mc1 {
 
-namespace {
-
-class osc final {
-  double phase;
-public:
-  std::shared_ptr<double(double)> sin {
-    static_cast<double(*)(double)>(std::sin), [](double(*)(double)) {}
-  };
-
-  template<size_t Size>
-  void process(std::span<float, Size> buffer, spa_io_position &position)
-  {
-    const double diff = tau * 440 / position.clock.rate.denom;
-    for (auto &sample: buffer) {
-      sample = (*sin)(phase) * 0.2;
-      phase += diff;
-      while (phase >= tau) phase -= tau;
-    }
-  }
-};
-
-class engine final : pipewire::make_filter_events<engine>
+class engine final
 {
-  pipewire::main_loop_ptr main_loop;
-  pipewire::filter_ptr filter;
-  pipewire::port_ptr<osc> out;
   gccjit::context gcc;
   boost::asio::thread_pool compiler;
 
-  static pw_properties *filter_props() {
-    return pw_properties_new(
-      PW_KEY_MEDIA_TYPE, "Audio",
-      PW_KEY_MEDIA_CATEGORY, "Source",
-      PW_KEY_MEDIA_ROLE, "DSP",
-      PW_KEY_MEDIA_CLASS, "Stream/Output/Audio",
-      PW_KEY_NODE_AUTOCONNECT, "true",
-      nullptr
-    );
-  }
-  static pw_properties *port_props() {
-    return pw_properties_new(
-      PW_KEY_FORMAT_DSP, "32 bit float mono audio",
-      PW_KEY_PORT_NAME, "output",
-      nullptr
-    );
-  }
-
-  friend class pipewire::make_filter_events<engine>;
-  void process(spa_io_position &position)
-  {
-    std::cout << position.clock.rate.num << '/' << position.clock.rate.denom << std::endl;
-    pipewire::process_port(out, position);
-  }
-  void state_changed(pw_filter_state old, pw_filter_state now, const char *error)
-  {
-  }
-
 public:
   engine()
-  : main_loop{pipewire::make_main_loop()}
-  , filter{pipewire::make_filter(main_loop, "dsp", filter_props(), &filter_events, this)}
-  , out{pipewire::make_port<osc>(filter, PW_DIRECTION_OUTPUT, PW_FILTER_PORT_FLAG_MAP_BUFFERS, filter_props())}
-  , gcc{gccjit::context::acquire()}
+  : gcc{gccjit::context::acquire()}
   , compiler{1}
   {
     gcc.set_int_option(GCC_JIT_INT_OPTION_OPTIMIZATION_LEVEL, 3);
     gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_INITIAL_GIMPLE, true);
     gcc.set_bool_option(GCC_JIT_BOOL_OPTION_DUMP_SUMMARY, true);
     make_tabled_function(gcc, "fast_sin", tau, 256, std::sin);
-    auto result = gccjit::compile_shared(gcc);
-    out->sin = gccjit::get_code<double(double)>(result, "fast_sin");
-    gcc.dump_to_file(".fast_sin.gimple", false);
   }
 
   ~engine() { gcc.release(); }
-
-  std::error_code connect()
-  { return pipewire::connect(filter, PW_FILTER_FLAG_RT_PROCESS); }
-
-  awaitable<void> pipewire() { co_await pipewire::run(main_loop); }
 
   awaitable<void> udp_server(udp::socket socket)
   {
@@ -124,7 +61,7 @@ public:
       switch (*i) {
       case 0: std::cout << "quit" << std::endl; break;
       case 1:
-        if (auto dag = MiniCollider::dag::parse(bytes)) {
+        if (auto dag = DAG::parse(bytes)) {
           if (bytes.empty()) {
             post(compiler, [dag = std::move(dag.value()), this]()
             {
@@ -139,11 +76,10 @@ public:
     }
   }
 
-  void compile_synth(MiniCollider::dag dag)
+  void compile_synth(DAG dag)
   {
     std::cout << dag;
-    for (auto const &op: dag.ops) {
-    }
+    compile(dag, 44100, 32);
   }
 };
 
@@ -152,27 +88,20 @@ public:
 
 int main(int argc, char *argv[])
 {
-  pw_init(&argc, &argv);
   boost::asio::io_context io;
 
   {
-    engine world;
-
-    if (auto errc = world.connect()) {
-      std::cerr << errc.message() << std::endl;
-      return EXIT_FAILURE;
-    }
+    mc1::engine world;
 
     {
       udp::socket socket{io, udp::endpoint(udp::v4(), std::atoi(argv[1]))};
       co_spawn(io, world.udp_server(std::move(socket)), detached);
     }
-    co_spawn(io, world.pipewire(), detached);
 
     io.run();
   }
 
-  pw_deinit();
+  std::cout << "ended" << std::endl;
 
   return EXIT_SUCCESS;
 }

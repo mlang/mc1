@@ -15,7 +15,7 @@ bool dag2json(istream& in, ostream& out)
   auto data = vector(istreambuf_iterator(in), istreambuf_iterator<char>());
   auto bytes = as_bytes(span(data));
 
-  if (auto dag = MiniCollider::dag::parse(bytes)) {
+  if (auto dag = mc1::DAG::parse(bytes)) {
     if (bytes.empty()) {
       out << json(dag.value());
 

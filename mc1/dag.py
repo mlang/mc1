@@ -1,6 +1,5 @@
-"""A DSL to describe and serialize signal graphs."""
+"""A DSL to describe and serialize signal graphs"""
 
-import abc
 import enum
 import inspect
 import io
@@ -10,9 +9,19 @@ import struct
 __all__ = ('SinOsc', 'DAG')
 
 
-class _Node(metaclass=abc.ABCMeta):
-    @abc.abstractmethod
-    def address(self) -> int: pass
+class Rate(enum.Enum):
+    AUDIO = b'a'
+    BLOCK = b'b'
+
+class _Node:
+    __slots__ = ('rate', 'num_out', 'args', '_index')
+
+    def __init__(self, rate, num_out, *args):
+        self.rate = rate
+        self.num_out = num_out
+        self.args = args
+        self._index = len(DAG._operations)
+        DAG._operations.append(self)
 
     def __add__(self, other):  return Add(self, other)
     def __radd__(self, other): return Add(other, self)
@@ -21,35 +30,58 @@ class _Node(metaclass=abc.ABCMeta):
     def __sub__(self, other):  return Sub(self, other)
     def __rsub__(self, other): return Sub(other, self)
 
-
-class OpBase(_Node):
-    __slots__ = ('rate', 'args', '_index')
-
-    def __init__(self, rate, *args):
-        self.rate = rate
-        self.args = tuple(map(_convert, args))
-        self._index = _append(DAG._operations, self)
-
-    def address(self): return self._index
-
     def __bytes__(self):
         buf = io.BytesIO()
-        def pack(fmt, *args):
-            return buf.write(struct.pack(fmt, *args))
+        pack = lambda fmt, *args: buf.write(struct.pack(fmt, *args))
+
         name = bytes(self.__class__.__name__, 'utf-8')
         pack(f'{len(name)+1}p', name)
 
         pack('c', self.rate.value)
 
-        pack('H', len(self.args))
-        for arg in self.args: pack('H', arg.address())
+        pack('N', self.num_out)
+
+        pack('N', len(self.args))
+        for arg in self.args:
+            pack('N', arg if isinstance(arg, int) else arg._index)
 
         return buf.getvalue()
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {self.args!r}>"
 
-class Op(OpBase):
-    __slots__ = ('inputRates')
 
+class Const(_Node):
+    def __init__(self, value):
+        value = float(value)
+        try:
+            cindex = DAG._constants.index(value)
+        except ValueError:
+            cindex = len(DAG._constants)
+            DAG._constants.append(value)
+        super().__init__(Rate.BLOCK, 1, cindex)
+
+    def __float__(self) -> float: return DAG._constants[self.args[0]]
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} {float(self)}>"
+
+
+class Control(_Node):
+    __slots__ = ('name')
+
+    def __init__(self, name, *values):
+        self.name = name
+        cindex = len(DAG._controls)
+        DAG._controls.extend(values)
+        DAG._controlNames.append((name, cindex))
+        super().__init__(Rate.BLOCK, len(values), cindex)
+
+    def __repr__(self):
+        return f"<{self.__class__.__name__} '{self.name}'>"
+
+
+class _GraphArgs(_Node):
     def __new__(cls, *args, **kwargs):
         sequence_types = (list, range, tuple)
         lengths = [len(arg) for arg in args if isinstance(arg, sequence_types)]
@@ -69,54 +101,13 @@ class Op(OpBase):
             ) for index in range(max(lengths))
         )
 
-    def __init__(self, rate, *args):
-        super().__init__(rate, *args)
-        self.inputRates = b''.join(arg.rate.value for arg in self.args)
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} {self.rate} {list(arg.address() for arg in self.args)}>"
+    def __init__(self, rate, num_out, *args):
+        super().__init__(rate, num_out, *map(_convert, args))
 
 
-class Rate(enum.Enum):
-    AUDIO = b'a'
-    BLOCK = b'b'
-    CONST = b'c'
-
-
-class Flags(enum.IntFlag):
-    CONST = 0x8000
-
-class Const(_Node):
-    __slots__ = ('_index')
-    rate: Rate = Rate.CONST
-
-    def __init__(self, value):
-        value = float(value)
-        try:
-            self._index = DAG._constants.index(value)
-        except ValueError:
-            self._index = _append(DAG._constants, value)
-
-    def __float__(self) -> float: return DAG._constants[self._index]
-    def address(self) -> int: return Flags.CONST | self._index
-
-
-class Param(OpBase):
-    __slots__ = ('name', '_ctrlindex')
-
-    def __init__(self, name, *values):
-        super().__init__(Rate.BLOCK)
-        self.name = name
-        self._ctrlindex = _extend(DAG._controls, values)
-        DAG._controlNames.append((name, self._ctrlindex))
-
-    def __repr__(self):
-        return f"<{self.__class__.__name__} '{self.name}'>"
-
-
-class _BinOp(Op):
+class _BinOp(_GraphArgs):
     def __init__(self, left, right):
-        super().__init__(Rate.AUDIO, left, right)
+        super().__init__(Rate.AUDIO, 1, left, right)
 
 
 class Add(_BinOp): pass
@@ -125,13 +116,14 @@ class Mul(_BinOp): pass
 class Sub(_BinOp): pass
 
 
-class SinOsc(Op):
+class SinOsc(_GraphArgs):
     @classmethod
     def ar(cls, freq, phase=0):
-        return cls(Rate.AUDIO, freq, phase)
+        return cls(Rate.AUDIO, 1, freq, phase)
 
 
 def _convert(x):
+    if x is None: return None
     return x if isinstance(x, _Node) else Const(x)
 
 
@@ -139,7 +131,7 @@ class DAG:
     _constants: list[float] = []
     _controls: list[float] = []
     _controlNames: list[tuple[str, int]] = []
-    _operations: list[OpBase] = []
+    _operations: list[_Node] = []
     __slots__ = ('constants', 'controls', 'controlNames', 'operations')
 
     def __init__(self, func):
@@ -148,9 +140,9 @@ class DAG:
         def param(name, value):
             if not isinstance(value, (list, range, tuple)):
                 value = (value,)
-            return Param(name, *value)
+            return Control(name, *value)
         func = _WrapDefaults(func, param)
-        func()
+        _convert(func())
         for slot in self.__slots__:
             setattr(self, slot, getattr(self, f'_{slot}'))
 
@@ -164,13 +156,13 @@ class DAG:
         def pack(fmt, *args):
             return buf.write(struct.pack(fmt, *args))
 
-        pack('H', len(self.constants))
+        pack('N', len(self.constants))
         pack('f'*len(self.constants), *self.constants)
 
-        pack('H', len(self.controls))
+        pack('N', len(self.controls))
         pack('f'*len(self.controls), *self.controls)
 
-        pack('H', len(self.operations))
+        pack('N', len(self.operations))
         for op in self.operations: buf.write(bytes(op))
 
         return buf.getvalue()
@@ -201,18 +193,6 @@ class _WrapDefaults:
 
     def __call__(self):
         return self.func(*self.args, **self.kwargs)
-
-
-def _append(lst: list, item) -> int:
-    index = len(lst)
-    lst.append(item)
-    return index
-
-
-def _extend(lst: list, items: list) -> int:
-    index = len(lst)
-    lst.extend(items)
-    return index
 
 
 @DAG

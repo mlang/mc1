@@ -9,26 +9,27 @@
 
 #include <nlohmann/json.hpp>
 
-namespace MiniCollider {
+namespace mc1 {
 
-struct dag final {
+struct DAG final {
   std::vector<float> constants;
   std::vector<float> controls;
   struct op {
     std::string name;
     char rate;
-    std::vector<unsigned short> args;
+    size_t num_out;
+    std::vector<size_t> args;
 
     static std::optional<op> parse(std::span<const std::byte>&);
   };
   std::vector<op> ops;
 
-  static std::optional<dag> parse(std::span<const std::byte>&);
+  static std::optional<DAG> parse(std::span<const std::byte>&);
 };
 
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(dag::op, name, rate, args)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(dag, constants, controls, ops)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DAG::op, name, rate, num_out, args)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DAG, constants, controls, ops)
 
-std::ostream& operator<<(std::ostream&, const dag&);
+std::ostream& operator<<(std::ostream&, const DAG&);
 
 }
