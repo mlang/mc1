@@ -1,6 +1,5 @@
 """A DSL to describe and serialize signal graphs."""
 
-import abc
 import enum
 import inspect
 import io
@@ -9,6 +8,10 @@ import struct
 
 __all__ = ('SinOsc', 'DAG')
 
+
+class Rate(enum.Enum):
+    AUDIO = b'a'
+    BLOCK = b'b'
 
 class _Node:
     __slots__ = ('rate', 'num_out', 'args', 'index')
@@ -34,14 +37,15 @@ class _Node:
         name = bytes(self.__class__.__name__, 'utf-8')
         pack(f'{len(name)+1}p', name)
 
-        pack('c', self.rate)
+        pack('c', self.rate.value)
 
-        pack('H', len(self.num_out))
+        pack('N', self.num_out)
 
-        pack('H', len(self.args))
-        for arg in self.args: pack('H', arg.index)
+        pack('N', len(self.args))
+        for arg in self.args: pack('N', arg)
 
         return buf.getvalue()
+
 
 class Const(_Node):
     def __init__(self, value):
@@ -50,7 +54,7 @@ class Const(_Node):
             cindex = DAG._constants.index(value)
         except ValueError:
             cindex = _append(DAG._constants, value)
-        super().__init__('b', 1, cindex)
+        super().__init__(Rate.BLOCK, 1, cindex)
 
     def __float__(self) -> float: return DAG._constants[self.args[0]]
 
@@ -62,7 +66,7 @@ class Control(_Node):
         self.name = name
         cindex = _extend(DAG._controls, values)
         DAG._controlNames.append((name, cindex))
-        super().__init__('b', len(values), cindex)
+        super().__init__(Rate.BLOCK, len(values), cindex)
 
 
     def __repr__(self):
@@ -95,7 +99,7 @@ class _GraphArgs(_Node):
 
 class _BinOp(_GraphArgs):
     def __init__(self, left, right):
-        super().__init__('a', 1, left, right)
+        super().__init__(Rate.AUDIO, 1, left, right)
 
 
 class Add(_BinOp): pass
@@ -107,7 +111,7 @@ class Sub(_BinOp): pass
 class SinOsc(_GraphArgs):
     @classmethod
     def ar(cls, freq, phase=0):
-        return cls('a', 1, freq, phase)
+        return cls(Rate.AUDIO, 1, freq, phase)
 
 
 def _convert(x):
@@ -144,13 +148,13 @@ class DAG:
         def pack(fmt, *args):
             return buf.write(struct.pack(fmt, *args))
 
-        pack('H', len(self.constants))
+        pack('N', len(self.constants))
         pack('f'*len(self.constants), *self.constants)
 
-        pack('H', len(self.controls))
+        pack('N', len(self.controls))
         pack('f'*len(self.controls), *self.controls)
 
-        pack('H', len(self.operations))
+        pack('N', len(self.operations))
         for op in self.operations: buf.write(bytes(op))
 
         return buf.getvalue()
