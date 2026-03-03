@@ -13,6 +13,13 @@ class Rate(enum.Enum):
     AUDIO = b'a'
     BLOCK = b'b'
 
+def fastest_rate(*args):
+    for a in args:
+        r = a if isinstance(a, Rate) else a.rate
+        if r is Rate.AUDIO:
+            return Rate.AUDIO
+    return Rate.BLOCK
+
 class _Node:
     __slots__ = ('rate', 'num_out', 'args', '_index')
 
@@ -107,7 +114,9 @@ class _GraphArgs(_Node):
 
 class _BinOp(_GraphArgs):
     def __init__(self, left, right):
-        super().__init__(Rate.AUDIO, 1, left, right)
+        left = _convert(left)
+        right = _convert(right)
+        super().__init__(fastest_rate(left, right), 1, left, right)
 
 
 class Add(_BinOp): pass
