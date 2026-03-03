@@ -153,14 +153,10 @@ class DAG:
 
     def __bytes__(self):
         buf = io.BytesIO()
-        def pack(fmt, *args):
-            return buf.write(struct.pack(fmt, *args))
+        pack = lambda fmt, *args: buf.write(struct.pack(fmt, *args))
 
-        pack('N', len(self.constants))
-        pack('f'*len(self.constants), *self.constants)
-
-        pack('N', len(self.controls))
-        pack('f'*len(self.controls), *self.controls)
+        pack('N'+'f'*len(self.constants), len(self.constants), *self.constants)
+        pack('N'+'f'*len(self.controls), len(self.controls), *self.controls)
 
         pack('N', len(self.operations))
         for op in self.operations: buf.write(bytes(op))
