@@ -34,21 +34,37 @@ std::optional<DAG> DAG::parse(std::span<const std::byte> &bytes)
       if (auto consts = get_values<float>(bytes, n.value())) {
         if (auto nctrlvals = get_value<const size_t>(bytes)) {
           if (auto ctrlvals = get_values<float>(bytes, nctrlvals.value())) {
-            if (auto nops = get_value<const size_t>(bytes)) {
-              std::vector<op> ops;
-              ops.reserve(nops.value());
-              for (int i = 0; i != nops.value(); i++) {
-                auto op = op::parse(bytes);
-                if (!op) return std::nullopt;
-                ops.emplace_back(std::move(op.value()));
+            if (auto nctrlnames = get_value<const size_t>(bytes)) {
+              std::vector<DAG::control_name> controlNames;
+              controlNames.reserve(nctrlnames.value());
+              for (int i = 0; i != nctrlnames.value(); i++) {
+                auto controlName = get_pstring(bytes);
+                if (!controlName) return std::nullopt;
+                auto controlIndex = get_value<const size_t>(bytes);
+                if (!controlIndex) return std::nullopt;
+
+                controlNames.push_back({
+                  std::move(controlName.value()), controlIndex.value()
+                });
               }
 
-              return DAG{
-                std::move(name.value()),
-                std::move(consts.value()),
-                std::move(ctrlvals.value()),
-                std::move(ops)
-              };
+              if (auto nops = get_value<const size_t>(bytes)) {
+                std::vector<op> ops;
+                ops.reserve(nops.value());
+                for (int i = 0; i != nops.value(); i++) {
+                  auto op = op::parse(bytes);
+                  if (!op) return std::nullopt;
+                  ops.emplace_back(std::move(op.value()));
+                }
+
+                return DAG{
+                  std::move(name.value()),
+                  std::move(consts.value()),
+                  std::move(ctrlvals.value()),
+                  std::move(controlNames),
+                  std::move(ops)
+                };
+              }
             }
           }
         }
@@ -68,6 +84,10 @@ std::ostream& operator<<(std::ostream& os, const DAG& d)
   os << "\nControls: ";
   for (const auto& control : d.controls) {
     os << control << " ";
+  }
+  os << "\nControl Names: ";
+  for (const auto& controlName : d.controlNames) {
+    os << "(" << controlName.name << ", " << controlName.index << ") ";
   }
   os << "\nOperations:\n";
   for (const auto& operation : d.ops) {

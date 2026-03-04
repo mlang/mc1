@@ -6,7 +6,7 @@ import io
 import struct
 
 
-__all__ = ('In', 'Out', 'SinOsc', 'DAG')
+__all__ = ('In', 'Out', 'Pan', 'SinOsc', 'DAG')
 
 
 class Rate(enum.Enum):
@@ -144,6 +144,12 @@ class Out(_GraphArgs):
         return cls(Rate.AUDIO, signal.num_out, index, signal)
 
 
+class Pan(_GraphArgs):
+    def __init__(self, signal, pan=0):
+        signal = _convert(signal)
+        super().__init__(signal.rate, 2, signal, pan)
+
+
 def _convert(x):
     return x if isinstance(x, _Node) else Const(x)
 
@@ -183,6 +189,11 @@ class DAG:
 
         pack('N'+'f'*len(self.constants), len(self.constants), *self.constants)
         pack('N'+'f'*len(self.controls), len(self.controls), *self.controls)
+        pack('N', len(self.controlNames))
+        for cname, cindex in self.controlNames:
+            name = bytes(cname, 'utf-8')
+            pack(f'{len(name)+1}p', name)
+            pack('N', cindex)
 
         pack('N', len(self.operations))
         for op in self.operations: buf.write(bytes(op))
