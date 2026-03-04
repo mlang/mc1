@@ -48,6 +48,24 @@ struct Context
   size_t block_size;
   DAG const& graph;
 
+  gccjit::function sinf;
+
+  std::unordered_map<std::string, gccjit::function> kernelCache;
+  std::unordered_map<std::string, std::unique_ptr<StateTypeBase>> stateCache;
+
+  Context(unsigned int sample_rate, size_t block_size, DAG const& graph)
+  : gcc{gccjit::context::acquire()}
+  , sample_rate{sample_rate}, block_size{block_size}, graph{graph}
+  , sinf{import_function<float(float)>("sinf")}
+  , kernelCache{}, stateCache{}
+  {}
+
+  ~Context() { gcc.release(); }
+
+  Context(Context const&) = delete;
+  Context& operator=(Context const&) = delete;
+
+  // Fancy helpers
   template<class T> gccjit::type type()
   {
     using NoPtr = std::remove_pointer_t<T>;
@@ -64,28 +82,44 @@ struct Context
   template<class T> gccjit::type type(int n)
   { return gcc.new_array_type(type<T>(), n); }
 
-  gccjit::function sinf;
+  template<class Sig>
+  gccjit::function import_function(const char* name)
+  {
+    using traits = fn_traits<Sig>;
+    return import_function<Sig>(name, std::make_index_sequence<traits::nargs>{});
+  }
 
-  std::unordered_map<std::string, gccjit::function> kernelCache;
-  std::unordered_map<std::string, std::unique_ptr<StateTypeBase>> stateCache;
+private:
+  template<class> struct fn_traits;
 
-  Context(unsigned int sample_rate, size_t block_size, DAG const& graph)
-  : gcc{gccjit::context::acquire()}
-  , sample_rate{sample_rate}, block_size{block_size}, graph{graph}
-  , sinf{[&]{
-      auto params = std::vector{ gcc.new_param(type<float>(), "x") };
-      return gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
-        type<float>(), "sinf", params, 0
-      );
-    }()}
-  , kernelCache{}, stateCache{}
-  {}
+  template<class R, class... Args>
+  struct fn_traits<R(Args...)>
+  {
+    using return_t = R;
+    using args_t = std::tuple<Args...>;
+    static constexpr std::size_t nargs = sizeof...(Args);
+  };
 
-  ~Context() { gcc.release(); }
+  template<class R, class... Args>
+  struct fn_traits<R(*)(Args...)> : fn_traits<R(Args...)> {};
 
-  Context(Context const&) = delete;
-  Context& operator=(Context const&) = delete;
+  template<class Sig, std::size_t... I>
+  gccjit::function import_function(const char* name, std::index_sequence<I...>)
+  {
+    using traits = fn_traits<Sig>;
+    using R = typename traits::return_t;
+    using Tup = typename traits::args_t;
 
+    auto params = std::vector{
+      gcc.new_param(type<std::tuple_element_t<I, Tup>>(), std::format("a{}", I))...
+    };
+
+    return gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
+      type<R>(), name, params, 0
+    );
+  }
+
+public:
   template<class T, class MakeFn>
   T& get_or_make_state(std::string const& key, MakeFn &&make_fn)
   {
