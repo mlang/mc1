@@ -27,6 +27,7 @@ struct StateTypeBase
 };
 
 template<class> inline constexpr enum gcc_jit_types jit_type_v;
+template<> inline constexpr enum gcc_jit_types jit_type_v<void>   = GCC_JIT_TYPE_VOID;
 template<> inline constexpr enum gcc_jit_types jit_type_v<float>  = GCC_JIT_TYPE_FLOAT;
 template<> inline constexpr enum gcc_jit_types jit_type_v<size_t> = GCC_JIT_TYPE_SIZE_T;
 
@@ -129,7 +130,6 @@ protected:
   size_t vertex_index;
   size_t num_out;
   gccjit::rvalue rvalue;
-  std::optional<gccjit::lvalue> state;
 
   std::string kernel_name() const { return std::format("{}_{}", name, sig); }
 
@@ -192,8 +192,9 @@ public:
     );
   }
 
-  virtual void emit_init(gccjit::block) {};
-  virtual void emit_proc(gccjit::function, gccjit::block) = 0;
+  virtual std::optional<gccjit::type> state_type() const { return std::nullopt; }
+  virtual void emit_init(gccjit::block, std::optional<gccjit::lvalue>) {}
+  virtual void emit_proc(gccjit::function, gccjit::block, std::optional<gccjit::lvalue>) = 0;
 };
 
 class NonGraphArgs : public CodegenNode
@@ -221,7 +222,10 @@ protected:
   std::vector<CodegenNode*> args;
 
   gccjit::rvalue new_proc_local(
-    gccjit::function f, gccjit::block b, std::variant<gccjit::function, gccjit::rvalue> v
+    gccjit::function f,
+    gccjit::block b,
+    std::variant<gccjit::function, gccjit::rvalue> v,
+    std::optional<gccjit::rvalue> state_ptr = std::nullopt
   )
   {
     auto var = f.new_local(
@@ -234,9 +238,9 @@ protected:
       [&](gccjit::function kernel)
       {
         std::vector<gccjit::rvalue> call_args;
-        call_args.reserve(args.size() + (rate() == 'a') + (state ? 1 : 0));
+        call_args.reserve(args.size() + (rate() == 'a') + (state_ptr ? 1 : 0));
 
-        if (state) call_args.push_back(state->get_address());
+        if (state_ptr) call_args.push_back(*state_ptr);
         if (rate() == 'a') call_args.push_back(var[0].get_address());
         for (auto *op : args) call_args.push_back(op->get_rvalue());
 
@@ -274,7 +278,7 @@ struct Const final : NonGraphArgs
 {
   using NonGraphArgs::NonGraphArgs;
 
-  void emit_proc(gccjit::function, gccjit::block) override
+  void emit_proc(gccjit::function, gccjit::block, std::optional<gccjit::lvalue>) override
   {
     assert(args.size() == 1);
     rvalue = ctx.new_float(ctx.graph.constants[args.front()]);
@@ -285,10 +289,10 @@ struct Control final : NonGraphArgs
 {
   using NonGraphArgs::NonGraphArgs;
 
-  void emit_proc(gccjit::function f, gccjit::block) override
+  void emit_proc(gccjit::function f, gccjit::block, std::optional<gccjit::lvalue>) override
   {
     assert(args.size() == 1);
-    rvalue = f.get_param(0)[args.front()];
+    rvalue = f.get_param(1)[args.front()];
   }
 };
 
@@ -305,12 +309,12 @@ struct In final : GraphArgs
     assert(this->args[0]->output_count() == 1);
   }
 
-  void emit_proc(gccjit::function f, gccjit::block) override
+  void emit_proc(gccjit::function f, gccjit::block, std::optional<gccjit::lvalue>) override
   {
     assert(sig == "ba");
     assert(args.size() == 1);
 
-    auto abus = f.get_param(1);
+    auto abus = f.get_param(2);
     auto idx = ctx.gcc.new_cast(args[0]->get_rvalue(), ctx.type<size_t>());
     auto c_bs = ctx.gcc.new_rvalue(ctx.type<size_t>(), long(ctx.block_size));
 
@@ -357,13 +361,13 @@ public:
     assert(this->args[0]->output_count() == 1);
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b) override
+  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue>) override
   {
     assert(sig == "baa");
     assert(args.size() == 2);
     assert(kernel);
 
-    auto abus = f.get_param(1);
+    auto abus = f.get_param(2);
 
     auto idx = ctx.gcc.new_cast(args[0]->get_rvalue(), ctx.type<size_t>());
     auto c_bs = ctx.gcc.new_rvalue(ctx.type<size_t>(), long(ctx.block_size));
@@ -439,7 +443,7 @@ public:
     assert(this->args[1]->output_count() == 1);
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b) override
+  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue>) override
   {
     assert(args.size() == 2);
     assert(sig.size() == 3);
@@ -481,6 +485,7 @@ class SinOsc final : public GraphArgs
 
   StateType &ST;
   std::optional<gccjit::function> kernel;
+  std::optional<gccjit::type> state_type() const override { return ST.st; }
 
   static bool is_sig_supported(std::string const& s)
   { return s == "bba" || s == "aba" || s == "baa" || s == "aaa"; }
@@ -553,21 +558,18 @@ public:
     assert(is_sig_supported(this->sig));
   }
 
-  void emit_init(gccjit::block b) override
+  void emit_init(gccjit::block b, std::optional<gccjit::lvalue> state_field) override
   {
-    state = ctx.gcc.new_global(
-      GCC_JIT_GLOBAL_INTERNAL, ST.st,
-      ctx.graph_symbol(std::format("s{}", vertex_index))
-    );
-
-    b.add_assignment(state->access_field(ST.phase), ctx.gcc.zero(ctx.type<float>()));
+    assert(state_field);
+    b.add_assignment(state_field->access_field(ST.phase), ctx.gcc.zero(ctx.type<float>()));
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b) override
+  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue> state_field) override
   {
     assert(rate() == 'a');
     assert(kernel);
-    rvalue = new_proc_local(f, b, *kernel);
+    assert(state_field);
+    rvalue = new_proc_local(f, b, *kernel, state_field->get_address());
   }
 };
 
@@ -628,7 +630,7 @@ public:
     assert(is_sig_supported(this->sig));
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b) override
+  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue>) override
   {
     assert(args.size() == 2);
     assert(sig.size() == 3);
@@ -782,19 +784,54 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
   auto nodes = opcodes.instantiate_topologically_ordered_nodes(ctx, g);
 
   auto t_void  = ctx.gcc.get_type(GCC_JIT_TYPE_VOID);
+  auto t_size_t = ctx.type<size_t>();
+  auto t_void_ptr = ctx.type<void*>();
 
-  std::vector<gccjit::param> init_args{};
+  std::vector<std::optional<gccjit::field>> state_fields(nodes.size());
+  std::vector<gccjit::field> state_field_list;
+  state_field_list.reserve(nodes.size());
+
+  for (size_t i = 0; i < nodes.size(); i++) {
+    if (auto st = nodes[i]->state_type()) {
+      auto field = ctx.gcc.new_field(*st, std::format("s{}", i));
+      state_fields[i] = field;
+      state_field_list.push_back(field);
+    }
+  }
+
+  auto state_struct = state_field_list.empty()
+    ? std::optional<gccjit::type>{}
+    : std::optional<gccjit::type>{ctx.gcc.new_struct_type(
+        ctx.graph_symbol("state"), state_field_list
+      )};
+
+  auto make_node_state = [&](gccjit::param p_state, size_t i) -> std::optional<gccjit::lvalue>
+  {
+    if (!state_struct || !state_fields[i]) return std::nullopt;
+
+    auto p_graph_state = ctx.gcc.new_cast(p_state, state_struct->get_pointer());
+    auto lv_graph_state = p_graph_state.dereference();
+    return lv_graph_state.access_field(*state_fields[i]);
+  };
+
+  auto init_args = std::vector{
+    ctx.gcc.new_param(t_void_ptr, "state"),
+  };
   auto init = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
     t_void, ctx.graph_symbol("init"), init_args, 0
   );
   {
     auto entry = init.new_block("entry");
-    for (auto &op: nodes) op->emit_init(entry);
+    auto p_state = init.get_param(0);
+    for (size_t i = 0; i < nodes.size(); i++) {
+      nodes[i]->emit_init(entry, make_node_state(p_state, i));
+    }
     entry.end_with_return();
   }
 
-  // process(const float *controls, float *abus)
+  // process(void *state, const float *controls, float *abus)
   auto process_args = std::vector{
+    ctx.gcc.new_param(t_void_ptr, "state"),
     ctx.gcc.new_param(ctx.type<const float*>(), "controls"),
     ctx.gcc.new_param(ctx.type<float*>(), "abus"),
   };
@@ -803,8 +840,23 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
   );
   {
     auto entry = process.new_block("entry");
-    for (auto &op: nodes) op->emit_proc(process, entry);
+    auto p_state = process.get_param(0);
+    for (size_t i = 0; i < nodes.size(); i++) {
+      nodes[i]->emit_proc(process, entry, make_node_state(p_state, i));
+    }
     entry.end_with_return();
+  }
+
+  auto state_size = ctx.gcc.new_global(
+    GCC_JIT_GLOBAL_EXPORTED, t_size_t, ctx.graph_symbol("state_size")
+  );
+  if (!state_struct) {
+    state_size.set_initializer_rvalue(ctx.gcc.zero(t_size_t));
+  } else {
+    auto rv = gccjit::rvalue(gcc_jit_context_new_sizeof(
+      ctx.gcc.get_inner_context(), state_struct->get_inner_type()
+    ));
+    state_size.set_initializer_rvalue(ctx.gcc.new_cast(rv, ctx.type<size_t>()));
   }
 
   return Result{ctx.gcc.compile()};

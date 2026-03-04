@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstddef>
 #include <iostream>
 #include <print>
 #include <ranges>
@@ -71,7 +72,8 @@ public:
 
     auto r = compile(dag, SR, BS);
     auto s = r[dag.name];
-    s.init();
+    std::vector<std::byte> state(s.state_size);
+    s.init(state.data());
 
     std::vector<float> controls = dag.controls;
 
@@ -79,7 +81,7 @@ public:
     std::vector<float> abus(2 * BS, 0.0f);
 
     for (int iter = 0; iter < 10; ++iter) {
-      s.process(controls.data(), abus.data());
+      s.process(state.data(), controls.data(), abus.data());
 
       std::println("process call {}", iter);
       std::println("i\tch0\tch1");
@@ -95,7 +97,7 @@ public:
 
     auto t0 = std::chrono::steady_clock::now();
     for (size_t i = 0; i < nblocks; ++i) {
-      s.process(controls.data(), abus.data());
+      s.process(state.data(), controls.data(), abus.data());
     }
     auto t1 = std::chrono::steady_clock::now();
 

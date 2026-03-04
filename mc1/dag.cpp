@@ -35,7 +35,7 @@ std::optional<DAG> DAG::parse(std::span<const std::byte> &bytes)
         if (auto nctrlvals = get_value<const size_t>(bytes)) {
           if (auto ctrlvals = get_values<float>(bytes, nctrlvals.value())) {
             if (auto nctrlnames = get_value<const size_t>(bytes)) {
-              std::vector<DAG::control_name> controlNames;
+              std::vector<DAG::ControlName> controlNames;
               controlNames.reserve(nctrlnames.value());
               for (int i = 0; i != nctrlnames.value(); i++) {
                 auto controlName = get_pstring(bytes);
