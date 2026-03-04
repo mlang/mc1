@@ -132,7 +132,6 @@ class SinOsc(_GraphArgs):
 
 
 def _convert(x):
-    if x is None: return None
     return x if isinstance(x, _Node) else Const(x)
 
 
@@ -151,7 +150,7 @@ class DAG:
                 value = (value,)
             return Control(name, *value)
         func = _WrapDefaults(func, param)
-        _convert(func())
+        func()
         for slot in self.__slots__:
             setattr(self, slot, getattr(self, f'_{slot}'))
 
