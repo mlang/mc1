@@ -87,6 +87,11 @@ struct Context
     return ref;
   }
 
+  std::string graph_symbol(std::string_view base) const
+  {
+    return std::format("{}_{}", graph.name, base);
+  }
+
   gccjit::rvalue new_float(float value)
   {
     return gcc.new_rvalue(type<float>(), static_cast<double>(value));
@@ -550,7 +555,10 @@ public:
 
   void emit_init(gccjit::block b) override
   {
-    state = ctx.gcc.new_global(GCC_JIT_GLOBAL_INTERNAL, ST.st, std::format("s{}", vertex_index));
+    state = ctx.gcc.new_global(
+      GCC_JIT_GLOBAL_INTERNAL, ST.st,
+      ctx.graph_symbol(std::format("s{}", vertex_index))
+    );
 
     b.add_assignment(state->access_field(ST.phase), ctx.gcc.zero(ctx.type<float>()));
   }
@@ -777,7 +785,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
 
   std::vector<gccjit::param> init_args{};
   auto init = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
-    t_void, "init", init_args, 0
+    t_void, ctx.graph_symbol("init"), init_args, 0
   );
   {
     auto entry = init.new_block("entry");
@@ -791,7 +799,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     ctx.gcc.new_param(ctx.type<float*>(), "abus"),
   };
   auto process = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
-    t_void, "process", process_args, 0
+    t_void, ctx.graph_symbol("process"), process_args, 0
   );
   {
     auto entry = process.new_block("entry");

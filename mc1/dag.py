@@ -6,7 +6,7 @@ import io
 import struct
 
 
-__all__ = ('SinOsc', 'DAG')
+__all__ = ('In', 'Out', 'SinOsc', 'DAG')
 
 
 class Rate(enum.Enum):
@@ -131,6 +131,19 @@ class SinOsc(_GraphArgs):
         return cls(Rate.AUDIO, 1, freq, phase)
 
 
+class In(_GraphArgs):
+    @classmethod
+    def ar(cls, index=0):
+        return cls(Rate.AUDIO, 1, index)
+
+
+class Out(_GraphArgs):
+    @classmethod
+    def ar(cls, index, signal):
+        signal = _convert(signal)
+        return cls(Rate.AUDIO, signal.num_out, index, signal)
+
+
 def _convert(x):
     return x if isinstance(x, _Node) else Const(x)
 
@@ -140,10 +153,12 @@ class DAG:
     _controls: list[float] = []
     _controlNames: list[tuple[str, int]] = []
     _operations: list[_Node] = []
-    __slots__ = ('constants', 'controls', 'controlNames', 'operations')
+    _graph_slots = ('constants', 'controls', 'controlNames', 'operations')
+    __slots__ = ('name', *_graph_slots)
 
     def __init__(self, func):
         self._reset()
+        self.name = func.__name__
 
         def param(name, value):
             if not isinstance(value, (list, range, tuple)):
@@ -151,17 +166,20 @@ class DAG:
             return Control(name, *value)
         func = _WrapDefaults(func, param)
         func()
-        for slot in self.__slots__:
+        for slot in self._graph_slots:
             setattr(self, slot, getattr(self, f'_{slot}'))
 
     @classmethod
     def _reset(cls):
-        for slot in cls.__slots__:
+        for slot in cls._graph_slots:
             setattr(cls, f'_{slot}', [])
 
     def __bytes__(self):
         buf = io.BytesIO()
         pack = lambda fmt, *args: buf.write(struct.pack(fmt, *args))
+
+        name = bytes(self.name, 'utf-8')
+        pack(f'{len(name)+1}p', name)
 
         pack('N'+'f'*len(self.constants), len(self.constants), *self.constants)
         pack('N'+'f'*len(self.controls), len(self.controls), *self.controls)

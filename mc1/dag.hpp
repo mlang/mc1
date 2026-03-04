@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <span>
+#include <string>
 #include <vector>
 
 
@@ -12,6 +13,7 @@
 namespace mc1 {
 
 struct DAG final {
+  std::string name;
   std::vector<float> constants;
   std::vector<float> controls;
   struct op {
@@ -28,7 +30,7 @@ struct DAG final {
 };
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DAG::op, name, rate, num_out, args)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DAG, constants, controls, ops)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(DAG, name, constants, controls, ops)
 
 std::ostream& operator<<(std::ostream&, const DAG&);
 

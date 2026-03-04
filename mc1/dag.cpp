@@ -29,24 +29,27 @@ std::optional<DAG::op> DAG::op::parse(std::span<const std::byte> &bytes)
 
 std::optional<DAG> DAG::parse(std::span<const std::byte> &bytes)
 {
-  if (auto n = get_value<const size_t>(bytes)) {
-    if (auto consts = get_values<float>(bytes, n.value())) {
-      if (auto nctrlvals = get_value<const size_t>(bytes)) {
-        if (auto ctrlvals = get_values<float>(bytes, nctrlvals.value())) {
-          if (auto nops = get_value<const size_t>(bytes)) {
-            std::vector<op> ops;
-            ops.reserve(nops.value());
-            for (int i = 0; i != nops.value(); i++) {
-              auto op = op::parse(bytes);
-              if (!op) return std::nullopt;
-              ops.emplace_back(std::move(op.value()));
-            }
+  if (auto name = get_pstring(bytes)) {
+    if (auto n = get_value<const size_t>(bytes)) {
+      if (auto consts = get_values<float>(bytes, n.value())) {
+        if (auto nctrlvals = get_value<const size_t>(bytes)) {
+          if (auto ctrlvals = get_values<float>(bytes, nctrlvals.value())) {
+            if (auto nops = get_value<const size_t>(bytes)) {
+              std::vector<op> ops;
+              ops.reserve(nops.value());
+              for (int i = 0; i != nops.value(); i++) {
+                auto op = op::parse(bytes);
+                if (!op) return std::nullopt;
+                ops.emplace_back(std::move(op.value()));
+              }
 
-            return DAG{
-              std::move(consts.value()),
-              std::move(ctrlvals.value()),
-              std::move(ops)
-            };
+              return DAG{
+                std::move(name.value()),
+                std::move(consts.value()),
+                std::move(ctrlvals.value()),
+                std::move(ops)
+              };
+            }
           }
         }
       }
@@ -57,6 +60,7 @@ std::optional<DAG> DAG::parse(std::span<const std::byte> &bytes)
 
 std::ostream& operator<<(std::ostream& os, const DAG& d)
 {
+  os << "Name: " << d.name << "\n";
   os << "Constants: ";
   for (const auto& constant : d.constants) {
     os << constant << " ";

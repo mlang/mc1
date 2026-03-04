@@ -1,6 +1,9 @@
+#include <chrono>
 #include <iostream>
+#include <print>
 #include <ranges>
 #include <utility>
+#include <vector>
 
 #include <boost/asio.hpp>
 
@@ -63,7 +66,44 @@ public:
   void compile_synth(DAG dag)
   {
     std::cout << dag;
-    compile(dag, 44100, 32);
+    constexpr unsigned int SR = 44100;
+    constexpr size_t BS = 32;
+
+    auto r = compile(dag, SR, BS);
+    auto s = r[dag.name];
+    s.init();
+
+    std::vector<float> controls = dag.controls;
+
+    // Two-channel audiobus: channel-major layout [ch0 block][ch1 block]
+    std::vector<float> abus(2 * BS, 0.0f);
+
+    for (int iter = 0; iter < 10; ++iter) {
+      s.process(controls.data(), abus.data());
+
+      std::println("process call {}", iter);
+      std::println("i\tch0\tch1");
+      for (size_t i = 0; i < BS; ++i) {
+        float ch0 = abus[i];
+        float ch1 = abus[BS + i];
+        std::println("{}\t{}\t{}", i, ch0, ch1);
+      }
+      std::println("");
+    }
+
+    const size_t nblocks = SR / BS;
+
+    auto t0 = std::chrono::steady_clock::now();
+    for (size_t i = 0; i < nblocks; ++i) {
+      s.process(controls.data(), abus.data());
+    }
+    auto t1 = std::chrono::steady_clock::now();
+
+    std::chrono::duration<double> elapsed = t1 - t0;
+    double seconds = elapsed.count();
+    double ratio = 1.0 / seconds;
+
+    std::println("perf: {} blocks in {} s (x{})", nblocks, seconds, ratio);
   }
 };
 
