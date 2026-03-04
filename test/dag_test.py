@@ -14,9 +14,11 @@ def roundtrip_json(graphFunc):
 
 @pytest.mark.parametrize("graphFunc, expected",
 [( lambda freq=440: freq,
-   {'constants': [],
+   {'name': '<lambda>',
+    'constants': [],
     'controls': [440.0],
-    'ops': [{'name': 'Param', 'rate': 98, 'args': []}]
+    'controlNames': [{'name': 'freq', 'index': 0}],
+    'ops': [{'name': 'Control', 'rate': 98, 'num_out': 1, 'args': [0]}]
    }
  )
 ])
