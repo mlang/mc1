@@ -18,7 +18,6 @@ class Result
 
 public:
   class Synth {
-    init_fn_t init_{};
     process_fn_t process_{};
     std::vector<std::byte> state_;
 
@@ -26,12 +25,7 @@ public:
     Synth() = default;
 
     Synth(init_fn_t init, process_fn_t process, size_t state_size)
-    : init_{init}
-    , process_{process}
-    , state_(state_size)
-    {
-      if (init_) init_(state_.data());
-    }
+    : process_{process}, state_(state_size) { init(state_.data()); }
 
     Synth(Synth const&) = delete;
     Synth& operator=(Synth const&) = delete;
@@ -39,11 +33,7 @@ public:
     Synth& operator=(Synth&&) noexcept = default;
 
     void process(const float *controls, float *abus)
-    {
-      if (process_) process_(state_.data(), controls, abus);
-    }
-
-    size_t state_size() const { return state_.size(); }
+    { process_(state_.data(), controls, abus); }
   };
 
 private:
