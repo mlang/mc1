@@ -31,6 +31,16 @@ template<> inline constexpr enum gcc_jit_types jit_type_v<void>   = GCC_JIT_TYPE
 template<> inline constexpr enum gcc_jit_types jit_type_v<float>  = GCC_JIT_TYPE_FLOAT;
 template<> inline constexpr enum gcc_jit_types jit_type_v<size_t> = GCC_JIT_TYPE_SIZE_T;
 
+gccjit::rvalue new_sizeof(gccjit::type type)
+{
+  auto context = type.get_context();
+  auto rv = gccjit::rvalue{
+    gcc_jit_context_new_sizeof(context.get_inner_context(), type.get_inner_type())
+  };
+  // sizeof(type) is of type int for some reason
+  return context.new_cast(rv, context.get_type(GCC_JIT_TYPE_SIZE_T));
+}
+
 struct Context
 {
   gccjit::context gcc;
@@ -853,10 +863,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
   if (!state_struct) {
     state_size.set_initializer_rvalue(ctx.gcc.zero(t_size_t));
   } else {
-    auto rv = gccjit::rvalue(gcc_jit_context_new_sizeof(
-      ctx.gcc.get_inner_context(), state_struct->get_inner_type()
-    ));
-    state_size.set_initializer_rvalue(ctx.gcc.new_cast(rv, ctx.type<size_t>()));
+    state_size.set_initializer_rvalue(new_sizeof(*state_struct));
   }
 
   return Result{ctx.gcc.compile()};
