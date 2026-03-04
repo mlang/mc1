@@ -1,5 +1,7 @@
+#include <array>
 #include <chrono>
 #include <cstddef>
+#include <cstring>
 #include <iostream>
 #include <print>
 #include <ranges>
@@ -26,6 +28,23 @@ class engine final
   boost::asio::thread_pool compiler;
   bool running = true;
 
+  static std::array<std::byte, sizeof(unsigned short)> make_msg(unsigned short id)
+  {
+    std::array<std::byte, sizeof(unsigned short)> bytes{};
+    std::memcpy(bytes.data(), &id, sizeof(id));
+    return bytes;
+  }
+
+  static void send_message(udp::socket &socket, udp::endpoint sender, unsigned short id)
+  {
+    auto bytes = make_msg(id);
+    boost::asio::post(socket.get_executor(), [&socket, sender = std::move(sender), bytes]() {
+      boost::system::error_code ec;
+      socket.send_to(buffer(bytes), sender, 0, ec);
+      if (ec) std::cerr << "send_to failed: " << ec.message() << std::endl;
+    });
+  }
+
 public:
   engine() : compiler{1} {}
 
@@ -36,14 +55,14 @@ public:
       while (running) {
         udp::endpoint sender;
         size_t n = co_await socket.async_receive_from(buffer(data), sender, use_awaitable);
-        packet_received(std::span(&data[0], n));
+        packet_received(socket, sender, std::span(&data[0], n));
       }
     } catch (std::exception& e) {
       std::cerr << e.what() << std::endl;
     }
   }
 
-  void packet_received(std::span<const std::byte> bytes)
+  void packet_received(udp::socket &socket, udp::endpoint sender, std::span<const std::byte> bytes)
   {
     if (auto i = mlang::get_value<unsigned short>(bytes)) {
       switch (*i) {
@@ -57,6 +76,13 @@ public:
             });
           }
         }
+        break;
+      case 2:
+        // Barrier against the compile queue: reply only after all prior jobs ran.
+        post(compiler, [&socket, sender = std::move(sender)]()
+        {
+          send_message(socket, sender, 3);
+        });
         break;
       default:
         std::cout << *i << std::endl;

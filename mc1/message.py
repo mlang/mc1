@@ -2,6 +2,8 @@ import struct
 
 from mc1.dag import DAG
 
+DONE_IDENTIFIER = 3
+
 
 class Message:
     __slots__ = ('_payload',)
@@ -24,3 +26,6 @@ class Quit(Message, identifier=0): pass
 class Compile(Message, identifier=1):
     def __init__(self, payload):
         super().__init__(DAG(payload) if callable(payload) else payload)
+
+
+class Sync(Message, identifier=2): pass

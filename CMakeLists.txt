@@ -19,3 +19,6 @@ add_test(NAME mypy COMMAND mypy -p mc1
 add_test(NAME pytest COMMAND pytest
   WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
 )
+add_test(NAME compile COMMAND python3 -m mc1 test/compile.py
+  WORKING_DIRECTORY "${PROJECT_SOURCE_DIR}"
+)
