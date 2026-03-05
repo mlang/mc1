@@ -1,0 +1,466 @@
+void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
+{
+  float iftmp.0;
+  size_t i;
+  float phase;
+
+  entry:
+  phase = st->phase;
+  i = 0;
+  goto cond;
+  cond:
+  if (i <= 31) goto body; else goto done;
+  body:
+  _1 = phase + phase;
+  _2 = i * 4;
+  _3 = out + _2;
+  _4 = sinf (_1);
+  *_3 = _4;
+  _5 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
+  phase = phase + _5;
+  if (phase >= 6.28318530717958623199592693708837032318115234375e+0) goto <D.154>; else goto <D.155>;
+  <D.154>:
+  iftmp.0 = 1.0e+0;
+  goto <D.156>;
+  <D.155>:
+  iftmp.0 = 0.0;
+  <D.156>:
+  _6 = iftmp.0 * 6.28318530717958623199592693708837032318115234375e+0;
+  phase = phase - _6;
+  goto cont;
+  cont:
+  i = i + 1;
+  goto cond;
+  done:
+  st->phase = phase;
+  return;
+}
+
+
+void Mul_aba (float * r, const float * a, float b)
+{
+  size_t i;
+
+  entry:
+  i = 0;
+  goto cond;
+  cond:
+  if (i <= 31) goto body; else goto done;
+  body:
+  _1 = i * 4;
+  _2 = a + _1;
+  _3 = *_2;
+  _4 = i * 4;
+  _5 = r + _4;
+  _6 = b * _3;
+  *_5 = _6;
+  goto cont;
+  cont:
+  i = i + 1;
+  goto cond;
+  done:
+  return;
+}
+
+
+void Pan_aba (float * out, const float * in, float pan)
+{
+  size_t i;
+
+  entry:
+  i = 0;
+  goto cond;
+  cond:
+  if (i <= 31) goto body; else goto done;
+  body:
+  _1 = i * 4;
+  _2 = in + _1;
+  _3 = *_2;
+  _4 = 1.0e+0 - pan;
+  _5 = _4 * 5.0e-1;
+  _6 = i * 4;
+  _7 = out + _6;
+  _8 = _3 * _5;
+  *_7 = _8;
+  _9 = i * 4;
+  _10 = in + _9;
+  _11 = *_10;
+  _12 = pan + 1.0e+0;
+  _13 = _12 * 5.0e-1;
+  _14 = i + 32;
+  _15 = _14 * 4;
+  _16 = out + _15;
+  _17 = _11 * _13;
+  *_16 = _17;
+  goto cont;
+  cont:
+  i = i + 1;
+  goto cond;
+  done:
+  return;
+}
+
+
+void Out_baa (float * dst, const float * a)
+{
+  size_t i;
+
+  entry:
+  i = 0;
+  goto cond;
+  cond:
+  if (i <= 31) goto body; else goto done;
+  body:
+  _1 = i * 4;
+  _2 = a + _1;
+  _3 = i * 4;
+  _4 = dst + _3;
+  _5 = *_2;
+  *_4 = _5;
+  goto cont;
+  cont:
+  i = i + 1;
+  goto cond;
+  done:
+  return;
+}
+
+
+void tone_init (void * state)
+{
+  entry:
+  MEM[(struct tone_state *)state].s3.phase = 0.0;
+  return;
+}
+
+
+void tone_process (void * state, const float * controls, float * abus)
+{
+  float e6[64];
+  float e4[32];
+  float e3[32];
+
+  try
+    {
+      entry:
+      _1 = &MEM[(struct tone_state *)state].s3;
+      _2 = *controls;
+      SinOsc_bba (_1, &e3[0], _2, 0.0);
+      _3 = controls + 4;
+      _4 = *_3;
+      Mul_aba (&e4[0], &e3[0], _4);
+      Pan_aba (&e6[0], &e4[0], 0.0);
+      Out_baa (abus, &e6[0]);
+      _5 = abus + 128;
+      _6 = &e6[0] + 128;
+      Out_baa (_5, _6);
+      return;
+    }
+  finally
+    {
+      e6 = {CLOBBER(eos)};
+      e4 = {CLOBBER(eos)};
+      e3 = {CLOBBER(eos)};
+    }
+}
+
+
+	.arch armv8-a
+	.file	"fake.c"
+	.text
+	.align	2
+	.p2align 5,,15
+	.global	tone_init
+	.type	tone_init, %function
+tone_init:
+.LFB4:
+	.cfi_startproc
+.L2:
+	str	wzr, [x0]
+	ret
+	.cfi_endproc
+.LFE4:
+	.size	tone_init, .-tone_init
+	.align	2
+	.p2align 5,,15
+	.global	tone_process
+	.type	tone_process, %function
+tone_process:
+.LFB5:
+	.cfi_startproc
+.L5:
+	stp	x29, x30, [sp, -496]!
+	.cfi_def_cfa_offset 496
+	.cfi_offset 29, -496
+	.cfi_offset 30, -488
+	mov	w4, 26002
+	mov	w3, 4059
+	mov	x29, sp
+	movk	w3, 0x40c9, lsl 16
+	stp	x19, x20, [sp, 16]
+	.cfi_offset 19, -480
+	.cfi_offset 20, -472
+	add	x19, sp, 112
+	add	x20, sp, 240
+	stp	x21, x22, [sp, 32]
+	.cfi_offset 21, -464
+	.cfi_offset 22, -456
+	mov	x22, x1
+	mov	x21, x2
+	stp	d10, d11, [sp, 64]
+	.cfi_offset 74, -432
+	.cfi_offset 75, -424
+	movi	v11.2s, #0
+	movk	w4, 0x3915, lsl 16
+	str	x23, [sp, 48]
+	.cfi_offset 23, -448
+	mov	x23, x0
+	stp	d12, d13, [sp, 80]
+	fmov	s10, w3
+	.cfi_offset 76, -416
+	.cfi_offset 77, -408
+	ldr	s12, [x1]
+	stp	d14, d15, [sp, 96]
+	.cfi_offset 78, -400
+	.cfi_offset 79, -392
+	fmov	s13, w4
+	ldr	s15, [x0]
+	fmov	s14, w3
+	.p2align 5,,15
+.L6:
+	fadd	s0, s15, s11
+	bl	sinf
+	fmadd	s15, s12, s13, s15
+	str	s0, [x19]
+	fcmpe	s15, s14
+	bge	.L10
+.L7:
+	add	x19, x19, 4
+	cmp	x19, x20
+	bne	.L6
+.L9:
+	ldp	q23, q30, [sp, 112]
+	add	x0, sp, 368
+	ldp	q29, q28, [sp, 144]
+	add	x2, x21, 128
+	ldp	q27, q26, [sp, 176]
+	ldp	q25, q24, [sp, 208]
+	str	s15, [x23]
+	fmov	v31.4s, 5.0e-1
+	ldr	s0, [x22, 4]
+	fmul	v24.4s, v24.4s, v0.s[0]
+	fmul	v30.4s, v30.4s, v0.s[0]
+	fmul	v29.4s, v29.4s, v0.s[0]
+	fmul	v28.4s, v28.4s, v0.s[0]
+	fmul	v27.4s, v27.4s, v0.s[0]
+	fmul	v26.4s, v26.4s, v0.s[0]
+	fmul	v25.4s, v25.4s, v0.s[0]
+	fmul	v23.4s, v23.4s, v0.s[0]
+	fmul	v30.4s, v30.4s, v31.4s
+	fmul	v29.4s, v29.4s, v31.4s
+	fmul	v28.4s, v28.4s, v31.4s
+	fmul	v27.4s, v27.4s, v31.4s
+	fmul	v26.4s, v26.4s, v31.4s
+	fmul	v25.4s, v25.4s, v31.4s
+	stp	q30, q29, [sp, 256]
+	fmul	v23.4s, v23.4s, v31.4s
+	stp	q28, q27, [sp, 288]
+	fmul	v31.4s, v24.4s, v31.4s
+	stp	q26, q25, [sp, 320]
+	stp	q30, q29, [sp, 384]
+	stp	q31, q23, [sp, 352]
+	stp	q28, q27, [sp, 416]
+	ldp	q30, q22, [x19, 16]
+	stp	q26, q25, [sp, 448]
+	stp	q23, q30, [x21]
+	ldp	q26, q28, [x19, 48]
+	ldp	q27, q30, [x19, 80]
+	ldp	q29, q24, [x19, 112]
+	stp	q22, q26, [x21, 32]
+	ldp	q26, q25, [x0, 16]
+	stp	q28, q27, [x21, 64]
+	ldp	q28, q27, [x0, 48]
+	stp	q30, q29, [x21, 96]
+	ldp	q30, q29, [x0, 80]
+	str	q24, [x21, 128]
+	stp	q26, q25, [x2, 16]
+	stp	q28, q27, [x2, 48]
+	stp	q30, q29, [x2, 80]
+	str	q31, [x21, 240]
+	ldr	x23, [sp, 48]
+	ldp	x19, x20, [sp, 16]
+	ldp	x21, x22, [sp, 32]
+	ldp	d10, d11, [sp, 64]
+	ldp	d12, d13, [sp, 80]
+	ldp	d14, d15, [sp, 96]
+	ldp	x29, x30, [sp], 496
+	.cfi_remember_state
+	.cfi_restore 30
+	.cfi_restore 29
+	.cfi_restore 23
+	.cfi_restore 21
+	.cfi_restore 22
+	.cfi_restore 19
+	.cfi_restore 20
+	.cfi_restore 78
+	.cfi_restore 79
+	.cfi_restore 76
+	.cfi_restore 77
+	.cfi_restore 74
+	.cfi_restore 75
+	.cfi_def_cfa_offset 0
+	ret
+	.p2align 2,,3
+.L10:
+	.cfi_restore_state
+	fsub	s15, s15, s10
+	b	.L7
+	.cfi_endproc
+.LFE5:
+	.size	tone_process, .-tone_process
+	.global	tone_state_size
+	.data
+	.align	3
+	.type	tone_state_size, %object
+	.size	tone_state_size, 8
+tone_state_size:
+	.xword	4
+	.ident	"GCC: (Debian 14.2.0-19) 14.2.0"
+	.section	.note.GNU-stack,"",@progbits
+Name: tone
+Constants: 0 
+Controls: 440 0.2 
+Control Names: (freq, 0) (amp, 1) 
+Operations:
+  Name: Control
+  Rate: b
+  Args: 0 
+  Name: Control
+  Rate: b
+  Args: 1 
+  Name: Const
+  Rate: b
+  Args: 0 
+  Name: SinOsc
+  Rate: a
+  Args: 0 2 
+  Name: Mul
+  Rate: a
+  Args: 3 1 
+  Name: Const
+  Rate: b
+  Args: 0 
+  Name: Pan
+  Rate: a
+  Args: 4 5 
+  Name: Const
+  Rate: b
+  Args: 0 
+  Name: Out
+  Rate: a
+  Args: 7 6 
+process call 0
+i	ch0	ch1
+0	0.000000	0.000000
+1	0.006265	0.006265
+2	0.012505	0.012505
+3	0.018696	0.018696
+4	0.024814	0.024814
+5	0.030834	0.030834
+6	0.036733	0.036733
+7	0.042488	0.042488
+8	0.048075	0.048075
+9	0.053474	0.053474
+10	0.058663	0.058663
+11	0.063622	0.063622
+12	0.068330	0.068330
+13	0.072770	0.072770
+14	0.076924	0.076924
+15	0.080776	0.080776
+16	0.084310	0.084310
+17	0.087514	0.087514
+18	0.090373	0.090373
+19	0.092878	0.092878
+20	0.095017	0.095017
+21	0.096783	0.096783
+22	0.098170	0.098170
+23	0.099170	0.099170
+24	0.099781	0.099781
+25	0.099999	0.099999
+26	0.099825	0.099825
+27	0.099259	0.099259
+28	0.098303	0.098303
+29	0.096960	0.096960
+30	0.095237	0.095237
+31	0.093139	0.093139
+
+process call 1
+i	ch0	ch1
+0	0.090676	0.090676
+1	0.087856	0.087856
+2	0.084691	0.084691
+3	0.081194	0.081194
+4	0.077377	0.077377
+5	0.073257	0.073257
+6	0.068848	0.068848
+7	0.064170	0.064170
+8	0.059239	0.059239
+9	0.054075	0.054075
+10	0.048699	0.048699
+11	0.043131	0.043131
+12	0.037395	0.037395
+13	0.031511	0.031511
+14	0.025503	0.025503
+15	0.019396	0.019396
+16	0.013212	0.013212
+17	0.006976	0.006976
+18	0.000712	0.000712
+19	-0.005554	-0.005554
+20	-0.011798	-0.011798
+21	-0.017996	-0.017996
+22	-0.024123	-0.024123
+23	-0.030155	-0.030155
+24	-0.036069	-0.036069
+25	-0.041842	-0.041842
+26	-0.047449	-0.047449
+27	-0.052871	-0.052871
+28	-0.058085	-0.058085
+29	-0.063070	-0.063070
+30	-0.067808	-0.067808
+31	-0.072279	-0.072279
+
+process call 2
+i	ch0	ch1
+0	-0.076467	-0.076467
+1	-0.080354	-0.080354
+2	-0.083925	-0.083925
+3	-0.087167	-0.087167
+4	-0.090066	-0.090066
+5	-0.092611	-0.092611
+6	-0.094793	-0.094793
+7	-0.096602	-0.096602
+8	-0.098031	-0.098031
+9	-0.099076	-0.099076
+10	-0.099731	-0.099731
+11	-0.099994	-0.099994
+12	-0.099865	-0.099865
+13	-0.099343	-0.099343
+14	-0.098431	-0.098431
+15	-0.097132	-0.097132
+16	-0.095452	-0.095452
+17	-0.093396	-0.093396
+18	-0.090974	-0.090974
+19	-0.088194	-0.088194
+20	-0.085068	-0.085068
+21	-0.081608	-0.081608
+22	-0.077827	-0.077827
+23	-0.073740	-0.073740
+24	-0.069364	-0.069364
+25	-0.064715	-0.064715
+26	-0.059811	-0.059811
+27	-0.054673	-0.054673
+28	-0.049320	-0.049320
+29	-0.043773	-0.043773
+30	-0.038055	-0.038055
+31	-0.032186	-0.032186
+

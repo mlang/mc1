@@ -4,6 +4,7 @@
 
 #include <cstddef>
 #include <libgccjit++.h>
+#include <memory>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -18,14 +19,15 @@ class Result
 
 public:
   class Synth {
+    std::shared_ptr<gcc_jit_result> owner_;
     process_fn_t process_{};
     std::vector<std::byte> state_;
 
   public:
     Synth() = default;
 
-    Synth(init_fn_t init, process_fn_t process, size_t state_size)
-    : process_{process}, state_(state_size) { init(state_.data()); }
+    Synth(std::shared_ptr<gcc_jit_result> owner, init_fn_t init, process_fn_t process, size_t state_size)
+    : owner_{std::move(owner)}, process_{process}, state_(state_size) { init(state_.data()); }
 
     Synth(Synth const&) = delete;
     Synth& operator=(Synth const&) = delete;
@@ -37,17 +39,17 @@ public:
   };
 
 private:
-  gcc_jit_result *r{};
+  std::shared_ptr<gcc_jit_result> r_;
 
 public:
-  explicit Result(gcc_jit_result *r) : r{r} {}
-
-  ~Result() { if (r) gcc_jit_result_release(r); }
+  explicit Result(gcc_jit_result *r)
+  : r_{r, &gcc_jit_result_release}
+  {}
 
   Result(Result const&) = delete;
   Result& operator=(Result const&) = delete;
 
-  Result(Result &&o) noexcept : r{o.r} { o.r = nullptr; }
+  Result(Result &&) noexcept = default;
 
   Result& operator=(Result &&) = delete;
 
@@ -59,11 +61,12 @@ public:
     process_name += "_process";
     std::string state_size_name{name};
     state_size_name += "_state_size";
-    auto state_size_ptr = gcc_jit_result_get_global(r, state_size_name.c_str());
+    auto state_size_ptr = gcc_jit_result_get_global(r_.get(), state_size_name.c_str());
     auto state_size = state_size_ptr ? *reinterpret_cast<size_t const*>(state_size_ptr) : 0;
     return Synth{
-      reinterpret_cast<init_fn_t>(gcc_jit_result_get_code(r, init_name.c_str())),
-      reinterpret_cast<process_fn_t>(gcc_jit_result_get_code(r, process_name.c_str())),
+      r_,
+      reinterpret_cast<init_fn_t>(gcc_jit_result_get_code(r_.get(), init_name.c_str())),
+      reinterpret_cast<process_fn_t>(gcc_jit_result_get_code(r_.get(), process_name.c_str())),
       state_size
     };
   }

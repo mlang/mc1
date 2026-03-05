@@ -1,6 +1,4 @@
-@DAG
-def tone(freq=440):
-    Out.ar(0, Pan(SinOsc.ar(freq)))
+from test.graphs import tone
 
 dsp.send(Compile(tone))
 dsp.sync()
