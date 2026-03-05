@@ -5,7 +5,6 @@ Experimental re-architecture of SuperCollider using Python as the host language 
 ## Purpose
 - Keep the user-facing API in Python (no new DSL).
 - Model SynthDefs as graphs and JIT-compile them into efficient audio kernels.
-- Explore stateful DSP nodes and scheduling without the SC server/client split.
 
 ## State
 - Early prototype / research code.
