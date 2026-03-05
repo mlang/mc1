@@ -1,4 +1,4 @@
-from test.graphs import tone
+from test.graphs import drone
 
-dsp.send(Compile(tone))
+dsp.send(Compile(drone))
 dsp.sync()

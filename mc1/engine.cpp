@@ -50,7 +50,7 @@ public:
 
   awaitable<void> udp_server(udp::socket socket)
   {
-    std::byte data[1024];
+    std::byte data[65536];
     try {
       while (running) {
         udp::endpoint sender;

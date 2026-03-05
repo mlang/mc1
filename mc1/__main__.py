@@ -17,15 +17,16 @@ def main():
     dsp.run()
     time.sleep(0.1)
 
+    ns = {k: v for k, v in globals().items() if not k.startswith("__")}
+    ns["dsp"] = dsp
+
     if script is not None:
         sys.argv = [script, *script_args]
-        ns = {k: v for k, v in globals().items() if not k.startswith("__")}
-        ns["dsp"] = dsp
         runpy.run_path(script, init_globals=ns, run_name="__main__")
         return
 
     code.interact(
-        local=locals(),
+        local=ns,
         banner="""MiniCollider
 
 Example:
