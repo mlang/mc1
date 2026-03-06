@@ -214,7 +214,7 @@ class _WrapDefaults:
     
         for param in sig.parameters.values():
             if param.default is param.empty:
-                raise ValueError(f"Parameter '{name}' has no default value")
+                raise ValueError(f"Parameter '{param.name}' has no default value")
             if param.kind in (param.POSITIONAL_OR_KEYWORD, param.POSITIONAL_ONLY):
                 args.append(wrap(param.name, param.default))
             elif param.kind == param.KEYWORD_ONLY:

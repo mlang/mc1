@@ -24,3 +24,11 @@ def roundtrip_json(graphFunc):
 ])
 def test_roundtrip(graphFunc, expected):
     assert roundtrip_json(graphFunc) == pytest.approx(expected, rel=1e-6)
+
+
+def test_missing_default_raises_value_error():
+    def bad(freq, amp=0.1):
+        return freq * amp
+
+    with pytest.raises(ValueError, match="Parameter 'freq' has no default value"):
+        DAG(bad)
