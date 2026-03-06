@@ -15,6 +15,7 @@
 #include "audio.hpp"
 #include "compiler.hpp"
 #include "dag.hpp"
+#include "osc.hpp"
 
 using boost::asio::ip::udp;
 using boost::asio::awaitable;
@@ -31,17 +32,10 @@ class engine final
   std::unique_ptr<audio_device> audio;
   bool running = true;
 
-  static std::array<std::byte, sizeof(unsigned short)> make_msg(unsigned short id)
+  static void send_message(udp::socket &socket, udp::endpoint sender, std::vector<std::byte> bytes)
   {
-    std::array<std::byte, sizeof(unsigned short)> bytes{};
-    std::memcpy(bytes.data(), &id, sizeof(id));
-    return bytes;
-  }
-
-  static void send_message(udp::socket &socket, udp::endpoint sender, unsigned short id)
-  {
-    auto bytes = make_msg(id);
-    boost::asio::post(socket.get_executor(), [&socket, sender = std::move(sender), bytes]() {
+    boost::asio::post(socket.get_executor(),
+      [&socket, sender = std::move(sender), bytes = std::move(bytes)]() {
       boost::system::error_code ec;
       socket.send_to(buffer(bytes), sender, 0, ec);
       if (ec) std::cerr << "send_to failed: " << ec.message() << std::endl;
@@ -67,29 +61,41 @@ public:
 
   void packet_received(udp::socket &socket, udp::endpoint sender, std::span<const std::byte> bytes)
   {
-    if (auto i = mlang::get_value<unsigned short>(bytes)) {
-      switch (*i) {
-      case 0: running = false; break;
-      case 1:
-        if (auto dag = DAG::parse(bytes)) {
-          if (bytes.empty()) {
-            post(compiler, [dag = std::move(dag.value()), this]()
-            {
-              compile_synth(std::move(dag));
-            });
-          }
+    auto packet = osc::decode_packet(bytes);
+    if (!packet) return;
+
+    auto msg = std::get_if<osc::message>(&packet.value());
+    if (!msg) return;
+
+    if (msg->address == "/mc1/quit") {
+      running = false;
+      return;
+    }
+
+    if (msg->address == "/mc1/compile") {
+      if (msg->args.size() != 1) return;
+      auto blob = std::get_if<osc::blob>(&msg->args[0]);
+      if (!blob) return;
+
+      auto dag_bytes = std::span<const std::byte>(blob->data);
+      if (auto dag = DAG::parse(dag_bytes)) {
+        if (dag_bytes.empty()) {
+          post(compiler, [dag = std::move(dag.value()), this]()
+          {
+            compile_synth(std::move(dag));
+          });
         }
-        break;
-      case 2:
-        // Barrier against the compile queue: reply only after all prior jobs ran.
-        post(compiler, [&socket, sender = std::move(sender)]()
-        {
-          send_message(socket, sender, 3);
-        });
-        break;
-      default:
-        std::cout << *i << std::endl;
       }
+      return;
+    }
+
+    if (msg->address == "/mc1/sync") {
+      // Barrier against the compile queue: reply only after all prior jobs ran.
+      post(compiler, [&socket, sender = std::move(sender)]()
+      {
+        std::vector<osc::argument> args;
+        send_message(socket, sender, osc::encode_message("/mc1/done", args));
+      });
     }
   }
 

@@ -1,10 +1,10 @@
 import atexit
 import pathlib
 import socket
-import struct
 import subprocess
 
-from mc1.message import DONE_IDENTIFIER, Sync
+from mc1 import osc
+from mc1.message import DONE_ADDRESS, Sync
 
 
 class Engine:
@@ -37,10 +37,11 @@ class Engine:
         try:
             while True:
                 data, _sender = self.udp.recvfrom(1024)
-                if len(data) < 2:
+                try:
+                    packet = osc.decode_packet(data)
+                except ValueError:
                     continue
-                msg_id = struct.unpack("H", data[:2])[0]
-                if msg_id == DONE_IDENTIFIER:
+                if isinstance(packet, osc.Message) and packet.address == DONE_ADDRESS:
                     return
         finally:
             self.udp.settimeout(old_timeout)
