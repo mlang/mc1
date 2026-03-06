@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED TRUE)
 find_package(Boost CONFIG REQUIRED)
 find_package(nlohmann_json REQUIRED)
 
-add_executable(engine mc1/compiler.cpp mc1/dag.cpp mc1/engine.cpp)
+add_executable(engine mc1/compiler.cpp mc1/dag.cpp mc1/audio.cpp mc1/engine.cpp)
 target_link_libraries(engine gccjit nlohmann_json::nlohmann_json)
 
 add_executable(dag2json test/dag2json.cpp mc1/dag.cpp)

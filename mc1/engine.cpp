@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstring>
 #include <iostream>
+#include <memory>
 #include <print>
 #include <ranges>
 #include <utility>
@@ -11,6 +12,7 @@
 #include <boost/asio.hpp>
 
 #include "mlang/bytes.hpp"
+#include "audio.hpp"
 #include "compiler.hpp"
 #include "dag.hpp"
 
@@ -26,6 +28,7 @@ namespace mc1 {
 class engine final
 {
   boost::asio::thread_pool compiler;
+  std::unique_ptr<audio_device> audio;
   bool running = true;
 
   static std::array<std::byte, sizeof(unsigned short)> make_msg(unsigned short id)
