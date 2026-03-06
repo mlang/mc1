@@ -1,3 +1,27 @@
+float sinf_lookup (float x)
+{
+  float D.164;
+  float b;
+  float a;
+  size_t i;
+
+  entry:
+  x = x * 4.0743663787841796875e+1;
+  i = (size_t) x;
+  _1 = i * 4;
+  _2 = &sinf_lookup__table[0] + _1;
+  a = *_2;
+  _3 = i * 4;
+  _4 = &sinf_lookup__table[1] + _3;
+  b = *_4;
+  _5 = b - a;
+  _6 = (float) i;
+  _7 = x - _6;
+  D.164 = fmaf (_7, _5, a);
+  return D.164;
+}
+
+
 void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
 {
   float iftmp.0;
@@ -14,17 +38,17 @@ void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
   _1 = phase + phase;
   _2 = i * 4;
   _3 = out + _2;
-  _4 = sinf (_1);
+  _4 = sinf_lookup (_1);
   *_3 = _4;
   _5 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   phase = phase + _5;
-  if (phase >= 6.28318530717958623199592693708837032318115234375e+0) goto <D.154>; else goto <D.155>;
-  <D.154>:
+  if (phase >= 6.28318530717958623199592693708837032318115234375e+0) goto <D.166>; else goto <D.167>;
+  <D.166>:
   iftmp.0 = 1.0e+0;
-  goto <D.156>;
-  <D.155>:
+  goto <D.168>;
+  <D.167>:
   iftmp.0 = 0.0;
-  <D.156>:
+  <D.168>:
   _6 = iftmp.0 * 6.28318530717958623199592693708837032318115234375e+0;
   phase = phase - _6;
   goto cont;
@@ -143,17 +167,17 @@ void tone_process (void * state, const float * controls, float * abus)
   try
     {
       entry:
-      _1 = &MEM[(struct tone_state *)state].s3;
-      _2 = *controls;
-      SinOsc_bba (_1, &e3[0], _2, 0.0);
+      _1 = *controls;
+      _2 = &MEM[(struct tone_state *)state].s3;
+      SinOsc_bba (_2, &e3[0], _1, 0.0);
       _3 = controls + 4;
       _4 = *_3;
       Mul_aba (&e4[0], &e3[0], _4);
       Pan_aba (&e6[0], &e4[0], 0.0);
       Out_baa (abus, &e6[0]);
-      _5 = abus + 128;
-      _6 = &e6[0] + 128;
-      Out_baa (_5, _6);
+      _5 = &e6[0] + 128;
+      _6 = abus + 128;
+      Out_baa (_6, _5);
       return;
     }
   finally
@@ -165,166 +189,465 @@ void tone_process (void * state, const float * controls, float * abus)
 }
 
 
-	.arch armv8-a
 	.file	"fake.c"
 	.text
-	.align	2
-	.p2align 5,,15
-	.global	tone_init
-	.type	tone_init, %function
-tone_init:
-.LFB4:
+	.p2align 4
+	.globl	sinf_lookup
+	.type	sinf_lookup, @function
+sinf_lookup:
+.LFB0:
 	.cfi_startproc
 .L2:
-	str	wzr, [x0]
-	ret
+	movss	.LC0(%rip), %xmm1
+	mulss	%xmm0, %xmm1
+	comiss	.LC1(%rip), %xmm1
+	jnb	.L3
+	cvttss2siq	%xmm1, %rax
+.L4:
+	leaq	sinf_lookup__table(%rip), %rcx
+	leaq	0(,%rax,4), %rdx
+	movss	(%rcx,%rax,4), %xmm2
+	testq	%rax, %rax
+	js	.L5
+	pxor	%xmm3, %xmm3
+	cvtsi2ssq	%rax, %xmm3
+.L6:
+	leaq	4+sinf_lookup__table(%rip), %rax
+	subss	%xmm3, %xmm1
+	movss	(%rax,%rdx), %xmm0
+	subss	%xmm2, %xmm0
+	jmp	fmaf@PLT
+	.p2align 4,,10
+	.p2align 3
+.L3:
+	movaps	%xmm1, %xmm0
+	subss	.LC1(%rip), %xmm0
+	cvttss2siq	%xmm0, %rax
+	btcq	$63, %rax
+	jmp	.L4
+	.p2align 4,,10
+	.p2align 3
+.L5:
+	movq	%rax, %rcx
+	andl	$1, %eax
+	pxor	%xmm3, %xmm3
+	shrq	%rcx
+	orq	%rax, %rcx
+	cvtsi2ssq	%rcx, %xmm3
+	addss	%xmm3, %xmm3
+	jmp	.L6
 	.cfi_endproc
-.LFE4:
-	.size	tone_init, .-tone_init
-	.align	2
-	.p2align 5,,15
-	.global	tone_process
-	.type	tone_process, %function
-tone_process:
+.LFE0:
+	.size	sinf_lookup, .-sinf_lookup
+	.p2align 4
+	.globl	tone_init
+	.type	tone_init, @function
+tone_init:
 .LFB5:
 	.cfi_startproc
-.L5:
-	stp	x29, x30, [sp, -496]!
-	.cfi_def_cfa_offset 496
-	.cfi_offset 29, -496
-	.cfi_offset 30, -488
-	mov	w4, 26002
-	mov	w3, 4059
-	mov	x29, sp
-	movk	w3, 0x40c9, lsl 16
-	stp	x19, x20, [sp, 16]
-	.cfi_offset 19, -480
-	.cfi_offset 20, -472
-	add	x19, sp, 112
-	add	x20, sp, 240
-	stp	x21, x22, [sp, 32]
-	.cfi_offset 21, -464
-	.cfi_offset 22, -456
-	mov	x22, x1
-	mov	x21, x2
-	stp	d10, d11, [sp, 64]
-	.cfi_offset 74, -432
-	.cfi_offset 75, -424
-	movi	v11.2s, #0
-	movk	w4, 0x3915, lsl 16
-	str	x23, [sp, 48]
-	.cfi_offset 23, -448
-	mov	x23, x0
-	stp	d12, d13, [sp, 80]
-	fmov	s10, w3
-	.cfi_offset 76, -416
-	.cfi_offset 77, -408
-	ldr	s12, [x1]
-	stp	d14, d15, [sp, 96]
-	.cfi_offset 78, -400
-	.cfi_offset 79, -392
-	fmov	s13, w4
-	ldr	s15, [x0]
-	fmov	s14, w3
-	.p2align 5,,15
-.L6:
-	fadd	s0, s15, s11
-	bl	sinf
-	fmadd	s15, s12, s13, s15
-	str	s0, [x19]
-	fcmpe	s15, s14
-	bge	.L10
-.L7:
-	add	x19, x19, 4
-	cmp	x19, x20
-	bne	.L6
 .L9:
-	ldp	q23, q30, [sp, 112]
-	add	x0, sp, 368
-	ldp	q29, q28, [sp, 144]
-	add	x2, x21, 128
-	ldp	q27, q26, [sp, 176]
-	ldp	q25, q24, [sp, 208]
-	str	s15, [x23]
-	fmov	v31.4s, 5.0e-1
-	ldr	s0, [x22, 4]
-	fmul	v24.4s, v24.4s, v0.s[0]
-	fmul	v30.4s, v30.4s, v0.s[0]
-	fmul	v29.4s, v29.4s, v0.s[0]
-	fmul	v28.4s, v28.4s, v0.s[0]
-	fmul	v27.4s, v27.4s, v0.s[0]
-	fmul	v26.4s, v26.4s, v0.s[0]
-	fmul	v25.4s, v25.4s, v0.s[0]
-	fmul	v23.4s, v23.4s, v0.s[0]
-	fmul	v30.4s, v30.4s, v31.4s
-	fmul	v29.4s, v29.4s, v31.4s
-	fmul	v28.4s, v28.4s, v31.4s
-	fmul	v27.4s, v27.4s, v31.4s
-	fmul	v26.4s, v26.4s, v31.4s
-	fmul	v25.4s, v25.4s, v31.4s
-	stp	q30, q29, [sp, 256]
-	fmul	v23.4s, v23.4s, v31.4s
-	stp	q28, q27, [sp, 288]
-	fmul	v31.4s, v24.4s, v31.4s
-	stp	q26, q25, [sp, 320]
-	stp	q30, q29, [sp, 384]
-	stp	q31, q23, [sp, 352]
-	stp	q28, q27, [sp, 416]
-	ldp	q30, q22, [x19, 16]
-	stp	q26, q25, [sp, 448]
-	stp	q23, q30, [x21]
-	ldp	q26, q28, [x19, 48]
-	ldp	q27, q30, [x19, 80]
-	ldp	q29, q24, [x19, 112]
-	stp	q22, q26, [x21, 32]
-	ldp	q26, q25, [x0, 16]
-	stp	q28, q27, [x21, 64]
-	ldp	q28, q27, [x0, 48]
-	stp	q30, q29, [x21, 96]
-	ldp	q30, q29, [x0, 80]
-	str	q24, [x21, 128]
-	stp	q26, q25, [x2, 16]
-	stp	q28, q27, [x2, 48]
-	stp	q30, q29, [x2, 80]
-	str	q31, [x21, 240]
-	ldr	x23, [sp, 48]
-	ldp	x19, x20, [sp, 16]
-	ldp	x21, x22, [sp, 32]
-	ldp	d10, d11, [sp, 64]
-	ldp	d12, d13, [sp, 80]
-	ldp	d14, d15, [sp, 96]
-	ldp	x29, x30, [sp], 496
-	.cfi_remember_state
-	.cfi_restore 30
-	.cfi_restore 29
-	.cfi_restore 23
-	.cfi_restore 21
-	.cfi_restore 22
-	.cfi_restore 19
-	.cfi_restore 20
-	.cfi_restore 78
-	.cfi_restore 79
-	.cfi_restore 76
-	.cfi_restore 77
-	.cfi_restore 74
-	.cfi_restore 75
-	.cfi_def_cfa_offset 0
+	movl	$0x00000000, (%rdi)
 	ret
-	.p2align 2,,3
-.L10:
-	.cfi_restore_state
-	fsub	s15, s15, s10
-	b	.L7
 	.cfi_endproc
 .LFE5:
+	.size	tone_init, .-tone_init
+	.p2align 4
+	.globl	tone_process
+	.type	tone_process, @function
+tone_process:
+.LFB6:
+	.cfi_startproc
+.L11:
+	pushq	%r14
+	.cfi_def_cfa_offset 16
+	.cfi_offset 14, -16
+	movq	%rdi, %r14
+	pushq	%r13
+	.cfi_def_cfa_offset 24
+	.cfi_offset 13, -24
+	movq	%rsi, %r13
+	pushq	%r12
+	.cfi_def_cfa_offset 32
+	.cfi_offset 12, -32
+	movq	%rdx, %r12
+	pushq	%rbp
+	.cfi_def_cfa_offset 40
+	.cfi_offset 6, -40
+	pushq	%rbx
+	.cfi_def_cfa_offset 48
+	.cfi_offset 3, -48
+	subq	$400, %rsp
+	.cfi_def_cfa_offset 448
+	movss	(%rsi), %xmm3
+	movss	(%rdi), %xmm1
+	leaq	16(%rsp), %rbx
+	leaq	144(%rsp), %rbp
+	movss	%xmm3, 12(%rsp)
+	.p2align 4
+	.p2align 3
+.L12:
+	pxor	%xmm0, %xmm0
+	movss	%xmm1, 8(%rsp)
+	addss	%xmm1, %xmm0
+	call	sinf_lookup@PLT
+	movss	8(%rsp), %xmm1
+	movss	%xmm0, (%rbx)
+	movss	.LC3(%rip), %xmm0
+	mulss	12(%rsp), %xmm0
+	addss	%xmm0, %xmm1
+	comiss	.LC4(%rip), %xmm1
+	jb	.L13
+	subss	.LC5(%rip), %xmm1
+.L13:
+	addq	$4, %rbx
+	cmpq	%rbp, %rbx
+	jne	.L12
+.L15:
+	movss	%xmm1, (%r14)
+	movaps	112(%rsp), %xmm3
+	movss	4(%r13), %xmm0
+	movaps	128(%rsp), %xmm2
+	movaps	96(%rsp), %xmm4
+	movaps	80(%rsp), %xmm5
+	movaps	64(%rsp), %xmm6
+	shufps	$0, %xmm0, %xmm0
+	mulps	%xmm0, %xmm3
+	movaps	48(%rsp), %xmm7
+	movaps	32(%rsp), %xmm8
+	mulps	%xmm0, %xmm4
+	mulps	%xmm0, %xmm6
+	movss	.LC7(%rip), %xmm1
+	mulps	%xmm0, %xmm8
+	mulps	%xmm0, %xmm7
+	shufps	$0, %xmm1, %xmm1
+	mulps	%xmm0, %xmm5
+	mulps	%xmm0, %xmm2
+	mulps	16(%rsp), %xmm0
+	mulps	%xmm1, %xmm8
+	mulps	%xmm1, %xmm7
+	mulps	%xmm1, %xmm6
+	mulps	%xmm1, %xmm5
+	mulps	%xmm1, %xmm0
+	mulps	%xmm1, %xmm4
+	movups	%xmm8, 16(%r12)
+	mulps	%xmm1, %xmm3
+	movups	%xmm7, 32(%r12)
+	mulps	%xmm2, %xmm1
+	movups	%xmm6, 48(%r12)
+	movups	%xmm5, 64(%r12)
+	movups	%xmm0, (%r12)
+	movups	%xmm4, 80(%r12)
+	movups	%xmm3, 96(%r12)
+	movups	%xmm1, 112(%r12)
+	movups	%xmm0, 128(%r12)
+	movups	%xmm8, 144(%r12)
+	movups	%xmm7, 160(%r12)
+	movups	%xmm6, 176(%r12)
+	movups	%xmm5, 192(%r12)
+	movups	%xmm4, 208(%r12)
+	movups	%xmm3, 224(%r12)
+	movups	%xmm1, 240(%r12)
+	addq	$400, %rsp
+	.cfi_def_cfa_offset 48
+	popq	%rbx
+	.cfi_def_cfa_offset 40
+	popq	%rbp
+	.cfi_def_cfa_offset 32
+	popq	%r12
+	.cfi_def_cfa_offset 24
+	popq	%r13
+	.cfi_def_cfa_offset 16
+	popq	%r14
+	.cfi_def_cfa_offset 8
+	ret
+	.cfi_endproc
+.LFE6:
 	.size	tone_process, .-tone_process
-	.global	tone_state_size
+	.globl	tone_state_size
 	.data
-	.align	3
-	.type	tone_state_size, %object
+	.align 8
+	.type	tone_state_size, @object
 	.size	tone_state_size, 8
 tone_state_size:
-	.xword	4
+	.quad	4
+	.align 32
+	.type	sinf_lookup__table, @object
+	.size	sinf_lookup__table, 1028
+sinf_lookup__table:
+	.long	0
+	.long	1019808432
+	.long	1028193072
+	.long	1033283845
+	.long	1036565814
+	.long	1039839859
+	.long	1041645699
+	.long	1043271843
+	.long	1044891074
+	.long	1046502419
+	.long	1048104909
+	.long	1049136788
+	.long	1049927730
+	.long	1050712805
+	.long	1051491540
+	.long	1052263466
+	.long	1053028118
+	.long	1053785035
+	.long	1054533760
+	.long	1055273845
+	.long	1056004842
+	.long	1056726312
+	.long	1057201213
+	.long	1057551770
+	.long	1057896922
+	.long	1058236459
+	.long	1058570176
+	.long	1058897874
+	.long	1059219354
+	.long	1059534422
+	.long	1059842890
+	.long	1060144571
+	.long	1060439283
+	.long	1060726850
+	.long	1061007098
+	.long	1061279857
+	.long	1061544963
+	.long	1061802258
+	.long	1062051586
+	.long	1062292797
+	.long	1062525746
+	.long	1062750291
+	.long	1062966299
+	.long	1063173637
+	.long	1063372184
+	.long	1063561817
+	.long	1063742424
+	.long	1063913895
+	.long	1064076126
+	.long	1064229022
+	.long	1064372488
+	.long	1064506440
+	.long	1064630795
+	.long	1064745479
+	.long	1064850424
+	.long	1064945565
+	.long	1065030847
+	.long	1065106216
+	.long	1065171628
+	.long	1065227044
+	.long	1065272429
+	.long	1065307757
+	.long	1065333007
+	.long	1065348163
+	.long	1065353216
+	.long	1065348163
+	.long	1065333007
+	.long	1065307757
+	.long	1065272429
+	.long	1065227043
+	.long	1065171628
+	.long	1065106216
+	.long	1065030846
+	.long	1064945565
+	.long	1064850424
+	.long	1064745479
+	.long	1064630794
+	.long	1064506439
+	.long	1064372488
+	.long	1064229022
+	.long	1064076126
+	.long	1063913894
+	.long	1063742424
+	.long	1063561817
+	.long	1063372183
+	.long	1063173638
+	.long	1062966298
+	.long	1062750290
+	.long	1062525744
+	.long	1062292797
+	.long	1062051586
+	.long	1061802257
+	.long	1061544964
+	.long	1061279856
+	.long	1061007096
+	.long	1060726848
+	.long	1060439283
+	.long	1060144570
+	.long	1059842888
+	.long	1059534422
+	.long	1059219353
+	.long	1058897872
+	.long	1058570173
+	.long	1058236458
+	.long	1057896921
+	.long	1057551768
+	.long	1057201213
+	.long	1056726309
+	.long	1056004838
+	.long	1055273846
+	.long	1054533759
+	.long	1053785031
+	.long	1053028112
+	.long	1052263466
+	.long	1051491538
+	.long	1050712800
+	.long	1049927731
+	.long	1049136786
+	.long	1048104901
+	.long	1046502408
+	.long	1044891073
+	.long	1043271837
+	.long	1041645690
+	.long	1039839862
+	.long	1036565808
+	.long	1033283829
+	.long	1028193021
+	.long	1019808422
+	.long	-1279541970
+	.long	-1127675132
+	.long	-1119290580
+	.long	-1114199796
+	.long	-1110917817
+	.long	-1107643763
+	.long	-1105837947
+	.long	-1104211799
+	.long	-1102592563
+	.long	-1100981229
+	.long	-1099378736
+	.long	-1098346856
+	.long	-1097555912
+	.long	-1096770842
+	.long	-1095992105
+	.long	-1095220177
+	.long	-1094455531
+	.long	-1093698611
+	.long	-1092949883
+	.long	-1092209797
+	.long	-1091478805
+	.long	-1090757334
+	.long	-1090282433
+	.long	-1089931877
+	.long	-1089586725
+	.long	-1089247187
+	.long	-1088913472
+	.long	-1088585774
+	.long	-1088264293
+	.long	-1087949224
+	.long	-1087640758
+	.long	-1087339076
+	.long	-1087044363
+	.long	-1086756798
+	.long	-1086476550
+	.long	-1086203793
+	.long	-1085938685
+	.long	-1085681389
+	.long	-1085432061
+	.long	-1085190849
+	.long	-1084957900
+	.long	-1084733354
+	.long	-1084517351
+	.long	-1084310011
+	.long	-1084111464
+	.long	-1083921830
+	.long	-1083741223
+	.long	-1083569752
+	.long	-1083407519
+	.long	-1083254627
+	.long	-1083111160
+	.long	-1082977208
+	.long	-1082852853
+	.long	-1082738168
+	.long	-1082633223
+	.long	-1082538081
+	.long	-1082452802
+	.long	-1082377432
+	.long	-1082312020
+	.long	-1082256604
+	.long	-1082211219
+	.long	-1082175890
+	.long	-1082150641
+	.long	-1082135485
+	.long	-1082130432
+	.long	-1082135485
+	.long	-1082150641
+	.long	-1082175891
+	.long	-1082211219
+	.long	-1082256605
+	.long	-1082312020
+	.long	-1082377432
+	.long	-1082452802
+	.long	-1082538083
+	.long	-1082633225
+	.long	-1082738170
+	.long	-1082852855
+	.long	-1082977208
+	.long	-1083111160
+	.long	-1083254627
+	.long	-1083407523
+	.long	-1083569755
+	.long	-1083741227
+	.long	-1083921834
+	.long	-1084111464
+	.long	-1084310011
+	.long	-1084517351
+	.long	-1084733359
+	.long	-1084957905
+	.long	-1085190854
+	.long	-1085432061
+	.long	-1085681390
+	.long	-1085938685
+	.long	-1086203793
+	.long	-1086476553
+	.long	-1086756801
+	.long	-1087044369
+	.long	-1087339076
+	.long	-1087640758
+	.long	-1087949227
+	.long	-1088264297
+	.long	-1088585777
+	.long	-1088913476
+	.long	-1089247194
+	.long	-1089586725
+	.long	-1089931877
+	.long	-1090282436
+	.long	-1090757341
+	.long	-1091478813
+	.long	-1092209812
+	.long	-1092949898
+	.long	-1093698612
+	.long	-1094455531
+	.long	-1095220185
+	.long	-1095992113
+	.long	-1096770850
+	.long	-1097555928
+	.long	-1098346873
+	.long	-1099378737
+	.long	-1100981230
+	.long	-1102592580
+	.long	-1104211817
+	.long	-1105837964
+	.long	-1107643830
+	.long	-1110917884
+	.long	-1114199799
+	.long	-1119290586
+	.long	-1127675273
+	.long	0
+	.section	.rodata.cst4,"aM",@progbits,4
+	.align 4
+.LC0:
+	.long	1109588355
+	.align 4
+.LC1:
+	.long	1593835520
+	.align 4
+.LC3:
+	.long	957703570
+	.align 4
+.LC4:
+	.long	1086918619
+	.set	.LC5,.LC4
+	.align 4
+.LC7:
+	.long	1056964608
 	.ident	"GCC: (Debian 14.2.0-19) 14.2.0"
 	.section	.note.GNU-stack,"",@progbits
 Name: tone
@@ -362,105 +685,105 @@ Operations:
 process call 0
 i	ch0	ch1
 0	0.000000	0.000000
-1	0.006265	0.006265
+1	0.006264	0.006264
 2	0.012505	0.012505
-3	0.018696	0.018696
-4	0.024814	0.024814
-5	0.030834	0.030834
-6	0.036733	0.036733
-7	0.042488	0.042488
-8	0.048075	0.048075
+3	0.018695	0.018695
+4	0.024812	0.024812
+5	0.030832	0.030832
+6	0.036731	0.036731
+7	0.042486	0.042486
+8	0.048072	0.048072
 9	0.053474	0.053474
-10	0.058663	0.058663
-11	0.063622	0.063622
-12	0.068330	0.068330
-13	0.072770	0.072770
-14	0.076924	0.076924
-15	0.080776	0.080776
-16	0.084310	0.084310
-17	0.087514	0.087514
+10	0.058659	0.058659
+11	0.063620	0.063620
+12	0.068325	0.068325
+13	0.072766	0.072766
+14	0.076920	0.076920
+15	0.080771	0.080771
+16	0.084308	0.084308
+17	0.087507	0.087507
 18	0.090373	0.090373
-19	0.092878	0.092878
-20	0.095017	0.095017
-21	0.096783	0.096783
-22	0.098170	0.098170
-23	0.099170	0.099170
-24	0.099781	0.099781
-25	0.099999	0.099999
-26	0.099825	0.099825
-27	0.099259	0.099259
-28	0.098303	0.098303
-29	0.096960	0.096960
-30	0.095237	0.095237
-31	0.093139	0.093139
+19	0.092871	0.092871
+20	0.095015	0.095015
+21	0.096777	0.096777
+22	0.098165	0.098165
+23	0.099164	0.099164
+24	0.099774	0.099774
+25	0.099996	0.099996
+26	0.099818	0.099818
+27	0.099258	0.099258
+28	0.098295	0.098295
+29	0.096958	0.096958
+30	0.095230	0.095230
+31	0.093135	0.093135
 
 process call 1
 i	ch0	ch1
-0	0.090676	0.090676
-1	0.087856	0.087856
-2	0.084691	0.084691
-3	0.081194	0.081194
-4	0.077377	0.077377
-5	0.073257	0.073257
-6	0.068848	0.068848
-7	0.064170	0.064170
-8	0.059239	0.059239
-9	0.054075	0.054075
-10	0.048699	0.048699
-11	0.043131	0.043131
-12	0.037395	0.037395
-13	0.031511	0.031511
-14	0.025503	0.025503
-15	0.019396	0.019396
-16	0.013212	0.013212
-17	0.006976	0.006976
+0	0.090671	0.090671
+1	0.087851	0.087851
+2	0.084688	0.084688
+3	0.081188	0.081188
+4	0.077376	0.077376
+5	0.073251	0.073251
+6	0.068847	0.068847
+7	0.064165	0.064165
+8	0.059236	0.059236
+9	0.054072	0.054072
+10	0.048696	0.048696
+11	0.043130	0.043130
+12	0.037392	0.037392
+13	0.031510	0.031510
+14	0.025501	0.025501
+15	0.019395	0.019395
+16	0.013211	0.013211
+17	0.006975	0.006975
 18	0.000712	0.000712
-19	-0.005554	-0.005554
-20	-0.011798	-0.011798
-21	-0.017996	-0.017996
-22	-0.024123	-0.024123
-23	-0.030155	-0.030155
+19	-0.005553	-0.005553
+20	-0.011797	-0.011797
+21	-0.017994	-0.017994
+22	-0.024122	-0.024122
+23	-0.030153	-0.030153
 24	-0.036069	-0.036069
-25	-0.041842	-0.041842
-26	-0.047449	-0.047449
-27	-0.052871	-0.052871
-28	-0.058085	-0.058085
-29	-0.063070	-0.063070
-30	-0.067808	-0.067808
-31	-0.072279	-0.072279
+25	-0.041839	-0.041839
+26	-0.047448	-0.047448
+27	-0.052868	-0.052868
+28	-0.058081	-0.058081
+29	-0.063067	-0.063067
+30	-0.067803	-0.067803
+31	-0.072278	-0.072278
 
 process call 2
 i	ch0	ch1
-0	-0.076467	-0.076467
-1	-0.080354	-0.080354
-2	-0.083925	-0.083925
-3	-0.087167	-0.087167
-4	-0.090066	-0.090066
-5	-0.092611	-0.092611
-6	-0.094793	-0.094793
-7	-0.096602	-0.096602
-8	-0.098031	-0.098031
-9	-0.099076	-0.099076
+0	-0.076461	-0.076461
+1	-0.080353	-0.080353
+2	-0.083919	-0.083919
+3	-0.087164	-0.087164
+4	-0.090060	-0.090060
+5	-0.092606	-0.092606
+6	-0.094788	-0.094788
+7	-0.096595	-0.096595
+8	-0.098029	-0.098029
+9	-0.099068	-0.099068
 10	-0.099731	-0.099731
-11	-0.099994	-0.099994
-12	-0.099865	-0.099865
-13	-0.099343	-0.099343
-14	-0.098431	-0.098431
-15	-0.097132	-0.097132
-16	-0.095452	-0.095452
-17	-0.093396	-0.093396
-18	-0.090974	-0.090974
+11	-0.099987	-0.099987
+12	-0.099862	-0.099862
+13	-0.099336	-0.099336
+14	-0.098426	-0.098426
+15	-0.097127	-0.097127
+16	-0.095445	-0.095445
+17	-0.093394	-0.093394
+18	-0.090967	-0.090967
 19	-0.088194	-0.088194
-20	-0.085068	-0.085068
-21	-0.081608	-0.081608
-22	-0.077827	-0.077827
-23	-0.073740	-0.073740
-24	-0.069364	-0.069364
-25	-0.064715	-0.064715
-26	-0.059811	-0.059811
-27	-0.054673	-0.054673
+20	-0.085062	-0.085062
+21	-0.081605	-0.081605
+22	-0.077822	-0.077822
+23	-0.073736	-0.073736
+24	-0.069360	-0.069360
+25	-0.064710	-0.064710
+26	-0.059809	-0.059809
+27	-0.054669	-0.054669
 28	-0.049320	-0.049320
-29	-0.043773	-0.043773
-30	-0.038055	-0.038055
-31	-0.032186	-0.032186
+29	-0.043770	-0.043770
+30	-0.038054	-0.038054
+31	-0.032184	-0.032184
 

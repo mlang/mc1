@@ -1,5 +1,9 @@
 #include "compiler.hpp"
 
+#include <numbers>
+
+#include "mlang/gccjit.hpp"
+
 #include <cassert>
 #include <chrono>
 #include <cmath>
@@ -56,7 +60,7 @@ struct Context
   Context(unsigned int sample_rate, size_t block_size, DAG const& graph)
   : gcc{gccjit::context::acquire()}
   , sample_rate{sample_rate}, block_size{block_size}, graph{graph}
-  , sinf{import_function<float(float)>("sinf")}
+  , sinf{gccjit::make_tabled_function(gcc, "sinf_lookup", std::numbers::pi_v<float> * 2.0f, 256, std::sinf)}
   , kernelCache{}, stateCache{}
   {}
 

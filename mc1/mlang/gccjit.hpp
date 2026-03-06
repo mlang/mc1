@@ -133,7 +133,7 @@ make_tabled_function(context gcc, std::string name, T period, size_t n, T(*f)(T)
   block.add_assignment(a, table_a[i]);
   block.add_assignment(b, table_b[i]);
   block.end_with_return(
-    gcc.get_builtin_function("__builtin_fma")(
+    gcc.get_builtin_function("__builtin_fmaf")(
       x - gcc.new_cast(i, fp_type), b - a, a
     )
   );
