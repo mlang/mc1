@@ -146,6 +146,24 @@ public:
     return gcc.new_rvalue(type<float>(), static_cast<double>(value));
   }
 
+  gccjit::rvalue wrap_tau(gccjit::rvalue phase)
+  {
+    auto t_int = gcc.get_type(GCC_JIT_TYPE_INT);
+    auto tau = new_float(static_cast<float>(2.0 * std::numbers::pi_v<double>));
+
+    auto wrapped_hi = gcc.new_cast(
+      gcc.new_comparison(GCC_JIT_COMPARISON_GE, phase, tau), t_int
+    );
+    auto wrapped_hi_f = gcc.new_cast(wrapped_hi, type<float>());
+    auto out = phase - (tau * wrapped_hi_f);
+
+    auto wrapped_lo = gcc.new_cast(
+      gcc.new_comparison(GCC_JIT_COMPARISON_LT, out, gcc.zero(type<float>())), t_int
+    );
+    auto wrapped_lo_f = gcc.new_cast(wrapped_lo, type<float>());
+    return out + (tau * wrapped_lo_f);
+  }
+
   gccjit::block loop(gccjit::function fn, gccjit::block entry, auto &&body_fn)
   {
     auto c_BS_size = gcc.new_rvalue(type<size_t>(), long(block_size));
@@ -558,9 +576,6 @@ class SinOsc final : public GraphArgs
       auto lv_phase = k.new_local(ctx.type<float>(), "phase");
       entry.add_assignment(lv_phase, p_st.dereference_field(ST.phase));
 
-      auto c_bs_f = ctx.gcc.new_rvalue(ctx.type<float>(), double(ctx.block_size));
-
-      auto tau = ctx.gcc.new_rvalue(ctx.type<float>(), 2.0 * std::numbers::pi_v<double>);
       auto tau_over_sr = ctx.gcc.new_rvalue(
         ctx.type<float>(), (2.0 * std::numbers::pi_v<double>) / double(ctx.sample_rate)
       );
@@ -569,18 +584,12 @@ class SinOsc final : public GraphArgs
         gccjit::rvalue freq  = (args[0]->rate() == 'a') ? p_freq[lv_i] : p_freq;
         gccjit::rvalue phofs = (args[1]->rate() == 'a') ? p_phase[lv_i] : p_phase;
 
-        auto outv = ctx.sinf(lv_phase + phofs);
+        auto outv = ctx.sinf(ctx.wrap_tau(lv_phase + phofs));
         body.add_assignment(p_out[lv_i], outv);
 
         // phase += tau*freq/sample_rate
         auto delta = freq * tau_over_sr;
-        body.add_assignment(lv_phase, lv_phase + delta);
-
-        // branchless wrap: phase -= tau * (phase >= tau)
-        auto t_int = ctx.gcc.get_type(GCC_JIT_TYPE_INT);
-        auto wrapped = ctx.gcc.new_cast(ctx.gcc.new_comparison(GCC_JIT_COMPARISON_GE, lv_phase, tau), t_int);
-        auto wrapped_f = ctx.gcc.new_cast(wrapped, ctx.type<float>());
-        body.add_assignment(lv_phase, lv_phase - (tau * wrapped_f));
+        body.add_assignment(lv_phase, ctx.wrap_tau(lv_phase + delta));
         body.end_with_jump(cont);
       });
       after_loop.add_assignment(p_st.dereference_field(ST.phase), lv_phase);

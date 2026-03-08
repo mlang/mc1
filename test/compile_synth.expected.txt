@@ -1,6 +1,6 @@
 float sinf_lookup (float x)
 {
-  float D.164;
+  float D.165;
   float b;
   float a;
   size_t i;
@@ -14,17 +14,22 @@ float sinf_lookup (float x)
   _3 = i * 4;
   _4 = &sinf_lookup__table[1] + _3;
   b = *_4;
-  _5 = b - a;
-  _6 = (float) i;
-  _7 = x - _6;
-  D.164 = fmaf (_7, _5, a);
-  return D.164;
+  _5 = (float) i;
+  _6 = x - _5;
+  _7 = b - a;
+  D.165 = fmaf (_6, _7, a);
+  return D.165;
 }
 
 
 void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
 {
   float iftmp.0;
+  float iftmp.1;
+  float iftmp.2;
+  float iftmp.3;
+  float iftmp.4;
+  float iftmp.5;
   size_t i;
   float phase;
 
@@ -36,21 +41,75 @@ void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
   if (i <= 31) goto body; else goto done;
   body:
   _1 = phase + phase;
-  _2 = i * 4;
-  _3 = out + _2;
-  _4 = sinf_lookup (_1);
-  *_3 = _4;
-  _5 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
-  phase = phase + _5;
-  if (phase >= 6.28318530717958623199592693708837032318115234375e+0) goto <D.166>; else goto <D.167>;
-  <D.166>:
-  iftmp.0 = 1.0e+0;
-  goto <D.168>;
+  _2 = phase + phase;
+  if (_2 >= 6.283185482025146484375e+0) goto <D.167>; else goto <D.168>;
   <D.167>:
-  iftmp.0 = 0.0;
+  iftmp.0 = 1.0e+0;
+  goto <D.169>;
   <D.168>:
-  _6 = iftmp.0 * 6.28318530717958623199592693708837032318115234375e+0;
-  phase = phase - _6;
+  iftmp.0 = 0.0;
+  <D.169>:
+  _3 = iftmp.0 * 6.283185482025146484375e+0;
+  _4 = _1 - _3;
+  _5 = phase + phase;
+  _6 = phase + phase;
+  if (_6 >= 6.283185482025146484375e+0) goto <D.172>; else goto <D.173>;
+  <D.172>:
+  iftmp.2 = 1.0e+0;
+  goto <D.174>;
+  <D.173>:
+  iftmp.2 = 0.0;
+  <D.174>:
+  _7 = iftmp.2 * 6.283185482025146484375e+0;
+  _8 = _5 - _7;
+  if (_8 < 0.0) goto <D.175>; else goto <D.176>;
+  <D.175>:
+  iftmp.1 = 1.0e+0;
+  goto <D.177>;
+  <D.176>:
+  iftmp.1 = 0.0;
+  <D.177>:
+  _9 = iftmp.1 * 6.283185482025146484375e+0;
+  _10 = _4 + _9;
+  _11 = i * 4;
+  _12 = out + _11;
+  _13 = sinf_lookup (_10);
+  *_12 = _13;
+  _14 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
+  _15 = phase + _14;
+  _16 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
+  _17 = phase + _16;
+  if (_17 >= 6.283185482025146484375e+0) goto <D.179>; else goto <D.180>;
+  <D.179>:
+  iftmp.3 = 1.0e+0;
+  goto <D.181>;
+  <D.180>:
+  iftmp.3 = 0.0;
+  <D.181>:
+  _18 = iftmp.3 * 6.283185482025146484375e+0;
+  _19 = _15 - _18;
+  _20 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
+  _21 = phase + _20;
+  _22 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
+  _23 = phase + _22;
+  if (_23 >= 6.283185482025146484375e+0) goto <D.184>; else goto <D.185>;
+  <D.184>:
+  iftmp.5 = 1.0e+0;
+  goto <D.186>;
+  <D.185>:
+  iftmp.5 = 0.0;
+  <D.186>:
+  _24 = iftmp.5 * 6.283185482025146484375e+0;
+  _25 = _21 - _24;
+  if (_25 < 0.0) goto <D.187>; else goto <D.188>;
+  <D.187>:
+  iftmp.4 = 1.0e+0;
+  goto <D.189>;
+  <D.188>:
+  iftmp.4 = 0.0;
+  <D.189>:
+  _26 = iftmp.4 * 6.283185482025146484375e+0;
+  phase = _19 + _26;
   goto cont;
   cont:
   i = i + 1;
@@ -167,17 +226,17 @@ void tone_process (void * state, const float * controls, float * abus)
   try
     {
       entry:
-      _1 = *controls;
-      _2 = &MEM[(struct tone_state *)state].s3;
-      SinOsc_bba (_2, &e3[0], _1, 0.0);
+      _1 = &MEM[(struct tone_state *)state].s3;
+      _2 = *controls;
+      SinOsc_bba (_1, &e3[0], _2, 0.0);
       _3 = controls + 4;
       _4 = *_3;
       Mul_aba (&e4[0], &e3[0], _4);
       Pan_aba (&e6[0], &e4[0], 0.0);
       Out_baa (abus, &e6[0]);
-      _5 = &e6[0] + 128;
-      _6 = abus + 128;
-      Out_baa (_6, _5);
+      _5 = abus + 128;
+      _6 = &e6[0] + 128;
+      Out_baa (_5, _6);
       return;
     }
   finally
@@ -189,465 +248,470 @@ void tone_process (void * state, const float * controls, float * abus)
 }
 
 
+	.arch armv8-a
 	.file	"fake.c"
 	.text
-	.p2align 4
-	.globl	sinf_lookup
-	.type	sinf_lookup, @function
+	.align	2
+	.p2align 5,,15
+	.global	sinf_lookup
+	.type	sinf_lookup, %function
 sinf_lookup:
 .LFB0:
 	.cfi_startproc
 .L2:
-	movss	.LC0(%rip), %xmm1
-	mulss	%xmm0, %xmm1
-	comiss	.LC1(%rip), %xmm1
-	jnb	.L3
-	cvttss2siq	%xmm1, %rax
-.L4:
-	leaq	sinf_lookup__table(%rip), %rcx
-	leaq	0(,%rax,4), %rdx
-	movss	(%rcx,%rax,4), %xmm2
-	testq	%rax, %rax
-	js	.L5
-	pxor	%xmm3, %xmm3
-	cvtsi2ssq	%rax, %xmm3
-.L6:
-	leaq	4+sinf_lookup__table(%rip), %rax
-	subss	%xmm3, %xmm1
-	movss	(%rax,%rdx), %xmm0
-	subss	%xmm2, %xmm0
-	jmp	fmaf@PLT
-	.p2align 4,,10
-	.p2align 3
-.L3:
-	movaps	%xmm1, %xmm0
-	subss	.LC1(%rip), %xmm0
-	cvttss2siq	%xmm0, %rax
-	btcq	$63, %rax
-	jmp	.L4
-	.p2align 4,,10
-	.p2align 3
-.L5:
-	movq	%rax, %rcx
-	andl	$1, %eax
-	pxor	%xmm3, %xmm3
-	shrq	%rcx
-	orq	%rax, %rcx
-	cvtsi2ssq	%rcx, %xmm3
-	addss	%xmm3, %xmm3
-	jmp	.L6
+	mov	w0, 63875
+	movk	w0, 0x4222, lsl 16
+	fmov	s31, w0
+	adrp	x0, .LANCHOR0
+	add	x0, x0, :lo12:.LANCHOR0
+	fmul	s31, s0, s31
+	fcvtzu	x2, s31
+	lsl	x1, x2, 2
+	ucvtf	s29, x2
+	add	x2, x0, x1
+	ldr	s0, [x0, x1]
+	ldr	s30, [x2, 4]
+	fsub	s31, s31, s29
+	fsub	s30, s30, s0
+	fmadd	s0, s31, s30, s0
+	ret
 	.cfi_endproc
 .LFE0:
 	.size	sinf_lookup, .-sinf_lookup
-	.p2align 4
-	.globl	tone_init
-	.type	tone_init, @function
+	.align	2
+	.p2align 5,,15
+	.global	tone_init
+	.type	tone_init, %function
 tone_init:
 .LFB5:
 	.cfi_startproc
-.L9:
-	movl	$0x00000000, (%rdi)
+.L5:
+	str	wzr, [x0]
 	ret
 	.cfi_endproc
 .LFE5:
 	.size	tone_init, .-tone_init
-	.p2align 4
-	.globl	tone_process
-	.type	tone_process, @function
+	.align	2
+	.p2align 5,,15
+	.global	tone_process
+	.type	tone_process, %function
 tone_process:
 .LFB6:
 	.cfi_startproc
+.L7:
+	stp	x29, x30, [sp, -480]!
+	.cfi_def_cfa_offset 480
+	.cfi_offset 29, -480
+	.cfi_offset 30, -472
+	mov	w3, 4059
+	movk	w3, 0x40c9, lsl 16
+	mov	x29, sp
+	str	x23, [sp, 48]
+	.cfi_offset 23, -432
+	mov	x23, x0
+	stp	x19, x20, [sp, 16]
+	mov	w0, 26002
+	.cfi_offset 19, -464
+	.cfi_offset 20, -456
+	add	x19, sp, 96
+	stp	x21, x22, [sp, 32]
+	add	x20, sp, 224
+	.cfi_offset 21, -448
+	.cfi_offset 22, -440
+	mov	x22, x1
+	stp	d11, d12, [sp, 64]
+	.cfi_offset 75, -416
+	.cfi_offset 76, -408
+	movi	v11.2s, #0
+	ldr	s12, [x1]
+	mov	x21, x2
+	str	d15, [sp, 56]
+	stp	d13, d14, [sp, 80]
+	.cfi_offset 79, -424
+	.cfi_offset 77, -400
+	.cfi_offset 78, -392
+	movk	w0, 0x3915, lsl 16
+	ldr	s15, [x23]
+	fmov	s14, w3
+	fmov	s13, w0
+	.p2align 5,,15
+.L8:
+	fadd	s0, s15, s11
+	fcmpe	s0, s14
+	bge	.L20
+	fcmpe	s0, #0.0
+	bmi	.L23
+	b	.L11
+	.p2align 2,,3
+.L22:
+	fmov	s15, s0
+.L20:
+	fsub	s0, s0, s14
+	fadd	s0, s0, s11
 .L11:
-	pushq	%r14
-	.cfi_def_cfa_offset 16
-	.cfi_offset 14, -16
-	movq	%rdi, %r14
-	pushq	%r13
-	.cfi_def_cfa_offset 24
-	.cfi_offset 13, -24
-	movq	%rsi, %r13
-	pushq	%r12
-	.cfi_def_cfa_offset 32
-	.cfi_offset 12, -32
-	movq	%rdx, %r12
-	pushq	%rbp
-	.cfi_def_cfa_offset 40
-	.cfi_offset 6, -40
-	pushq	%rbx
-	.cfi_def_cfa_offset 48
-	.cfi_offset 3, -48
-	subq	$400, %rsp
-	.cfi_def_cfa_offset 448
-	movss	(%rsi), %xmm3
-	movss	(%rdi), %xmm1
-	leaq	16(%rsp), %rbx
-	leaq	144(%rsp), %rbp
-	movss	%xmm3, 12(%rsp)
-	.p2align 4
-	.p2align 3
-.L12:
-	pxor	%xmm0, %xmm0
-	movss	%xmm1, 8(%rsp)
-	addss	%xmm1, %xmm0
-	call	sinf_lookup@PLT
-	movss	8(%rsp), %xmm1
-	movss	%xmm0, (%rbx)
-	movss	.LC3(%rip), %xmm0
-	mulss	12(%rsp), %xmm0
-	addss	%xmm0, %xmm1
-	comiss	.LC4(%rip), %xmm1
-	jb	.L13
-	subss	.LC5(%rip), %xmm1
-.L13:
-	addq	$4, %rbx
-	cmpq	%rbp, %rbx
-	jne	.L12
-.L15:
-	movss	%xmm1, (%r14)
-	movaps	112(%rsp), %xmm3
-	movss	4(%r13), %xmm0
-	movaps	128(%rsp), %xmm2
-	movaps	96(%rsp), %xmm4
-	movaps	80(%rsp), %xmm5
-	movaps	64(%rsp), %xmm6
-	shufps	$0, %xmm0, %xmm0
-	mulps	%xmm0, %xmm3
-	movaps	48(%rsp), %xmm7
-	movaps	32(%rsp), %xmm8
-	mulps	%xmm0, %xmm4
-	mulps	%xmm0, %xmm6
-	movss	.LC7(%rip), %xmm1
-	mulps	%xmm0, %xmm8
-	mulps	%xmm0, %xmm7
-	shufps	$0, %xmm1, %xmm1
-	mulps	%xmm0, %xmm5
-	mulps	%xmm0, %xmm2
-	mulps	16(%rsp), %xmm0
-	mulps	%xmm1, %xmm8
-	mulps	%xmm1, %xmm7
-	mulps	%xmm1, %xmm6
-	mulps	%xmm1, %xmm5
-	mulps	%xmm1, %xmm0
-	mulps	%xmm1, %xmm4
-	movups	%xmm8, 16(%r12)
-	mulps	%xmm1, %xmm3
-	movups	%xmm7, 32(%r12)
-	mulps	%xmm2, %xmm1
-	movups	%xmm6, 48(%r12)
-	movups	%xmm5, 64(%r12)
-	movups	%xmm0, (%r12)
-	movups	%xmm4, 80(%r12)
-	movups	%xmm3, 96(%r12)
-	movups	%xmm1, 112(%r12)
-	movups	%xmm0, 128(%r12)
-	movups	%xmm8, 144(%r12)
-	movups	%xmm7, 160(%r12)
-	movups	%xmm6, 176(%r12)
-	movups	%xmm5, 192(%r12)
-	movups	%xmm4, 208(%r12)
-	movups	%xmm3, 224(%r12)
-	movups	%xmm1, 240(%r12)
-	addq	$400, %rsp
-	.cfi_def_cfa_offset 48
-	popq	%rbx
-	.cfi_def_cfa_offset 40
-	popq	%rbp
-	.cfi_def_cfa_offset 32
-	popq	%r12
-	.cfi_def_cfa_offset 24
-	popq	%r13
-	.cfi_def_cfa_offset 16
-	popq	%r14
-	.cfi_def_cfa_offset 8
+	bl	sinf_lookup
+	fmadd	s31, s12, s13, s15
+	str	s0, [x19]
+	fcmpe	s31, s14
+	bge	.L24
+	fcmpe	s31, #0.0
+	add	x19, x19, 4
+	bmi	.L18
+	fadd	s0, s31, s11
+	cmp	x19, x20
+	beq	.L17
+	fmov	s15, s0
+	b	.L11
+	.p2align 2,,3
+.L18:
+	fadd	s15, s31, s14
+	cmp	x19, x20
+	bne	.L8
+	fmov	s0, s15
+.L17:
+	ldp	q27, q29, [sp, 192]
+	add	x0, x21, 128
+	ldp	q22, q24, [sp, 96]
+	ldp	q23, q26, [sp, 128]
+	ldp	q25, q28, [sp, 160]
+	str	s0, [x23]
+	fmov	v31.4s, 5.0e-1
+	ldr	s30, [x22, 4]
+	fmul	v28.4s, v28.4s, v30.s[0]
+	fmul	v27.4s, v27.4s, v30.s[0]
+	fmul	v24.4s, v24.4s, v30.s[0]
+	fmul	v22.4s, v22.4s, v30.s[0]
+	fmul	v23.4s, v23.4s, v30.s[0]
+	fmul	v26.4s, v26.4s, v30.s[0]
+	fmul	v25.4s, v25.4s, v30.s[0]
+	fmul	v30.4s, v29.4s, v30.s[0]
+	fmul	v24.4s, v24.4s, v31.4s
+	fmul	v29.4s, v28.4s, v31.4s
+	fmul	v22.4s, v22.4s, v31.4s
+	fmul	v23.4s, v23.4s, v31.4s
+	fmul	v26.4s, v26.4s, v31.4s
+	fmul	v25.4s, v25.4s, v31.4s
+	fmul	v28.4s, v27.4s, v31.4s
+	stp	q22, q24, [x21]
+	fmul	v31.4s, v30.4s, v31.4s
+	stp	q23, q26, [x21, 32]
+	stp	q25, q29, [x21, 64]
+	stp	q28, q31, [x21, 96]
+	str	q22, [x21, 128]
+	stp	q24, q23, [x0, 16]
+	stp	q26, q25, [x0, 48]
+	stp	q29, q28, [x0, 80]
+	str	q31, [x21, 240]
+	ldr	d15, [sp, 56]
+	ldr	x23, [sp, 48]
+	ldp	x19, x20, [sp, 16]
+	ldp	x21, x22, [sp, 32]
+	ldp	d11, d12, [sp, 64]
+	ldp	d13, d14, [sp, 80]
+	ldp	x29, x30, [sp], 480
+	.cfi_remember_state
+	.cfi_restore 30
+	.cfi_restore 29
+	.cfi_restore 23
+	.cfi_restore 21
+	.cfi_restore 22
+	.cfi_restore 19
+	.cfi_restore 20
+	.cfi_restore 79
+	.cfi_restore 77
+	.cfi_restore 78
+	.cfi_restore 75
+	.cfi_restore 76
+	.cfi_def_cfa_offset 0
 	ret
+	.p2align 2,,3
+.L23:
+	.cfi_restore_state
+	fadd	s0, s0, s14
+	b	.L11
+	.p2align 2,,3
+.L24:
+	fsub	s31, s31, s14
+	add	x19, x19, 4
+	fadd	s0, s31, s11
+	cmp	x19, x20
+	beq	.L17
+	fcmpe	s0, s14
+	fmov	s15, s0
+	bge	.L22
+	b	.L11
 	.cfi_endproc
 .LFE6:
 	.size	tone_process, .-tone_process
-	.globl	tone_state_size
+	.global	tone_state_size
 	.data
-	.align 8
-	.type	tone_state_size, @object
-	.size	tone_state_size, 8
-tone_state_size:
-	.quad	4
-	.align 32
-	.type	sinf_lookup__table, @object
+	.align	4
+	.set	.LANCHOR0,. + 0
+	.type	sinf_lookup__table, %object
 	.size	sinf_lookup__table, 1028
 sinf_lookup__table:
-	.long	0
-	.long	1019808432
-	.long	1028193072
-	.long	1033283845
-	.long	1036565814
-	.long	1039839859
-	.long	1041645699
-	.long	1043271843
-	.long	1044891074
-	.long	1046502419
-	.long	1048104909
-	.long	1049136788
-	.long	1049927730
-	.long	1050712805
-	.long	1051491540
-	.long	1052263466
-	.long	1053028118
-	.long	1053785035
-	.long	1054533760
-	.long	1055273845
-	.long	1056004842
-	.long	1056726312
-	.long	1057201213
-	.long	1057551770
-	.long	1057896922
-	.long	1058236459
-	.long	1058570176
-	.long	1058897874
-	.long	1059219354
-	.long	1059534422
-	.long	1059842890
-	.long	1060144571
-	.long	1060439283
-	.long	1060726850
-	.long	1061007098
-	.long	1061279857
-	.long	1061544963
-	.long	1061802258
-	.long	1062051586
-	.long	1062292797
-	.long	1062525746
-	.long	1062750291
-	.long	1062966299
-	.long	1063173637
-	.long	1063372184
-	.long	1063561817
-	.long	1063742424
-	.long	1063913895
-	.long	1064076126
-	.long	1064229022
-	.long	1064372488
-	.long	1064506440
-	.long	1064630795
-	.long	1064745479
-	.long	1064850424
-	.long	1064945565
-	.long	1065030847
-	.long	1065106216
-	.long	1065171628
-	.long	1065227044
-	.long	1065272429
-	.long	1065307757
-	.long	1065333007
-	.long	1065348163
-	.long	1065353216
-	.long	1065348163
-	.long	1065333007
-	.long	1065307757
-	.long	1065272429
-	.long	1065227043
-	.long	1065171628
-	.long	1065106216
-	.long	1065030846
-	.long	1064945565
-	.long	1064850424
-	.long	1064745479
-	.long	1064630794
-	.long	1064506439
-	.long	1064372488
-	.long	1064229022
-	.long	1064076126
-	.long	1063913894
-	.long	1063742424
-	.long	1063561817
-	.long	1063372183
-	.long	1063173638
-	.long	1062966298
-	.long	1062750290
-	.long	1062525744
-	.long	1062292797
-	.long	1062051586
-	.long	1061802257
-	.long	1061544964
-	.long	1061279856
-	.long	1061007096
-	.long	1060726848
-	.long	1060439283
-	.long	1060144570
-	.long	1059842888
-	.long	1059534422
-	.long	1059219353
-	.long	1058897872
-	.long	1058570173
-	.long	1058236458
-	.long	1057896921
-	.long	1057551768
-	.long	1057201213
-	.long	1056726309
-	.long	1056004838
-	.long	1055273846
-	.long	1054533759
-	.long	1053785031
-	.long	1053028112
-	.long	1052263466
-	.long	1051491538
-	.long	1050712800
-	.long	1049927731
-	.long	1049136786
-	.long	1048104901
-	.long	1046502408
-	.long	1044891073
-	.long	1043271837
-	.long	1041645690
-	.long	1039839862
-	.long	1036565808
-	.long	1033283829
-	.long	1028193021
-	.long	1019808422
-	.long	-1279541970
-	.long	-1127675132
-	.long	-1119290580
-	.long	-1114199796
-	.long	-1110917817
-	.long	-1107643763
-	.long	-1105837947
-	.long	-1104211799
-	.long	-1102592563
-	.long	-1100981229
-	.long	-1099378736
-	.long	-1098346856
-	.long	-1097555912
-	.long	-1096770842
-	.long	-1095992105
-	.long	-1095220177
-	.long	-1094455531
-	.long	-1093698611
-	.long	-1092949883
-	.long	-1092209797
-	.long	-1091478805
-	.long	-1090757334
-	.long	-1090282433
-	.long	-1089931877
-	.long	-1089586725
-	.long	-1089247187
-	.long	-1088913472
-	.long	-1088585774
-	.long	-1088264293
-	.long	-1087949224
-	.long	-1087640758
-	.long	-1087339076
-	.long	-1087044363
-	.long	-1086756798
-	.long	-1086476550
-	.long	-1086203793
-	.long	-1085938685
-	.long	-1085681389
-	.long	-1085432061
-	.long	-1085190849
-	.long	-1084957900
-	.long	-1084733354
-	.long	-1084517351
-	.long	-1084310011
-	.long	-1084111464
-	.long	-1083921830
-	.long	-1083741223
-	.long	-1083569752
-	.long	-1083407519
-	.long	-1083254627
-	.long	-1083111160
-	.long	-1082977208
-	.long	-1082852853
-	.long	-1082738168
-	.long	-1082633223
-	.long	-1082538081
-	.long	-1082452802
-	.long	-1082377432
-	.long	-1082312020
-	.long	-1082256604
-	.long	-1082211219
-	.long	-1082175890
-	.long	-1082150641
-	.long	-1082135485
-	.long	-1082130432
-	.long	-1082135485
-	.long	-1082150641
-	.long	-1082175891
-	.long	-1082211219
-	.long	-1082256605
-	.long	-1082312020
-	.long	-1082377432
-	.long	-1082452802
-	.long	-1082538083
-	.long	-1082633225
-	.long	-1082738170
-	.long	-1082852855
-	.long	-1082977208
-	.long	-1083111160
-	.long	-1083254627
-	.long	-1083407523
-	.long	-1083569755
-	.long	-1083741227
-	.long	-1083921834
-	.long	-1084111464
-	.long	-1084310011
-	.long	-1084517351
-	.long	-1084733359
-	.long	-1084957905
-	.long	-1085190854
-	.long	-1085432061
-	.long	-1085681390
-	.long	-1085938685
-	.long	-1086203793
-	.long	-1086476553
-	.long	-1086756801
-	.long	-1087044369
-	.long	-1087339076
-	.long	-1087640758
-	.long	-1087949227
-	.long	-1088264297
-	.long	-1088585777
-	.long	-1088913476
-	.long	-1089247194
-	.long	-1089586725
-	.long	-1089931877
-	.long	-1090282436
-	.long	-1090757341
-	.long	-1091478813
-	.long	-1092209812
-	.long	-1092949898
-	.long	-1093698612
-	.long	-1094455531
-	.long	-1095220185
-	.long	-1095992113
-	.long	-1096770850
-	.long	-1097555928
-	.long	-1098346873
-	.long	-1099378737
-	.long	-1100981230
-	.long	-1102592580
-	.long	-1104211817
-	.long	-1105837964
-	.long	-1107643830
-	.long	-1110917884
-	.long	-1114199799
-	.long	-1119290586
-	.long	-1127675273
-	.long	0
-	.section	.rodata.cst4,"aM",@progbits,4
-	.align 4
-.LC0:
-	.long	1109588355
-	.align 4
-.LC1:
-	.long	1593835520
-	.align 4
-.LC3:
-	.long	957703570
-	.align 4
-.LC4:
-	.long	1086918619
-	.set	.LC5,.LC4
-	.align 4
-.LC7:
-	.long	1056964608
+	.word	0
+	.word	1019808432
+	.word	1028193072
+	.word	1033283845
+	.word	1036565814
+	.word	1039839859
+	.word	1041645699
+	.word	1043271843
+	.word	1044891074
+	.word	1046502419
+	.word	1048104909
+	.word	1049136788
+	.word	1049927730
+	.word	1050712805
+	.word	1051491540
+	.word	1052263466
+	.word	1053028118
+	.word	1053785035
+	.word	1054533760
+	.word	1055273845
+	.word	1056004842
+	.word	1056726312
+	.word	1057201213
+	.word	1057551770
+	.word	1057896922
+	.word	1058236459
+	.word	1058570176
+	.word	1058897874
+	.word	1059219354
+	.word	1059534422
+	.word	1059842890
+	.word	1060144571
+	.word	1060439283
+	.word	1060726850
+	.word	1061007098
+	.word	1061279857
+	.word	1061544963
+	.word	1061802258
+	.word	1062051586
+	.word	1062292797
+	.word	1062525746
+	.word	1062750291
+	.word	1062966299
+	.word	1063173637
+	.word	1063372184
+	.word	1063561817
+	.word	1063742424
+	.word	1063913895
+	.word	1064076126
+	.word	1064229022
+	.word	1064372488
+	.word	1064506440
+	.word	1064630795
+	.word	1064745479
+	.word	1064850424
+	.word	1064945565
+	.word	1065030847
+	.word	1065106216
+	.word	1065171628
+	.word	1065227044
+	.word	1065272429
+	.word	1065307757
+	.word	1065333007
+	.word	1065348163
+	.word	1065353216
+	.word	1065348163
+	.word	1065333007
+	.word	1065307757
+	.word	1065272429
+	.word	1065227043
+	.word	1065171628
+	.word	1065106216
+	.word	1065030846
+	.word	1064945565
+	.word	1064850424
+	.word	1064745479
+	.word	1064630794
+	.word	1064506439
+	.word	1064372488
+	.word	1064229022
+	.word	1064076126
+	.word	1063913894
+	.word	1063742424
+	.word	1063561817
+	.word	1063372183
+	.word	1063173638
+	.word	1062966298
+	.word	1062750290
+	.word	1062525744
+	.word	1062292797
+	.word	1062051586
+	.word	1061802257
+	.word	1061544964
+	.word	1061279856
+	.word	1061007096
+	.word	1060726848
+	.word	1060439283
+	.word	1060144570
+	.word	1059842888
+	.word	1059534422
+	.word	1059219353
+	.word	1058897872
+	.word	1058570173
+	.word	1058236458
+	.word	1057896921
+	.word	1057551768
+	.word	1057201213
+	.word	1056726309
+	.word	1056004838
+	.word	1055273846
+	.word	1054533759
+	.word	1053785031
+	.word	1053028112
+	.word	1052263466
+	.word	1051491538
+	.word	1050712800
+	.word	1049927731
+	.word	1049136786
+	.word	1048104901
+	.word	1046502408
+	.word	1044891073
+	.word	1043271837
+	.word	1041645690
+	.word	1039839862
+	.word	1036565808
+	.word	1033283829
+	.word	1028193021
+	.word	1019808422
+	.word	-1279541970
+	.word	-1127675132
+	.word	-1119290580
+	.word	-1114199796
+	.word	-1110917817
+	.word	-1107643763
+	.word	-1105837947
+	.word	-1104211799
+	.word	-1102592563
+	.word	-1100981229
+	.word	-1099378736
+	.word	-1098346856
+	.word	-1097555912
+	.word	-1096770842
+	.word	-1095992105
+	.word	-1095220177
+	.word	-1094455531
+	.word	-1093698611
+	.word	-1092949883
+	.word	-1092209797
+	.word	-1091478805
+	.word	-1090757334
+	.word	-1090282433
+	.word	-1089931877
+	.word	-1089586725
+	.word	-1089247187
+	.word	-1088913472
+	.word	-1088585774
+	.word	-1088264293
+	.word	-1087949224
+	.word	-1087640758
+	.word	-1087339076
+	.word	-1087044363
+	.word	-1086756798
+	.word	-1086476550
+	.word	-1086203793
+	.word	-1085938685
+	.word	-1085681389
+	.word	-1085432061
+	.word	-1085190849
+	.word	-1084957900
+	.word	-1084733354
+	.word	-1084517351
+	.word	-1084310011
+	.word	-1084111464
+	.word	-1083921830
+	.word	-1083741223
+	.word	-1083569752
+	.word	-1083407519
+	.word	-1083254627
+	.word	-1083111160
+	.word	-1082977208
+	.word	-1082852853
+	.word	-1082738168
+	.word	-1082633223
+	.word	-1082538081
+	.word	-1082452802
+	.word	-1082377432
+	.word	-1082312020
+	.word	-1082256604
+	.word	-1082211219
+	.word	-1082175890
+	.word	-1082150641
+	.word	-1082135485
+	.word	-1082130432
+	.word	-1082135485
+	.word	-1082150641
+	.word	-1082175891
+	.word	-1082211219
+	.word	-1082256605
+	.word	-1082312020
+	.word	-1082377432
+	.word	-1082452802
+	.word	-1082538083
+	.word	-1082633225
+	.word	-1082738170
+	.word	-1082852855
+	.word	-1082977208
+	.word	-1083111160
+	.word	-1083254627
+	.word	-1083407523
+	.word	-1083569755
+	.word	-1083741227
+	.word	-1083921834
+	.word	-1084111464
+	.word	-1084310011
+	.word	-1084517351
+	.word	-1084733359
+	.word	-1084957905
+	.word	-1085190854
+	.word	-1085432061
+	.word	-1085681390
+	.word	-1085938685
+	.word	-1086203793
+	.word	-1086476553
+	.word	-1086756801
+	.word	-1087044369
+	.word	-1087339076
+	.word	-1087640758
+	.word	-1087949227
+	.word	-1088264297
+	.word	-1088585777
+	.word	-1088913476
+	.word	-1089247194
+	.word	-1089586725
+	.word	-1089931877
+	.word	-1090282436
+	.word	-1090757341
+	.word	-1091478813
+	.word	-1092209812
+	.word	-1092949898
+	.word	-1093698612
+	.word	-1094455531
+	.word	-1095220185
+	.word	-1095992113
+	.word	-1096770850
+	.word	-1097555928
+	.word	-1098346873
+	.word	-1099378737
+	.word	-1100981230
+	.word	-1102592580
+	.word	-1104211817
+	.word	-1105837964
+	.word	-1107643830
+	.word	-1110917884
+	.word	-1114199799
+	.word	-1119290586
+	.word	-1127675273
+	.word	0
+	.zero	4
+	.type	tone_state_size, %object
+	.size	tone_state_size, 8
+tone_state_size:
+	.xword	4
 	.ident	"GCC: (Debian 14.2.0-19) 14.2.0"
 	.section	.note.GNU-stack,"",@progbits
 Name: tone

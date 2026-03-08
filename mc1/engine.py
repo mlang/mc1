@@ -30,7 +30,7 @@ class Engine:
     def send(self, data):
         return self.udp.sendto(bytes(data), ("localhost", self.port))
 
-    def sync(self, timeout=5.0):
+    def sync(self, timeout=30.0):
         self.send(Sync())
         old_timeout = self.udp.gettimeout()
         self.udp.settimeout(timeout)
