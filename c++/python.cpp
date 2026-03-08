@@ -25,13 +25,11 @@ double perft(pybind11::bytes b)
   auto r = compile(*dag, SR, BS);
   auto s = r[dag->name];
 
-  std::vector<float> controls = dag->controls;
-
   // Two-channel audiobus: channel-major layout [ch0 block][ch1 block]
   std::vector<float> abus(2 * BS, 0.0f);
 
   for (int iter = 0; iter < 10; ++iter) {
-    s.process(controls.data(), abus.data());
+    s.process(abus.data());
 
     std::println("process call {}", iter);
     std::println("i\tch0\tch1");
@@ -47,7 +45,7 @@ double perft(pybind11::bytes b)
 
   auto t0 = std::chrono::steady_clock::now();
   for (size_t i = 0; i < nblocks; ++i) {
-    s.process(controls.data(), abus.data());
+    s.process(abus.data());
   }
   auto t1 = std::chrono::steady_clock::now();
 

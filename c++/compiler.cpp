@@ -7,6 +7,7 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <algorithm>
 #include <memory>
 #include <numbers>
 #include <optional>
@@ -913,7 +914,36 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     state_size.set_initializer_rvalue(new_sizeof(*state_struct));
   }
 
-  return Result{ctx.gcc.compile()};
+  auto control_descs = std::vector<Result::ControlDesc>{};
+  if (!g.controlNames.empty()) {
+    auto sorted = g.controlNames;
+    std::sort(sorted.begin(), sorted.end(), [](auto const &left, auto const &right) {
+      return left.index < right.index;
+    });
+
+    control_descs.reserve(sorted.size());
+    for (size_t i = 0; i < sorted.size(); ++i) {
+      auto const begin = sorted[i].index;
+      auto const end = (i + 1 < sorted.size()) ? sorted[i + 1].index : g.controls.size();
+      if (begin >= g.controls.size()) continue;
+      if (end < begin) continue;
+
+      control_descs.push_back(Result::ControlDesc{
+        sorted[i].name,
+        begin,
+        end - begin
+      });
+    }
+  }
+
+  auto synths = std::vector<Result::SynthDescriptor>{};
+  synths.push_back(Result::SynthDescriptor{
+    g.name,
+    g.controls,
+    std::move(control_descs),
+  });
+
+  return Result{ctx.gcc.compile(), std::move(synths)};
 }
 
 }
