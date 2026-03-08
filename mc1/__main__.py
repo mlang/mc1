@@ -1,39 +1,40 @@
 import code
 import runpy
 import sys
-import time
 
-from mc1.dag import *
-from mc1.engine import Engine
-from mc1.message import Compile, Quit
+from mc1 import *
 
 
-def main():
+if __name__ == "__main__":
     script = sys.argv[1] if len(sys.argv) > 1 else None
     script_args = sys.argv[2:] if len(sys.argv) > 2 else []
 
-    Engine.build()
-    dsp = Engine()
-    dsp.run()
-    time.sleep(0.1)
-
     ns = {k: v for k, v in globals().items() if not k.startswith("__")}
-    ns["dsp"] = dsp
+    ns['dsp'] = DSP()
 
     if script is not None:
         sys.argv = [script, *script_args]
         runpy.run_path(script, init_globals=ns, run_name="__main__")
-        return
+        sys.exit()
+
+    try:
+        import readline
+        import rlcompleter
+
+        # Match CPython's libedit/readline TAB binding behavior.
+        if "libedit" in (readline.__doc__ or ""):
+            readline.parse_and_bind("bind ^I rl_complete")
+        else:
+            readline.parse_and_bind("tab: complete")
+        readline.set_completer(rlcompleter.Completer(ns).complete)
+    except ImportError:
+        pass
 
     code.interact(
         local=ns,
         banner="""MiniCollider
 
 Example:
-    dsp.send(Compile(lambda freq=440: SinOsc.ar(freq) * 0.1))""",
+    perft(bytes(lambda freq=440: SinOsc.ar(freq) * 0.1))""",
         exitmsg="",
     )
-
-
-if __name__ == "__main__":
-    main()
