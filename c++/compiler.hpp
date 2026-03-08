@@ -2,10 +2,13 @@
 
 #include "dag.hpp"
 
+#include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <functional>
 #include <libgccjit++.h>
+#include <optional>
+#include <span>
 #include <unordered_map>
 #include <memory>
 #include <string>
@@ -67,13 +70,20 @@ public:
       if (init) init(state_.data());
     }
 
-    Synth(Synth const&) = delete;
-    Synth& operator=(Synth const&) = delete;
+    Synth(Synth const&) = default;
+    Synth& operator=(Synth const&) = default;
     Synth(Synth&&) noexcept = default;
     Synth& operator=(Synth&&) noexcept = default;
 
     bool has_control(std::string_view name) const
     { return controls_by_name_.contains(std::string(name)); }
+
+    std::optional<ControlSlot> control_slot(std::string_view name) const
+    {
+      auto it = controls_by_name_.find(std::string(name));
+      if (it == controls_by_name_.end()) return std::nullopt;
+      return it->second;
+    }
 
     float get_control(std::string_view name) const
     {
@@ -101,6 +111,20 @@ public:
         return;
       }
       controls_[it->second.index] = value;
+    }
+
+    void set_control_values(std::string_view name, std::span<const float> values)
+    {
+      auto it = controls_by_name_.find(std::string(name));
+      if (it == controls_by_name_.end()) {
+        assert(false);
+        return;
+      }
+      if (it->second.width != values.size()) {
+        assert(false);
+        return;
+      }
+      std::copy_n(values.begin(), values.size(), controls_.begin() + it->second.index);
     }
 
     void process(float *abus)

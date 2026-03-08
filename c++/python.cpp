@@ -2,10 +2,17 @@
 #include <format>
 #include <span>
 #include <chrono>
+#include <algorithm>
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <limits>
 #include <memory>
+#include <string>
+#include <string_view>
+#include <unordered_map>
+#include <vector>
 
 #include "audio.hpp"
 #include "compiler.hpp"
@@ -62,6 +69,9 @@ class DSP
   size_t block_size_;
   uint32_t input_channels_;
   uint32_t output_channels_;
+  std::unordered_map<std::string, Result::Synth> synths_by_name_;
+  std::vector<Result::Synth> active_synths_;
+  std::vector<float> abus_;
   std::unique_ptr<audio_device> audio_device_;
 
   static uint32_t validate_positive(long value, const char* name)
@@ -82,6 +92,58 @@ class DSP
     return static_cast<uint32_t>(value);
   }
 
+  static float cast_float_control(
+      pybind11::handle value,
+      std::string_view synth_name,
+      std::string_view control_name)
+  {
+    try {
+      return pybind11::cast<float>(value);
+    } catch (const pybind11::cast_error&) {
+      throw pybind11::value_error(std::format(
+          "control '{}' for synth '{}' must be a number",
+          control_name,
+          synth_name));
+    }
+  }
+
+  static std::vector<float> parse_control_values(
+      pybind11::handle value,
+      std::string_view synth_name,
+      std::string_view control_name,
+      size_t width)
+  {
+    if (width == 1) {
+      return {cast_float_control(value, synth_name, control_name)};
+    }
+
+    if (!pybind11::isinstance<pybind11::sequence>(value) ||
+        pybind11::isinstance<pybind11::str>(value) ||
+        pybind11::isinstance<pybind11::bytes>(value)) {
+      throw pybind11::value_error(std::format(
+          "control '{}' for synth '{}' expects a sequence of {} numbers",
+          control_name,
+          synth_name,
+          width));
+    }
+
+    auto seq = pybind11::reinterpret_borrow<pybind11::sequence>(value);
+    if (static_cast<size_t>(pybind11::len(seq)) != width) {
+      throw pybind11::value_error(std::format(
+          "control '{}' for synth '{}' expects {} values",
+          control_name,
+          synth_name,
+          width));
+    }
+
+    std::vector<float> values;
+    values.reserve(width);
+    for (auto item : seq) {
+      values.push_back(cast_float_control(item, synth_name, control_name));
+    }
+    return values;
+  }
+
 public:
   DSP(
       long sample_rate = 44100,
@@ -96,6 +158,7 @@ public:
     if (input_channels_ == 0 && output_channels_ == 0) {
       throw pybind11::value_error("input_channels and output_channels cannot both be 0");
     }
+    abus_.resize(static_cast<size_t>(input_channels_ + output_channels_) * block_size_, 0.0f);
 
     audio_device_ = std::make_unique<audio_device>(
         input_channels_,
@@ -115,9 +178,98 @@ public:
 
   void process(void* output, const void* input, ma_uint32 frame_count)
   {
-    (void)output;
-    (void)input;
-    (void)frame_count;
+    assert(frame_count % block_size_ == 0);
+
+    const auto* in = static_cast<const float*>(input);
+    auto* out = static_cast<float*>(output);
+    const size_t nframes = static_cast<size_t>(frame_count);
+    const size_t nchunks = nframes / block_size_;
+    const size_t in_ch = static_cast<size_t>(input_channels_);
+    const size_t out_ch = static_cast<size_t>(output_channels_);
+
+    for (size_t chunk = 0; chunk < nchunks; ++chunk) {
+      std::fill(abus_.begin(), abus_.end(), 0.0f);
+
+      const size_t frame_offset = chunk * block_size_;
+      for (size_t f = 0; f < block_size_; ++f) {
+        const size_t src_frame = frame_offset + f;
+
+        for (size_t ch = 0; ch < out_ch; ++ch) {
+          float value = 0.0f;
+          if (out) value = out[src_frame * out_ch + ch];
+          abus_[ch * block_size_ + f] = value;
+        }
+
+        for (size_t ch = 0; ch < in_ch; ++ch) {
+          float value = 0.0f;
+          if (in) value = in[src_frame * in_ch + ch];
+          abus_[(out_ch + ch) * block_size_ + f] = value;
+        }
+      }
+
+      for (auto& synth : active_synths_) {
+        synth.process(abus_.data());
+      }
+
+      if (out) {
+        for (size_t f = 0; f < block_size_; ++f) {
+          const size_t dst_frame = frame_offset + f;
+          for (size_t ch = 0; ch < out_ch; ++ch) {
+            out[dst_frame * out_ch + ch] = abus_[ch * block_size_ + f];
+          }
+        }
+      }
+    }
+  }
+
+  void compile_graph(pybind11::bytes b)
+  {
+    auto bytes = std::as_bytes(std::span(std::string_view(b)));
+    auto dag = DAG::parse(bytes);
+    if (!dag) {
+      throw pybind11::value_error("invalid DAG bytes");
+    }
+
+    try {
+      auto result = compile(*dag, sample_rate_, block_size_);
+      auto synth = result[dag->name];
+      synths_by_name_.insert_or_assign(dag->name, std::move(synth));
+    } catch (const std::exception& ex) {
+      throw pybind11::value_error(std::string("compile failed: ") + ex.what());
+    }
+  }
+
+  void play(std::string_view synth_name, pybind11::kwargs controls)
+  {
+    auto it = synths_by_name_.find(std::string(synth_name));
+    if (it == synths_by_name_.end()) {
+      throw pybind11::value_error(std::format("unknown synth '{}'", synth_name));
+    }
+
+    auto synth = it->second;
+    for (auto item : controls) {
+      std::string control_name;
+      try {
+        control_name = pybind11::cast<std::string>(item.first);
+      } catch (const pybind11::cast_error&) {
+        throw pybind11::value_error(std::format(
+            "control names for synth '{}' must be strings",
+            synth_name));
+      }
+
+      auto slot = synth.control_slot(control_name);
+      if (!slot) {
+        throw pybind11::value_error(std::format(
+            "unknown control '{}' for synth '{}'",
+            control_name,
+            synth_name));
+      }
+
+      auto values = parse_control_values(item.second, synth_name, control_name, slot->width);
+      synth.set_control_values(control_name, values);
+    }
+
+    active_synths_.push_back(std::move(synth));
   }
 
   uint32_t sample_rate() const { return sample_rate_; }
@@ -155,5 +307,7 @@ PYBIND11_MODULE(_core, m, py::mod_gil_not_used())
   .def_property_readonly("block_size", &DSP::block_size)
   .def_property_readonly("input_channels", &DSP::input_channels)
   .def_property_readonly("output_channels", &DSP::output_channels)
+  .def("compile", &DSP::compile_graph, py::arg("dag_bytes"))
+  .def("play", &DSP::play, py::arg("synth_name"))
   .def("__repr__", &DSP::repr);
 }
