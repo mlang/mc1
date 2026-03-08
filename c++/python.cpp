@@ -38,7 +38,7 @@ double perft(pybind11::bytes b)
     for (size_t i = 0; i < BS; ++i) {
       float ch0 = abus[i];
       float ch1 = abus[BS + i];
-      std::println("{}\t{}\t{}", i, ch0, ch1);
+      std::println("{}\t{:.6g}\t{:.6g}", i, ch0, ch1);
     }
     std::println("");
   }
