@@ -20,6 +20,7 @@ cache-keys = [
     { file = "c++/**/*.{h,c,hpp,cpp}" },
     { file = "mc1/**/*.py" },
     { file = "CMakeLists.txt" },
+    { file = "c++/CMakeLists.txt" },
 ]
 
 [build-system]

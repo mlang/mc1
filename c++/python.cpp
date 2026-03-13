@@ -1,22 +1,21 @@
-#include <print>
-#include <format>
-#include <span>
-#include <chrono>
 #include <algorithm>
 #include <cassert>
-#include <cstddef>
+#include <chrono>
 #include <cstdint>
-#include <cstring>
+#include <format>
 #include <limits>
 #include <memory>
+#include <print>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include "audio.hpp"
 #include "compiler.hpp"
 #include "dag.hpp"
+#include "runtime.hpp"
 
 #include <pybind11/pybind11.h>
 
@@ -30,13 +29,14 @@ double perft(pybind11::bytes b)
   constexpr size_t BS = 32;
 
   auto r = compile(*dag, SR, BS);
-  auto s = r[dag->name];
+  auto compiled_synth = r[dag->name];
+  auto module = compiled_synth.instantiate();
 
   // Two-channel audiobus: channel-major layout [ch0 block][ch1 block]
   std::vector<float> abus(2 * BS, 0.0f);
 
   for (int iter = 0; iter < 10; ++iter) {
-    s.process(abus.data());
+    module.process(abus.data());
 
     std::println("process call {}", iter);
     std::println("i\tch0\tch1");
@@ -52,15 +52,12 @@ double perft(pybind11::bytes b)
 
   auto t0 = std::chrono::steady_clock::now();
   for (size_t i = 0; i < nblocks; ++i) {
-    s.process(abus.data());
+    module.process(abus.data());
   }
   auto t1 = std::chrono::steady_clock::now();
 
   std::chrono::duration<double> elapsed = t1 - t0;
-  double seconds = elapsed.count();
-  double ratio = 1.0 / seconds;
-
-  return seconds;
+  return elapsed.count();
 }
 
 class DSP
@@ -69,10 +66,10 @@ class DSP
   size_t block_size_;
   uint32_t input_channels_;
   uint32_t output_channels_;
-  std::unordered_map<std::string, Result::Synth> synths_by_name_;
-  std::vector<Result::Synth> active_synths_;
-  std::vector<float> abus_;
-  std::unique_ptr<audio_device> audio_device_;
+  runtime runtime_;
+  std::unordered_map<std::string, Result::CompiledSynth> compiled_synths_by_name_;
+  std::unordered_map<uint32_t, std::unique_ptr<module_instance>> modules_by_id_;
+  uint32_t next_module_id_ = 1;
 
   static uint32_t validate_positive(long value, const char* name)
   {
@@ -90,6 +87,17 @@ class DSP
       throw pybind11::value_error(std::string(name) + " must fit in uint32");
     }
     return static_cast<uint32_t>(value);
+  }
+
+  static uint32_t validate_output_channels(
+      uint32_t input_channels,
+      long output_channels)
+  {
+    auto value = validate_non_negative(output_channels, "output_channels");
+    if (input_channels == 0 && value == 0) {
+      throw pybind11::value_error("input_channels and output_channels cannot both be 0");
+    }
+    return value;
   }
 
   static float cast_float_control(
@@ -144,86 +152,43 @@ class DSP
     return values;
   }
 
+  template<typename Payload>
+  void enqueue_command(Payload payload, const char* action)
+  {
+    rt_command command{
+      .sample_offset = 0,
+      .payload = rt_payload{payload},
+    };
+    if (!runtime_.try_enqueue(command)) {
+      throw std::runtime_error(std::string(action) + ": rt command queue overflow");
+    }
+  }
+
+  void reap_retired_modules()
+  {
+    retire_token token;
+    while (runtime_.try_pop_retired(token)) {
+      modules_by_id_.erase(token.module->module_id);
+    }
+  }
+
 public:
   DSP(
       long sample_rate = 44100,
       long block_size = 32,
       long input_channels = 0,
       long output_channels = 2)
-  {
-    sample_rate_ = validate_positive(sample_rate, "sample_rate");
-    block_size_ = static_cast<size_t>(validate_positive(block_size, "block_size"));
-    input_channels_ = validate_non_negative(input_channels, "input_channels");
-    output_channels_ = validate_non_negative(output_channels, "output_channels");
-    if (input_channels_ == 0 && output_channels_ == 0) {
-      throw pybind11::value_error("input_channels and output_channels cannot both be 0");
-    }
-    abus_.resize(static_cast<size_t>(input_channels_ + output_channels_) * block_size_, 0.0f);
-
-    audio_device_ = std::make_unique<audio_device>(
-        input_channels_,
-        output_channels_,
-        &DSP::ma_trampoline,
-        this,
-        sample_rate_,
-        static_cast<uint32_t>(block_size_));
-  }
-
-  static void ma_trampoline(
-      ma_device* device,
-      void* output,
-      const void* input,
-      ma_uint32 frame_count)
-  { static_cast<DSP*>(device->pUserData)->process(output, input, frame_count); }
-
-  void process(void* output, const void* input, ma_uint32 frame_count)
-  {
-    assert(frame_count % block_size_ == 0);
-
-    const auto* in = static_cast<const float*>(input);
-    auto* out = static_cast<float*>(output);
-    const size_t nframes = static_cast<size_t>(frame_count);
-    const size_t nchunks = nframes / block_size_;
-    const size_t in_ch = static_cast<size_t>(input_channels_);
-    const size_t out_ch = static_cast<size_t>(output_channels_);
-
-    for (size_t chunk = 0; chunk < nchunks; ++chunk) {
-      std::fill(abus_.begin(), abus_.end(), 0.0f);
-
-      const size_t frame_offset = chunk * block_size_;
-      for (size_t f = 0; f < block_size_; ++f) {
-        const size_t src_frame = frame_offset + f;
-
-        for (size_t ch = 0; ch < out_ch; ++ch) {
-          float value = 0.0f;
-          if (out) value = out[src_frame * out_ch + ch];
-          abus_[ch * block_size_ + f] = value;
-        }
-
-        for (size_t ch = 0; ch < in_ch; ++ch) {
-          float value = 0.0f;
-          if (in) value = in[src_frame * in_ch + ch];
-          abus_[(out_ch + ch) * block_size_ + f] = value;
-        }
-      }
-
-      for (auto& synth : active_synths_) {
-        synth.process(abus_.data());
-      }
-
-      if (out) {
-        for (size_t f = 0; f < block_size_; ++f) {
-          const size_t dst_frame = frame_offset + f;
-          for (size_t ch = 0; ch < out_ch; ++ch) {
-            out[dst_frame * out_ch + ch] = abus_[ch * block_size_ + f];
-          }
-        }
-      }
-    }
-  }
+  : sample_rate_{validate_positive(sample_rate, "sample_rate")}
+  , block_size_{static_cast<size_t>(validate_positive(block_size, "block_size"))}
+  , input_channels_{validate_non_negative(input_channels, "input_channels")}
+  , output_channels_{validate_output_channels(input_channels_, output_channels)}
+  , runtime_{sample_rate_, block_size_, input_channels_, output_channels_}
+  {}
 
   void compile_graph(pybind11::bytes b)
   {
+    reap_retired_modules();
+
     auto bytes = std::as_bytes(std::span(std::string_view(b)));
     auto dag = DAG::parse(bytes);
     if (!dag) {
@@ -232,21 +197,27 @@ public:
 
     try {
       auto result = compile(*dag, sample_rate_, block_size_);
-      auto synth = result[dag->name];
-      synths_by_name_.insert_or_assign(dag->name, std::move(synth));
+      auto compiled_synth = result[dag->name];
+      compiled_synths_by_name_.insert_or_assign(dag->name, std::move(compiled_synth));
+    } catch (const pybind11::error_already_set&) {
+      throw;
     } catch (const std::exception& ex) {
       throw pybind11::value_error(std::string("compile failed: ") + ex.what());
     }
   }
 
-  void play(std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t add(std::string_view synth_name, pybind11::kwargs controls)
   {
-    auto it = synths_by_name_.find(std::string(synth_name));
-    if (it == synths_by_name_.end()) {
+    reap_retired_modules();
+
+    auto compiled_synth_it = compiled_synths_by_name_.find(std::string(synth_name));
+    if (compiled_synth_it == compiled_synths_by_name_.end()) {
       throw pybind11::value_error(std::format("unknown synth '{}'", synth_name));
     }
 
-    auto synth = it->second;
+    auto& compiled_synth = compiled_synth_it->second;
+
+    auto module = compiled_synth.instantiate();
     for (auto item : controls) {
       std::string control_name;
       try {
@@ -257,7 +228,7 @@ public:
             synth_name));
       }
 
-      auto slot = synth.control_slot(control_name);
+      auto slot = compiled_synth.control_slot(control_name);
       if (!slot) {
         throw pybind11::value_error(std::format(
             "unknown control '{}' for synth '{}'",
@@ -266,10 +237,48 @@ public:
       }
 
       auto values = parse_control_values(item.second, synth_name, control_name, slot->width);
-      synth.set_control_values(control_name, values);
+      module.set_control_values(slot->index, values);
     }
 
-    active_synths_.push_back(std::move(synth));
+    auto module_id = next_module_id_++;
+    auto instance = std::make_unique<module_instance>(module_instance{
+      .module_id = module_id,
+      .module = std::move(module),
+    });
+
+    auto* instance_ptr = instance.get();
+    modules_by_id_.insert_or_assign(module_id, std::move(instance));
+    try {
+      enqueue_command(start_module{module_id, instance_ptr}, "add failed");
+      return module_id;
+    } catch (...) {
+      modules_by_id_.erase(module_id);
+      throw;
+    }
+  }
+
+  void remove(long module_id)
+  {
+    reap_retired_modules();
+
+    auto validated_module_id = validate_non_negative(module_id, "module_id");
+    if (!modules_by_id_.contains(validated_module_id)) {
+      throw pybind11::value_error(std::format(
+          "unknown module_id {}",
+          validated_module_id));
+    }
+
+    enqueue_command(stop_module{validated_module_id}, "remove failed");
+  }
+
+  void start()
+  {
+    runtime_.start();
+  }
+
+  void stop() noexcept
+  {
+    runtime_.stop();
   }
 
   uint32_t sample_rate() const { return sample_rate_; }
@@ -287,7 +296,7 @@ public:
   }
 };
 
-}
+} // namespace mc1
 
 namespace py = pybind11;
 
@@ -308,6 +317,9 @@ PYBIND11_MODULE(_core, m, py::mod_gil_not_used())
   .def_property_readonly("input_channels", &DSP::input_channels)
   .def_property_readonly("output_channels", &DSP::output_channels)
   .def("compile", &DSP::compile_graph, py::arg("dag_bytes"))
-  .def("play", &DSP::play, py::arg("synth_name"))
+  .def("add", &DSP::add, py::arg("synth_name"))
+  .def("remove", &DSP::remove, py::arg("module_id"))
+  .def("start", &DSP::start)
+  .def("stop", &DSP::stop)
   .def("__repr__", &DSP::repr);
 }

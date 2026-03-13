@@ -54,17 +54,26 @@ def test_dsp_rejects_invalid_channel_values():
         DSP(input_channels=0, output_channels=0)
 
 
-def test_dsp_compile_and_play():
+def test_dsp_compile_and_add():
     dsp = DSP()
     dsp.compile(bytes(tone))
-    dsp.play("tone")
-    dsp.play("tone", freq=220)
+    dsp.add("tone")
+    dsp.add("tone", freq=220)
 
 
-def test_dsp_play_unknown_synth_raises():
+def test_dsp_start_and_stop():
+    dsp = DSP()
+    dsp.stop()
+    dsp.start()
+    dsp.start()
+    dsp.stop()
+    dsp.stop()
+
+
+def test_dsp_add_unknown_synth_raises():
     dsp = DSP()
     with pytest.raises(ValueError):
-        dsp.play("missing")
+        dsp.add("missing")
 
 
 def test_dsp_compile_invalid_bytes_raises():
@@ -73,26 +82,26 @@ def test_dsp_compile_invalid_bytes_raises():
         dsp.compile(b"not a dag")
 
 
-def test_dsp_compile_same_name_overwrites_and_plays_multiple():
+def test_dsp_compile_same_name_overwrites_and_adds_multiple():
     dsp = DSP()
     dsp.compile(bytes(tone))
     dsp.compile(bytes(tone))
-    dsp.play("tone")
-    dsp.play("tone")
+    dsp.add("tone")
+    dsp.add("tone")
 
 
-def test_dsp_play_unknown_control_raises():
+def test_dsp_add_unknown_control_raises():
     dsp = DSP()
     dsp.compile(bytes(tone))
     with pytest.raises(ValueError, match="unknown control"):
-        dsp.play("tone", unknown=1.0)
+        dsp.add("tone", unknown=1.0)
 
 
-def test_dsp_play_rejects_non_numeric_scalar_control():
+def test_dsp_add_rejects_non_numeric_scalar_control():
     dsp = DSP()
     dsp.compile(bytes(tone))
     with pytest.raises(ValueError, match="must be a number"):
-        dsp.play("tone", freq="nope")
+        dsp.add("tone", freq="nope")
 
 
 @DAG
@@ -100,14 +109,27 @@ def _multi_control(freq=(440, 442)):
     Out.ar(0, SinOsc.ar(220))
 
 
-def test_dsp_play_accepts_multi_width_control_sequence():
+def test_dsp_add_accepts_multi_width_control_sequence():
     dsp = DSP()
     dsp.compile(bytes(_multi_control))
-    dsp.play("_multi_control", freq=[220, 330])
+    dsp.add("_multi_control", freq=[220, 330])
 
 
-def test_dsp_play_rejects_multi_width_control_wrong_length():
+def test_dsp_add_rejects_multi_width_control_wrong_length():
     dsp = DSP()
     dsp.compile(bytes(_multi_control))
     with pytest.raises(ValueError, match="expects 2 values"):
-        dsp.play("_multi_control", freq=[220])
+        dsp.add("_multi_control", freq=[220])
+
+
+def test_dsp_remove_added_module():
+    dsp = DSP()
+    dsp.compile(bytes(tone))
+    module_id = dsp.add("tone")
+    dsp.remove(module_id)
+
+
+def test_dsp_remove_unknown_module_id_raises():
+    dsp = DSP()
+    with pytest.raises(ValueError, match="unknown module_id"):
+        dsp.remove(1)
