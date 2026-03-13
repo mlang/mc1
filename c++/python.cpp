@@ -164,6 +164,15 @@ class DSP
     }
   }
 
+  module_instance& get_module_instance(uint32_t module_id)
+  {
+    auto it = modules_by_id_.find(module_id);
+    if (it == modules_by_id_.end()) {
+      throw pybind11::value_error(std::format("unknown module_id {}", module_id));
+    }
+    return *it->second;
+  }
+
   void reap_retired_modules()
   {
     retire_token token;
@@ -243,6 +252,8 @@ public:
     auto module_id = next_module_id_++;
     auto instance = std::make_unique<module_instance>(module_instance{
       .module_id = module_id,
+      .synth_name = std::string(synth_name),
+      .compiled_synth = compiled_synth,
       .module = std::move(module),
     });
 
@@ -257,16 +268,55 @@ public:
     }
   }
 
+  void set(long module_id, pybind11::kwargs controls)
+  {
+    reap_retired_modules();
+
+    auto validated_module_id = validate_non_negative(module_id, "module_id");
+    auto& instance = get_module_instance(validated_module_id);
+
+    for (auto item : controls) {
+      std::string control_name;
+      try {
+        control_name = pybind11::cast<std::string>(item.first);
+      } catch (const pybind11::cast_error&) {
+        throw pybind11::value_error(std::format(
+            "control names for synth '{}' must be strings",
+            instance.synth_name));
+      }
+
+      auto slot = instance.compiled_synth.control_slot(control_name);
+      if (!slot) {
+        throw pybind11::value_error(std::format(
+            "unknown control '{}' for synth '{}'",
+            control_name,
+            instance.synth_name));
+      }
+
+      auto values = parse_control_values(
+          item.second,
+          instance.synth_name,
+          control_name,
+          slot->width);
+
+      for (size_t offset = 0; offset < values.size(); ++offset) {
+        enqueue_command(
+            set_control_value{
+              .module_id = validated_module_id,
+              .control_index = static_cast<uint32_t>(slot->index + offset),
+              .value = values[offset],
+            },
+            "set failed");
+      }
+    }
+  }
+
   void remove(long module_id)
   {
     reap_retired_modules();
 
     auto validated_module_id = validate_non_negative(module_id, "module_id");
-    if (!modules_by_id_.contains(validated_module_id)) {
-      throw pybind11::value_error(std::format(
-          "unknown module_id {}",
-          validated_module_id));
-    }
+    get_module_instance(validated_module_id);
 
     enqueue_command(stop_module{validated_module_id}, "remove failed");
   }
@@ -318,6 +368,7 @@ PYBIND11_MODULE(_core, m, py::mod_gil_not_used())
   .def_property_readonly("output_channels", &DSP::output_channels)
   .def("compile", &DSP::compile_graph, py::arg("dag_bytes"))
   .def("add", &DSP::add, py::arg("synth_name"))
+  .def("set", &DSP::set, py::arg("module_id"))
   .def("remove", &DSP::remove, py::arg("module_id"))
   .def("start", &DSP::start)
   .def("stop", &DSP::stop)

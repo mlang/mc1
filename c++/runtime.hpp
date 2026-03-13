@@ -8,6 +8,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <type_traits>
 #include <vector>
 
@@ -17,6 +18,8 @@ class audio_device;
 
 struct module_instance final {
   uint32_t module_id{};
+  std::string synth_name;
+  Result::CompiledSynth compiled_synth;
   Result::Module module;
 };
 

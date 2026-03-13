@@ -129,7 +129,51 @@ def test_dsp_remove_added_module():
     dsp.remove(module_id)
 
 
+def test_dsp_set_added_module_control():
+    dsp = DSP()
+    dsp.compile(bytes(tone))
+    module_id = dsp.add("tone")
+    dsp.set(module_id, freq=220)
+
+
+def test_dsp_set_accepts_multi_width_control_sequence():
+    dsp = DSP()
+    dsp.compile(bytes(_multi_control))
+    module_id = dsp.add("_multi_control")
+    dsp.set(module_id, freq=[220, 330])
+
+
+def test_dsp_set_unknown_control_raises():
+    dsp = DSP()
+    dsp.compile(bytes(tone))
+    module_id = dsp.add("tone")
+    with pytest.raises(ValueError, match="unknown control"):
+        dsp.set(module_id, unknown=1.0)
+
+
+def test_dsp_set_rejects_non_numeric_scalar_control():
+    dsp = DSP()
+    dsp.compile(bytes(tone))
+    module_id = dsp.add("tone")
+    with pytest.raises(ValueError, match="must be a number"):
+        dsp.set(module_id, freq="nope")
+
+
+def test_dsp_set_rejects_multi_width_control_wrong_length():
+    dsp = DSP()
+    dsp.compile(bytes(_multi_control))
+    module_id = dsp.add("_multi_control")
+    with pytest.raises(ValueError, match="expects 2 values"):
+        dsp.set(module_id, freq=[220])
+
+
 def test_dsp_remove_unknown_module_id_raises():
     dsp = DSP()
     with pytest.raises(ValueError, match="unknown module_id"):
         dsp.remove(1)
+
+
+def test_dsp_set_unknown_module_id_raises():
+    dsp = DSP()
+    with pytest.raises(ValueError, match="unknown module_id"):
+        dsp.set(1, freq=220)
