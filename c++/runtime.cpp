@@ -60,10 +60,9 @@ bool runtime::try_pop_retired(retire_token& token) noexcept
   return retired_modules_.try_pop(token);
 }
 
-void runtime::retire_module(module_instance* module) noexcept
+bool runtime::retire_module(module_instance* module) noexcept
 {
-  if (module == nullptr) return;
-  retired_modules_.try_push(retire_token{module});
+  return module != nullptr && retired_modules_.try_push(retire_token{module});
 }
 
 void runtime::drain_commands() noexcept
@@ -158,8 +157,7 @@ void runtime::apply_command(const rt_command& command) noexcept
       if (it == modules_.end()) return;
 
       auto* module = *it;
-      retire_token token{module};
-      if (!retired_modules_.try_push(token)) return;
+      if (!retire_module(module)) return;
 
       modules_.erase(it);
     },
@@ -188,8 +186,16 @@ void runtime::render_block(float* output, const float* input, size_t frame_offse
     }
   }
 
-  for (auto* module : modules_) {
+  for (size_t index = 0; index < modules_.size();) {
+    auto* module = modules_[index];
     module->module.process(abus_.data());
+
+    if (module->module.should_remove() && retire_module(module)) {
+      modules_.erase(modules_.begin() + static_cast<std::ptrdiff_t>(index));
+      continue;
+    }
+
+    ++index;
   }
 
   if (output == nullptr) return;

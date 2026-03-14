@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <libgccjit++.h>
 #include <optional>
 #include <span>
@@ -21,7 +22,7 @@ namespace mc1 {
 class Result
 {
   using init_fn_t = void (*)(void *);
-  using process_fn_t = void (*)(void *, const float *, float *);
+  using process_fn_t = uint32_t (*)(void *, const float *, float *);
 
 public:
   struct ControlDesc {
@@ -103,6 +104,8 @@ public:
     std::vector<std::byte> state_;
     std::vector<float> controls_;
     std::vector<size_t> trigger_control_indices_;
+    uint32_t last_done_action_{};
+    uint32_t pending_done_action_{};
 
   public:
     Module(
@@ -154,14 +157,27 @@ public:
       std::copy_n(values.begin(), values.size(), controls_.begin() + index);
     }
 
-    void process(float *abus)
+    uint32_t process(float *abus)
     {
       assert(process_ != nullptr);
-      process_(state_.data(), controls_.data(), abus);
+      last_done_action_ = process_(state_.data(), controls_.data(), abus);
+      if (last_done_action_ != 0 && pending_done_action_ == 0) {
+        pending_done_action_ = last_done_action_;
+      }
       for (auto index : trigger_control_indices_) {
         controls_[index] = 0.0f;
       }
+      return last_done_action_;
     }
+
+    uint32_t done_action() const noexcept
+    { return last_done_action_; }
+
+    uint32_t pending_done_action() const noexcept
+    { return pending_done_action_; }
+
+    bool should_remove() const noexcept
+    { return pending_done_action_ == 1; }
   };
 
 private:

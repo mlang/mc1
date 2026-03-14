@@ -65,7 +65,7 @@ private:
   boost::container::static_vector<module_instance*, max_modules> modules_{};
   std::unique_ptr<audio_device> audio_device_;
 
-  void retire_module(module_instance* module) noexcept;
+  bool retire_module(module_instance* module) noexcept;
   void drain_commands() noexcept;
   module_instance* find_module(uint32_t module_id) noexcept;
   void apply_command(const rt_command& command) noexcept;

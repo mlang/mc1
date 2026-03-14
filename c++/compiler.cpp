@@ -7,6 +7,7 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <algorithm>
 #include <memory>
 #include <numbers>
@@ -24,6 +25,16 @@
 
 namespace mc1 {
 
+namespace {
+
+constexpr int adsr_stage_idle = 0;
+constexpr int adsr_stage_attack = 1;
+constexpr int adsr_stage_decay = 2;
+constexpr int adsr_stage_sustain = 3;
+constexpr int adsr_stage_release = 4;
+
+} // namespace
+
 struct StateTypeBase
 {
   gccjit::type st;
@@ -35,6 +46,7 @@ template<class> inline constexpr enum gcc_jit_types jit_type_v;
 template<> inline constexpr enum gcc_jit_types jit_type_v<void>   = GCC_JIT_TYPE_VOID;
 template<> inline constexpr enum gcc_jit_types jit_type_v<float>  = GCC_JIT_TYPE_FLOAT;
 template<> inline constexpr enum gcc_jit_types jit_type_v<size_t> = GCC_JIT_TYPE_SIZE_T;
+template<> inline constexpr enum gcc_jit_types jit_type_v<uint32_t> = GCC_JIT_TYPE_UNSIGNED_INT;
 
 gccjit::rvalue new_sizeof(gccjit::type type)
 {
@@ -213,10 +225,15 @@ protected:
     return created;
   }
 
-  gccjit::function new_kernel(std::vector<gccjit::param> params) const
+  gccjit::function new_kernel(
+    std::vector<gccjit::param> params,
+    std::optional<gccjit::type> return_type = std::nullopt
+  ) const
   {
     return ctx.gcc.new_function(GCC_JIT_FUNCTION_INTERNAL,
-      ctx.gcc.get_type(rate() == 'a' ? GCC_JIT_TYPE_VOID : GCC_JIT_TYPE_FLOAT),
+      return_type.value_or(
+        ctx.gcc.get_type(rate() == 'a' ? GCC_JIT_TYPE_VOID : GCC_JIT_TYPE_FLOAT)
+      ),
       kernel_name(), params, 0
     );
   }
@@ -261,7 +278,12 @@ public:
 
   virtual std::optional<gccjit::type> state_type() const { return std::nullopt; }
   virtual void emit_init(gccjit::block, std::optional<gccjit::lvalue>) {}
-  virtual void emit_proc(gccjit::function, gccjit::block, std::optional<gccjit::lvalue>) = 0;
+  virtual void emit_proc(
+    gccjit::function,
+    gccjit::block,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) = 0;
 };
 
 class NonGraphArgs : public CodegenNode
@@ -345,7 +367,12 @@ struct Const final : NonGraphArgs
 {
   using NonGraphArgs::NonGraphArgs;
 
-  void emit_proc(gccjit::function, gccjit::block, std::optional<gccjit::lvalue>) override
+  void emit_proc(
+    gccjit::function,
+    gccjit::block,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) override
   {
     assert(args.size() == 1);
     rvalue = ctx.new_float(ctx.graph.constants[args.front()]);
@@ -356,7 +383,12 @@ struct Control final : NonGraphArgs
 {
   using NonGraphArgs::NonGraphArgs;
 
-  void emit_proc(gccjit::function f, gccjit::block, std::optional<gccjit::lvalue>) override
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) override
   {
     assert(args.size() == 1);
     rvalue = f.get_param(1)[args.front()];
@@ -376,7 +408,12 @@ struct In final : GraphArgs
     assert(this->args[0]->output_count() == 1);
   }
 
-  void emit_proc(gccjit::function f, gccjit::block, std::optional<gccjit::lvalue>) override
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) override
   {
     assert(sig == "ba");
     assert(args.size() == 1);
@@ -428,7 +465,12 @@ public:
     assert(this->args[0]->output_count() == 1);
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue>) override
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block b,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) override
   {
     assert(sig == "baa");
     assert(args.size() == 2);
@@ -510,7 +552,12 @@ public:
     assert(this->args[1]->output_count() == 1);
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue>) override
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block b,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) override
   {
     assert(args.size() == 2);
     assert(sig.size() == 3);
@@ -622,12 +669,441 @@ public:
     b.add_assignment(state_field->access_field(ST.phase), ctx.gcc.zero(ctx.type<float>()));
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue> state_field) override
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block b,
+    std::optional<gccjit::lvalue> state_field,
+    std::optional<gccjit::lvalue>
+  ) override
   {
     assert(rate() == 'a');
     assert(kernel);
     assert(state_field);
     rvalue = new_proc_local(f, b, *kernel, state_field->get_address());
+  }
+};
+
+class ADSR final : public GraphArgs
+{
+  struct StateType final : StateTypeBase
+  {
+    gccjit::field level;
+    gccjit::field stage;
+    gccjit::field last_gate;
+    gccjit::field release_start;
+
+    StateType(
+      gccjit::type st,
+      gccjit::field level,
+      gccjit::field stage,
+      gccjit::field last_gate,
+      gccjit::field release_start
+    )
+    : StateTypeBase{st}
+    , level{level}
+    , stage{stage}
+    , last_gate{last_gate}
+    , release_start{release_start}
+    {}
+  };
+
+  static constexpr const char *state_cache_key = "ADSR";
+
+  static StateType make_state_type(Context &ctx)
+  {
+    auto t_int = ctx.gcc.get_type(GCC_JIT_TYPE_INT);
+    auto fld_level = ctx.gcc.new_field(ctx.type<float>(), "level");
+    auto fld_stage = ctx.gcc.new_field(t_int, "stage");
+    auto fld_last_gate = ctx.gcc.new_field(t_int, "last_gate");
+    auto fld_release_start = ctx.gcc.new_field(ctx.type<float>(), "release_start");
+    auto fields = std::vector{fld_level, fld_stage, fld_last_gate, fld_release_start};
+    auto st = ctx.gcc.new_struct_type("adsr_state", fields);
+    return StateType(st, fld_level, fld_stage, fld_last_gate, fld_release_start);
+  }
+
+  static bool is_sig_supported(std::string const& s)
+  {
+    if (s.size() != 7 || s.back() != 'a') return false;
+    return std::ranges::all_of(s | std::views::take(6), [](char rate) {
+      return rate == 'a' || rate == 'b';
+    });
+  }
+
+  StateType &ST;
+  std::optional<gccjit::function> kernel;
+  std::optional<gccjit::type> state_type() const override { return ST.st; }
+
+  std::optional<gccjit::function> make_kernel() const override
+  {
+    if (!is_sig_supported(sig)) return std::nullopt;
+
+    auto t_state_ptr = ST.st.get_pointer();
+    auto t_float = ctx.type<float>();
+    auto t_float_ptr = ctx.type<float*>();
+    auto t_int = ctx.gcc.get_type(GCC_JIT_TYPE_INT);
+    auto t_u32 = ctx.type<uint32_t>();
+
+    auto p_st = ctx.gcc.new_param(t_state_ptr, "st");
+    auto p_out = ctx.gcc.new_param(t_float_ptr, "out");
+    auto p_gate = args[0]->new_param("gate");
+    auto p_attack = args[1]->new_param("attack");
+    auto p_decay = args[2]->new_param("decay");
+    auto p_sustain = args[3]->new_param("sustain");
+    auto p_release = args[4]->new_param("release");
+    auto p_done_value = args[5]->new_param("done_action");
+    auto p_done_action_accum = ctx.gcc.new_param(ctx.type<uint32_t*>(), "done_action_accum");
+
+    auto k = new_kernel(
+      {p_st, p_out, p_gate, p_attack, p_decay, p_sustain, p_release, p_done_value, p_done_action_accum}
+    );
+    {
+      auto entry = k.new_block("entry");
+
+      auto lv_level = k.new_local(t_float, "level");
+      auto lv_stage = k.new_local(t_int, "stage");
+      auto lv_last_gate = k.new_local(t_int, "last_gate");
+      auto lv_release_start = k.new_local(t_float, "release_start");
+      auto zero_size_t = ctx.gcc.zero(ctx.type<size_t>());
+      auto lv_done_action_accum = p_done_action_accum[zero_size_t];
+
+      auto zero_f = ctx.gcc.zero(t_float);
+      auto one_f = ctx.gcc.one(t_float);
+      auto zero_i = ctx.gcc.zero(t_int);
+      auto sample_rate = ctx.new_float(static_cast<float>(ctx.sample_rate));
+      auto c_stage_idle = ctx.gcc.new_rvalue(t_int, adsr_stage_idle);
+      auto c_stage_attack = ctx.gcc.new_rvalue(t_int, adsr_stage_attack);
+      auto c_stage_decay = ctx.gcc.new_rvalue(t_int, adsr_stage_decay);
+      auto c_stage_sustain = ctx.gcc.new_rvalue(t_int, adsr_stage_sustain);
+      auto c_stage_release = ctx.gcc.new_rvalue(t_int, adsr_stage_release);
+
+      auto sample_arg = [&](size_t index, gccjit::param p_arg, gccjit::lvalue lv_i) -> gccjit::rvalue
+      {
+        return args[index]->rate() == 'a' ? p_arg[lv_i] : p_arg;
+      };
+
+      auto non_negative = [&](gccjit::rvalue value) -> gccjit::rvalue
+      {
+        auto is_negative = ctx.gcc.new_cast(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LT, value, zero_f),
+          t_int
+        );
+        auto is_negative_f = ctx.gcc.new_cast(is_negative, t_float);
+        return value * (one_f - is_negative_f);
+      };
+
+      auto clamp_unit = [&](gccjit::rvalue value) -> gccjit::rvalue
+      {
+        auto clamped_low = non_negative(value);
+        auto is_high = ctx.gcc.new_cast(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_GT, clamped_low, one_f),
+          t_int
+        );
+        auto is_high_f = ctx.gcc.new_cast(is_high, t_float);
+        return clamped_low + ((one_f - clamped_low) * is_high_f);
+      };
+
+      auto set_action_if_done = [&](gccjit::block block, gccjit::rvalue done_value)
+      {
+        auto done_is_one = ctx.gcc.new_cast(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, done_value, one_f),
+          t_int
+        );
+        auto done_is_one_u32 = ctx.gcc.new_cast(done_is_one, t_u32);
+        block.add_assignment(lv_done_action_accum, ctx.gcc.new_binary_op(
+          GCC_JIT_BINARY_OP_BITWISE_OR,
+          t_u32,
+          lv_done_action_accum,
+          done_is_one_u32
+        ));
+      };
+
+      entry.add_assignment(lv_level, p_st.dereference_field(ST.level));
+      entry.add_assignment(lv_stage, p_st.dereference_field(ST.stage));
+      entry.add_assignment(lv_last_gate, p_st.dereference_field(ST.last_gate));
+      entry.add_assignment(lv_release_start, p_st.dereference_field(ST.release_start));
+
+      auto after_loop = ctx.loop(k, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i)
+      {
+        auto gate = sample_arg(0, p_gate, lv_i);
+        auto attack = non_negative(sample_arg(1, p_attack, lv_i));
+        auto decay = non_negative(sample_arg(2, p_decay, lv_i));
+        auto sustain = clamp_unit(sample_arg(3, p_sustain, lv_i));
+        auto release = non_negative(sample_arg(4, p_release, lv_i));
+        auto done_value = sample_arg(5, p_done_value, lv_i);
+        auto gate_on = ctx.gcc.new_cast(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_GT, gate, zero_f),
+          t_int
+        );
+
+        auto gate_on_check = k.new_block("adsr_gate_on_check");
+        auto gate_rise_apply = k.new_block("adsr_gate_rise_apply");
+        auto gate_fall_check = k.new_block("adsr_gate_fall_check");
+        auto gate_stage_check = k.new_block("adsr_gate_stage_check");
+        auto gate_fall_apply = k.new_block("adsr_gate_fall_apply");
+        auto after_gate = k.new_block("adsr_after_gate");
+        auto attack_zero_time_check = k.new_block("adsr_attack_zero_time_check");
+        auto attack_zero_apply = k.new_block("adsr_attack_zero_apply");
+        auto after_attack_zero = k.new_block("adsr_after_attack_zero");
+        auto decay_zero_time_check = k.new_block("adsr_decay_zero_time_check");
+        auto decay_zero_apply = k.new_block("adsr_decay_zero_apply");
+        auto decay_zero_sustain_apply = k.new_block("adsr_decay_zero_sustain_apply");
+        auto decay_zero_release_apply = k.new_block("adsr_decay_zero_release_apply");
+        auto after_decay_zero = k.new_block("adsr_after_decay_zero");
+        auto sustain_gate_check = k.new_block("adsr_sustain_gate_check");
+        auto sustain_release_apply = k.new_block("adsr_sustain_release_apply");
+        auto after_sustain_release = k.new_block("adsr_after_sustain_release");
+        auto release_zero_time_check = k.new_block("adsr_release_zero_time_check");
+        auto release_zero_apply = k.new_block("adsr_release_zero_apply");
+        auto after_release_zero = k.new_block("adsr_after_release_zero");
+        auto stage_attack_apply = k.new_block("adsr_stage_attack_apply");
+        auto stage_attack_finish = k.new_block("adsr_stage_attack_finish");
+        auto stage_decay_check = k.new_block("adsr_stage_decay_check");
+        auto stage_decay_apply = k.new_block("adsr_stage_decay_apply");
+        auto stage_decay_finish = k.new_block("adsr_stage_decay_finish");
+        auto stage_decay_finish_sustain = k.new_block("adsr_stage_decay_finish_sustain");
+        auto stage_decay_finish_release = k.new_block("adsr_stage_decay_finish_release");
+        auto stage_sustain_check = k.new_block("adsr_stage_sustain_check");
+        auto stage_sustain_apply = k.new_block("adsr_stage_sustain_apply");
+        auto stage_release_check = k.new_block("adsr_stage_release_check");
+        auto stage_release_apply = k.new_block("adsr_stage_release_apply");
+        auto stage_release_finish = k.new_block("adsr_stage_release_finish");
+        auto stage_idle_apply = k.new_block("adsr_stage_idle_apply");
+        auto sample_done = k.new_block("adsr_sample_done");
+
+        body.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, gate_on, zero_i),
+          gate_on_check,
+          gate_fall_check
+        );
+
+        gate_on_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_last_gate, zero_i),
+          gate_rise_apply,
+          after_gate
+        );
+        gate_rise_apply.add_assignment(lv_stage, c_stage_attack);
+        gate_rise_apply.end_with_jump(after_gate);
+
+        gate_fall_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, lv_last_gate, zero_i),
+          gate_stage_check,
+          after_gate
+        );
+        gate_stage_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, lv_stage, c_stage_idle),
+          gate_fall_apply,
+          after_gate
+        );
+        gate_fall_apply.add_assignment(lv_stage, c_stage_release);
+        gate_fall_apply.add_assignment(lv_release_start, lv_level);
+        gate_fall_apply.end_with_jump(after_gate);
+
+        after_gate.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_attack),
+          attack_zero_time_check,
+          after_attack_zero
+        );
+        attack_zero_time_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, attack, zero_f),
+          attack_zero_apply,
+          after_attack_zero
+        );
+        attack_zero_apply.add_assignment(lv_level, one_f);
+        attack_zero_apply.add_assignment(lv_stage, c_stage_decay);
+        attack_zero_apply.end_with_jump(after_attack_zero);
+
+        after_attack_zero.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_decay),
+          decay_zero_time_check,
+          after_decay_zero
+        );
+        decay_zero_time_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, decay, zero_f),
+          decay_zero_apply,
+          after_decay_zero
+        );
+        decay_zero_apply.add_assignment(lv_level, sustain);
+        decay_zero_apply.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, gate_on, zero_i),
+          decay_zero_sustain_apply,
+          decay_zero_release_apply
+        );
+        decay_zero_sustain_apply.add_assignment(lv_stage, c_stage_sustain);
+        decay_zero_sustain_apply.end_with_jump(after_decay_zero);
+        decay_zero_release_apply.add_assignment(lv_stage, c_stage_release);
+        decay_zero_release_apply.add_assignment(lv_release_start, lv_level);
+        decay_zero_release_apply.end_with_jump(after_decay_zero);
+
+        after_decay_zero.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_sustain),
+          sustain_gate_check,
+          after_sustain_release
+        );
+        sustain_gate_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, gate_on, zero_i),
+          sustain_release_apply,
+          after_sustain_release
+        );
+        sustain_release_apply.add_assignment(lv_stage, c_stage_release);
+        sustain_release_apply.add_assignment(lv_release_start, lv_level);
+        sustain_release_apply.end_with_jump(after_sustain_release);
+
+        after_sustain_release.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_release),
+          release_zero_time_check,
+          after_release_zero
+        );
+        release_zero_time_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, release, zero_f),
+          release_zero_apply,
+          after_release_zero
+        );
+        release_zero_apply.add_assignment(lv_level, zero_f);
+        release_zero_apply.add_assignment(lv_stage, c_stage_idle);
+        set_action_if_done(release_zero_apply, done_value);
+        release_zero_apply.end_with_jump(after_release_zero);
+
+        after_release_zero.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_attack),
+          stage_attack_apply,
+          stage_decay_check
+        );
+        stage_attack_apply.add_assignment(lv_level, lv_level + (one_f / (attack * sample_rate)));
+        stage_attack_apply.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_GE, lv_level, one_f),
+          stage_attack_finish,
+          sample_done
+        );
+        stage_attack_finish.add_assignment(lv_level, one_f);
+        stage_attack_finish.add_assignment(lv_stage, c_stage_decay);
+        stage_attack_finish.end_with_jump(sample_done);
+
+        stage_decay_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_decay),
+          stage_decay_apply,
+          stage_sustain_check
+        );
+        stage_decay_apply.add_assignment(
+          lv_level,
+          lv_level - ((one_f - sustain) / (decay * sample_rate))
+        );
+        stage_decay_apply.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, lv_level, sustain),
+          stage_decay_finish,
+          sample_done
+        );
+        stage_decay_finish.add_assignment(lv_level, sustain);
+        stage_decay_finish.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, gate_on, zero_i),
+          stage_decay_finish_sustain,
+          stage_decay_finish_release
+        );
+        stage_decay_finish_sustain.add_assignment(lv_stage, c_stage_sustain);
+        stage_decay_finish_sustain.end_with_jump(sample_done);
+        stage_decay_finish_release.add_assignment(lv_stage, c_stage_release);
+        stage_decay_finish_release.add_assignment(lv_release_start, lv_level);
+        stage_decay_finish_release.end_with_jump(sample_done);
+
+        stage_sustain_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_sustain),
+          stage_sustain_apply,
+          stage_release_check
+        );
+        stage_sustain_apply.add_assignment(lv_level, sustain);
+        stage_sustain_apply.end_with_jump(sample_done);
+
+        stage_release_check.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_release),
+          stage_release_apply,
+          stage_idle_apply
+        );
+        stage_release_apply.add_assignment(
+          lv_level,
+          lv_level - (lv_release_start / (release * sample_rate))
+        );
+        stage_release_apply.end_with_conditional(
+          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, lv_level, zero_f),
+          stage_release_finish,
+          sample_done
+        );
+        stage_release_finish.add_assignment(lv_level, zero_f);
+        stage_release_finish.add_assignment(lv_stage, c_stage_idle);
+        set_action_if_done(stage_release_finish, done_value);
+        stage_release_finish.end_with_jump(sample_done);
+
+        stage_idle_apply.add_assignment(lv_level, zero_f);
+        stage_idle_apply.end_with_jump(sample_done);
+
+        sample_done.add_assignment(p_out[lv_i], lv_level);
+        sample_done.add_assignment(lv_last_gate, gate_on);
+        sample_done.end_with_jump(cont);
+      });
+
+      after_loop.add_assignment(p_st.dereference_field(ST.level), lv_level);
+      after_loop.add_assignment(p_st.dereference_field(ST.stage), lv_stage);
+      after_loop.add_assignment(p_st.dereference_field(ST.last_gate), lv_last_gate);
+      after_loop.add_assignment(p_st.dereference_field(ST.release_start), lv_release_start);
+      after_loop.end_with_return();
+    }
+
+    return k;
+  }
+
+public:
+  ADSR(
+    Context &ctx, std::string name, std::string sig, size_t vertex_index, size_t num_out,
+    std::vector<CodegenNode*> args
+  )
+  : GraphArgs{ctx, std::move(name), std::move(sig), vertex_index, num_out, std::move(args)}
+  , ST{ctx.get_or_make_state<StateType>(state_cache_key, [&]{ return make_state_type(ctx); })}
+  , kernel{get_or_make_kernel()}
+  {
+    assert(output_count() == 1);
+    assert(this->args.size() == 6);
+    assert(std::ranges::all_of(this->args, [](CodegenNode *arg) { return arg->output_count() == 1; }));
+    assert(is_sig_supported(this->sig));
+  }
+
+  void emit_init(gccjit::block b, std::optional<gccjit::lvalue> state_field) override
+  {
+    assert(state_field);
+    auto t_int = ctx.gcc.get_type(GCC_JIT_TYPE_INT);
+    b.add_assignment(state_field->access_field(ST.level), ctx.gcc.zero(ctx.type<float>()));
+    b.add_assignment(state_field->access_field(ST.stage), ctx.gcc.zero(t_int));
+    b.add_assignment(state_field->access_field(ST.last_gate), ctx.gcc.zero(t_int));
+    b.add_assignment(state_field->access_field(ST.release_start), ctx.gcc.zero(ctx.type<float>()));
+  }
+
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block b,
+    std::optional<gccjit::lvalue> state_field,
+    std::optional<gccjit::lvalue> done_action
+  ) override
+  {
+    assert(rate() == 'a');
+    assert(state_field);
+    assert(done_action);
+    assert(kernel);
+
+    auto out = f.new_local(
+      ctx.type<float>(int(ctx.block_size * output_count())),
+      std::format("e{}", vertex_index)
+    );
+    auto call_args = std::vector<gccjit::rvalue>{
+      state_field->get_address(),
+      out[0].get_address(),
+      args[0]->get_rvalue(),
+      args[1]->get_rvalue(),
+      args[2]->get_rvalue(),
+      args[3]->get_rvalue(),
+      args[4]->get_rvalue(),
+      args[5]->get_rvalue(),
+      done_action->get_address(),
+    };
+    b.add_eval(ctx.gcc.new_call(*kernel, call_args));
+
+    rvalue = out[0].get_address();
   }
 };
 
@@ -688,7 +1164,12 @@ public:
     assert(is_sig_supported(this->sig));
   }
 
-  void emit_proc(gccjit::function f, gccjit::block b, std::optional<gccjit::lvalue>) override
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block b,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) override
   {
     assert(args.size() == 2);
     assert(sig.size() == 3);
@@ -731,6 +1212,7 @@ public:
     emplace<In>("In");
     emplace<Out>("Out");
 
+    emplace<ADSR>("ADSR");
     emplace<SinOsc>("SinOsc");
 
     emplace<BinOp>("Mul");
@@ -843,6 +1325,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
 
   auto t_void  = ctx.gcc.get_type(GCC_JIT_TYPE_VOID);
   auto t_size_t = ctx.type<size_t>();
+  auto t_u32 = ctx.type<uint32_t>();
   auto t_void_ptr = ctx.type<void*>();
 
   std::vector<std::optional<gccjit::field>> state_fields(nodes.size());
@@ -887,22 +1370,24 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     entry.end_with_return();
   }
 
-  // process(void *state, const float *controls, float *abus)
+  // uint32_t process(void *state, const float *controls, float *abus)
   auto process_args = std::vector{
     ctx.gcc.new_param(t_void_ptr, "state"),
     ctx.gcc.new_param(ctx.type<const float*>(), "controls"),
     ctx.gcc.new_param(ctx.type<float*>(), "abus"),
   };
   auto process = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
-    t_void, ctx.graph_symbol("process"), process_args, 0
+    t_u32, ctx.graph_symbol("process"), process_args, 0
   );
   {
     auto entry = process.new_block("entry");
     auto p_state = process.get_param(0);
+    auto done_action = process.new_local(t_u32, "done_action");
+    entry.add_assignment(done_action, ctx.gcc.zero(t_u32));
     for (size_t i = 0; i < nodes.size(); i++) {
-      nodes[i]->emit_proc(process, entry, make_node_state(p_state, i));
+      nodes[i]->emit_proc(process, entry, make_node_state(p_state, i), done_action);
     }
-    entry.end_with_return();
+    entry.end_with_return(done_action);
   }
 
   auto state_size = ctx.gcc.new_global(

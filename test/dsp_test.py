@@ -2,7 +2,7 @@ import pytest
 
 import mc1._core
 import mc1._test
-from mc1 import DAG, DSP, Out, SinOsc, Trigger, tone
+from mc1 import ADSR, DAG, DSP, Out, SinOsc, Trigger, default
 
 
 def test_dsp_defaults():
@@ -58,9 +58,9 @@ def test_dsp_rejects_invalid_channel_values():
 
 def test_dsp_compile_and_append():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    dsp.append("tone")
-    dsp.append("tone", freq=220)
+    dsp.compile(bytes(default))
+    dsp.append("default")
+    dsp.append("default", freq=220)
 
 
 def test_dsp_start_and_stop():
@@ -86,24 +86,24 @@ def test_dsp_compile_invalid_bytes_raises():
 
 def test_dsp_compile_same_name_overwrites_and_appends_multiple():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    dsp.compile(bytes(tone))
-    dsp.append("tone")
-    dsp.append("tone")
+    dsp.compile(bytes(default))
+    dsp.compile(bytes(default))
+    dsp.append("default")
+    dsp.append("default")
 
 
 def test_dsp_append_unknown_control_raises():
     dsp = DSP()
-    dsp.compile(bytes(tone))
+    dsp.compile(bytes(default))
     with pytest.raises(ValueError, match="unknown control"):
-        dsp.append("tone", unknown=1.0)
+        dsp.append("default", unknown=1.0)
 
 
 def test_dsp_append_rejects_non_numeric_scalar_control():
     dsp = DSP()
-    dsp.compile(bytes(tone))
+    dsp.compile(bytes(default))
     with pytest.raises(ValueError, match="must be a number"):
-        dsp.append("tone", freq="nope")
+        dsp.append("default", freq="nope")
 
 
 @DAG
@@ -124,6 +124,11 @@ def _annotated_value_control(freq: float = 440):
 @DAG
 def _trigger_default_pulse(trig: Trigger = 1):
     Out.ar(0, SinOsc.ar(220) * trig)
+
+
+@DAG
+def _adsr_env(gate=0, attack=0.25, decay=0.25, sustain=0.25, release=0.25, done_action=0):
+    Out.ar(0, ADSR.ar(gate, attack, decay, sustain, release, done_action))
 
 
 def test_dsp_append_accepts_multi_width_control_sequence():
@@ -160,15 +165,15 @@ def test_dsp_append_rejects_multi_width_control_wrong_length():
 
 def test_dsp_remove_added_module():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    module_id = dsp.append("tone")
+    dsp.compile(bytes(default))
+    module_id = dsp.append("default")
     dsp.remove(module_id)
 
 
 def test_dsp_set_added_module_control():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    module_id = dsp.append("tone")
+    dsp.compile(bytes(default))
+    module_id = dsp.append("default")
     dsp.set(module_id, freq=220)
 
 
@@ -196,16 +201,16 @@ def test_dsp_set_rejects_sequence_value_for_trigger_control():
 
 def test_dsp_set_unknown_control_raises():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    module_id = dsp.append("tone")
+    dsp.compile(bytes(default))
+    module_id = dsp.append("default")
     with pytest.raises(ValueError, match="unknown control"):
         dsp.set(module_id, unknown=1.0)
 
 
 def test_dsp_set_rejects_non_numeric_scalar_control():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    module_id = dsp.append("tone")
+    dsp.compile(bytes(default))
+    module_id = dsp.append("default")
     with pytest.raises(ValueError, match="must be a number"):
         dsp.set(module_id, freq="nope")
 
@@ -236,23 +241,23 @@ def test_dsp_add_is_not_available():
 
 def test_dsp_module_ids_reflect_runtime_order():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    first = dsp.append("tone")
-    second = dsp.append("tone")
-    head = dsp.prepend("tone")
-    before_second = dsp.insert_before(second, "tone")
-    after_head = dsp.insert_after(head, "tone")
+    dsp.compile(bytes(default))
+    first = dsp.append("default")
+    second = dsp.append("default")
+    head = dsp.prepend("default")
+    before_second = dsp.insert_before(second, "default")
+    after_head = dsp.insert_after(head, "default")
 
     assert dsp.module_ids == [head, after_head, first, before_second, second]
 
 
 def test_dsp_remove_preserves_survivor_order():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    first = dsp.append("tone")
-    second = dsp.append("tone")
-    third = dsp.append("tone")
-    fourth = dsp.append("tone")
+    dsp.compile(bytes(default))
+    first = dsp.append("default")
+    second = dsp.append("default")
+    third = dsp.append("default")
+    fourth = dsp.append("default")
 
     assert dsp.module_ids == [first, second, third, fourth]
 
@@ -268,31 +273,31 @@ def test_dsp_remove_preserves_survivor_order():
 
 def test_dsp_insert_before_unknown_module_id_raises():
     dsp = DSP()
-    dsp.compile(bytes(tone))
+    dsp.compile(bytes(default))
     with pytest.raises(ValueError, match="unknown module_id"):
-        dsp.insert_before(1, "tone")
+        dsp.insert_before(1, "default")
 
 
 def test_dsp_insert_after_unknown_module_id_raises():
     dsp = DSP()
-    dsp.compile(bytes(tone))
+    dsp.compile(bytes(default))
     with pytest.raises(ValueError, match="unknown module_id"):
-        dsp.insert_after(1, "tone")
+        dsp.insert_after(1, "default")
 
 
 def test_dsp_prepend_unknown_control_raises():
     dsp = DSP()
-    dsp.compile(bytes(tone))
+    dsp.compile(bytes(default))
     with pytest.raises(ValueError, match="unknown control"):
-        dsp.prepend("tone", unknown=1.0)
+        dsp.prepend("default", unknown=1.0)
 
 
 def test_dsp_insert_after_rejects_non_numeric_scalar_control():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    anchor = dsp.append("tone")
+    dsp.compile(bytes(default))
+    anchor = dsp.append("default")
     with pytest.raises(ValueError, match="must be a number"):
-        dsp.insert_after(anchor, "tone", freq="nope")
+        dsp.insert_after(anchor, "default", freq="nope")
 
 
 def test_dsp_insert_before_rejects_multi_width_control_wrong_length():
@@ -323,14 +328,82 @@ def test_trigger_default_resets_after_first_block():
     assert all(sample == 0.0 for sample in second_block)
 
 
+def test_adsr_renders_attack_decay_sustain_release():
+    rendered = mc1._test._render_control_blocks(
+        bytes(_adsr_env),
+        [
+            {"gate": 1, "attack": 0.25, "decay": 0.25, "sustain": 0.25, "release": 0.25},
+            {"gate": 1},
+            {"gate": 0},
+        ],
+        sample_rate=8,
+        block_size=4,
+        output_channels=1,
+    )
+
+    assert rendered["blocks"][0] == pytest.approx([0.5, 1.0, 0.625, 0.25])
+    assert rendered["blocks"][1] == pytest.approx([0.25, 0.25, 0.25, 0.25])
+    assert rendered["blocks"][2] == pytest.approx([0.125, 0.0, 0.0, 0.0])
+    assert rendered["done_actions"] == [0, 0, 0]
+
+
+def test_adsr_zero_times_and_done_action_fire_immediately():
+    rendered = mc1._test._render_control_blocks(
+        bytes(_adsr_env),
+        [
+            {"gate": 1, "attack": 0, "decay": 0, "sustain": 0.4, "release": 0, "done_action": 1},
+            {"gate": 0},
+        ],
+        sample_rate=8,
+        block_size=1,
+        output_channels=1,
+    )
+
+    assert rendered["blocks"][0] == pytest.approx([0.4])
+    assert rendered["blocks"][1] == pytest.approx([0.0])
+    assert rendered["done_actions"] == [0, 1]
+
+
+def test_adsr_done_action_removes_module_from_runtime():
+    module_ids = mc1._test._runtime_module_ids_per_block(
+        bytes(_adsr_env),
+        [
+            {"gate": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0, "done_action": 1},
+            {"gate": 0},
+            {"gate": 0},
+        ],
+        sample_rate=8,
+        block_size=1,
+        output_channels=1,
+    )
+
+    assert module_ids == [[1], [], []]
+
+
+def test_adsr_done_action_zero_keeps_module_in_runtime():
+    module_ids = mc1._test._runtime_module_ids_per_block(
+        bytes(_adsr_env),
+        [
+            {"gate": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0, "done_action": 0},
+            {"gate": 0},
+            {"gate": 0},
+        ],
+        sample_rate=8,
+        block_size=1,
+        output_channels=1,
+    )
+
+    assert module_ids == [[1], [1], [1]]
+
+
 def test_dsp_stale_anchor_insert_is_dropped():
     dsp = DSP()
-    dsp.compile(bytes(tone))
-    anchor = dsp.append("tone")
-    survivor = dsp.append("tone")
+    dsp.compile(bytes(default))
+    anchor = dsp.append("default")
+    survivor = dsp.append("default")
 
     dsp.remove(anchor)
-    dropped = dsp.insert_after(anchor, "tone")
+    dropped = dsp.insert_after(anchor, "default")
 
     assert dsp.module_ids == [survivor]
 

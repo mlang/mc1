@@ -6,7 +6,7 @@ import io
 import struct
 
 
-__all__ = ('In', 'Out', 'Pan', 'SinOsc', 'Trigger', 'DAG')
+__all__ = ('ADSR', 'In', 'Out', 'Pan', 'SinOsc', 'Trigger', 'DAG')
 
 
 class Trigger:
@@ -139,6 +139,12 @@ class SinOsc(_GraphArgs):
     @classmethod
     def ar(cls, freq, phase=0):
         return cls(Rate.AUDIO, 1, freq, phase)
+
+
+class ADSR(_GraphArgs):
+    @classmethod
+    def ar(cls, gate, attack, decay, sustain, release, done_action=0):
+        return cls(Rate.AUDIO, 1, gate, attack, decay, sustain, release, done_action)
 
 
 class In(_GraphArgs):
