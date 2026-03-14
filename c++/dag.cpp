@@ -42,9 +42,13 @@ std::optional<DAG> DAG::parse(std::span<const std::byte> &bytes)
                 if (!controlName) return std::nullopt;
                 auto controlIndex = get_value<const size_t>(bytes);
                 if (!controlIndex) return std::nullopt;
+                auto controlKind = get_value<const uint8_t>(bytes);
+                if (!controlKind) return std::nullopt;
 
                 controlNames.push_back({
-                  std::move(controlName.value()), controlIndex.value()
+                  std::move(controlName.value()),
+                  controlIndex.value(),
+                  static_cast<control_kind>(controlKind.value())
                 });
               }
 
@@ -87,7 +91,8 @@ std::ostream& operator<<(std::ostream& os, const DAG& d)
   }
   os << "\nControl Names: ";
   for (const auto& controlName : d.controlNames) {
-    os << "(" << controlName.name << ", " << controlName.index << ") ";
+    os << "(" << controlName.name << ", " << controlName.index << ", "
+       << static_cast<int>(controlName.kind) << ") ";
   }
   os << "\nOperations:\n";
   for (const auto& operation : d.ops) {

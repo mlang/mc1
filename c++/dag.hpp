@@ -1,6 +1,7 @@
 #pragma once
 
 #include <iostream>
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <span>
@@ -10,10 +11,16 @@
 
 namespace mc1 {
 
+enum class control_kind : uint8_t {
+  value = 0,
+  trigger = 1,
+};
+
 struct DAG final {
   struct ControlName {
     std::string name;
     size_t index;
+    control_kind kind{control_kind::value};
   };
 
   std::string name;

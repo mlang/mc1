@@ -931,7 +931,8 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
       control_descs.push_back(Result::ControlDesc{
         sorted[i].name,
         begin,
-        end - begin
+        end - begin,
+        sorted[i].kind,
       });
     }
   }

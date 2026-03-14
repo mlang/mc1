@@ -22,6 +22,28 @@
 
 namespace mc1 {
 
+namespace {
+
+uint32_t validate_positive_arg(long value, const char* name)
+{
+  if (value <= 0) throw pybind11::value_error(std::string(name) + " must be > 0");
+  if (value > static_cast<long>(std::numeric_limits<uint32_t>::max())) {
+    throw pybind11::value_error(std::string(name) + " must fit in uint32");
+  }
+  return static_cast<uint32_t>(value);
+}
+
+uint32_t validate_non_negative_arg(long value, const char* name)
+{
+  if (value < 0) throw pybind11::value_error(std::string(name) + " must be >= 0");
+  if (value > static_cast<long>(std::numeric_limits<uint32_t>::max())) {
+    throw pybind11::value_error(std::string(name) + " must fit in uint32");
+  }
+  return static_cast<uint32_t>(value);
+}
+
+} // namespace
+
 double perft(pybind11::bytes b)
 {
   auto bytes = std::as_bytes(std::span(std::string_view(b)));
@@ -74,20 +96,12 @@ class DSP
 
   static uint32_t validate_positive(long value, const char* name)
   {
-    if (value <= 0) throw pybind11::value_error(std::string(name) + " must be > 0");
-    if (value > static_cast<long>(std::numeric_limits<uint32_t>::max())) {
-      throw pybind11::value_error(std::string(name) + " must fit in uint32");
-    }
-    return static_cast<uint32_t>(value);
+    return validate_positive_arg(value, name);
   }
 
   static uint32_t validate_non_negative(long value, const char* name)
   {
-    if (value < 0) throw pybind11::value_error(std::string(name) + " must be >= 0");
-    if (value > static_cast<long>(std::numeric_limits<uint32_t>::max())) {
-      throw pybind11::value_error(std::string(name) + " must fit in uint32");
-    }
-    return static_cast<uint32_t>(value);
+    return validate_non_negative_arg(value, name);
   }
 
   static uint32_t validate_output_channels(

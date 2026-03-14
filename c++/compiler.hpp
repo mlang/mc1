@@ -28,6 +28,7 @@ public:
     std::string name;
     size_t index;
     size_t width;
+    control_kind kind{control_kind::value};
   };
 
   struct SynthDescriptor {
@@ -43,6 +44,7 @@ public:
     struct ControlSlot {
       size_t index;
       size_t width;
+      control_kind kind{control_kind::value};
     };
 
   private:
@@ -51,6 +53,7 @@ public:
     process_fn_t process_{};
     size_t state_size_{};
     std::vector<float> default_controls_;
+    std::vector<ControlDesc> control_descs_;
     std::unordered_map<std::string, ControlSlot> controls_by_name_;
 
   public:
@@ -60,6 +63,7 @@ public:
       process_fn_t process,
       size_t state_size,
       std::vector<float> default_controls,
+      std::vector<ControlDesc> control_descs,
       std::unordered_map<std::string, ControlSlot> controls_by_name
     )
     : owner_{std::move(owner)}
@@ -67,6 +71,7 @@ public:
     , process_{process}
     , state_size_{state_size}
     , default_controls_{std::move(default_controls)}
+    , control_descs_{std::move(control_descs)}
     , controls_by_name_{std::move(controls_by_name)}
     {}
 
@@ -85,6 +90,9 @@ public:
       return it->second;
     }
 
+    const std::vector<ControlDesc>& control_descs() const
+    { return control_descs_; }
+
     Module instantiate() const;
   };
 
@@ -94,6 +102,7 @@ public:
     process_fn_t process_{};
     std::vector<std::byte> state_;
     std::vector<float> controls_;
+    std::vector<size_t> trigger_control_indices_;
 
   public:
     Module(
@@ -101,12 +110,14 @@ public:
       init_fn_t init,
       process_fn_t process,
       size_t state_size,
-      std::vector<float> controls
+      std::vector<float> controls,
+      std::vector<size_t> trigger_control_indices
     )
     : owner_{std::move(owner)}
     , process_{process}
     , state_{state_size}
     , controls_{std::move(controls)}
+    , trigger_control_indices_{std::move(trigger_control_indices)}
     {
       if (init) init(state_.data());
     }
@@ -147,6 +158,9 @@ public:
     {
       assert(process_ != nullptr);
       process_(state_.data(), controls_.data(), abus);
+      for (auto index : trigger_control_indices_) {
+        controls_[index] = 0.0f;
+      }
     }
   };
 
@@ -172,7 +186,7 @@ public:
       for (auto const &control : synth.control_descs) {
         controls_by_name.insert_or_assign(
           control.name,
-          CompiledSynth::ControlSlot{control.index, control.width}
+          CompiledSynth::ControlSlot{control.index, control.width, control.kind}
         );
       }
 
@@ -187,6 +201,7 @@ public:
           process,
           state_size,
           synth.controls,
+          synth.control_descs,
           std::move(controls_by_name),
         }
       );
@@ -218,6 +233,15 @@ inline Result::Module Result::CompiledSynth::instantiate() const
     process_,
     state_size_,
     default_controls_,
+    [&]() {
+      auto trigger_control_indices = std::vector<size_t>{};
+      for (auto const& control : control_descs_) {
+        if (control.kind == control_kind::trigger) {
+          trigger_control_indices.push_back(control.index);
+        }
+      }
+      return trigger_control_indices;
+    }(),
   };
 }
 

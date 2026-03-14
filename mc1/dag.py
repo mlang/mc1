@@ -6,7 +6,16 @@ import io
 import struct
 
 
-__all__ = ('In', 'Out', 'Pan', 'SinOsc', 'DAG')
+__all__ = ('In', 'Out', 'Pan', 'SinOsc', 'Trigger', 'DAG')
+
+
+class Trigger:
+    pass
+
+
+class ControlKind(enum.Enum):
+    VALUE = 0
+    TRIGGER = 1
 
 
 class Rate(enum.Enum):
@@ -75,17 +84,18 @@ class Const(_Node):
 
 
 class Control(_Node):
-    __slots__ = ('name')
+    __slots__ = ('name', 'kind')
 
-    def __init__(self, name, *values):
+    def __init__(self, name, *values, kind=ControlKind.VALUE):
         self.name = name
+        self.kind = kind
         cindex = len(DAG._controls)
         DAG._controls.extend(values)
-        DAG._controlNames.append((name, cindex))
+        DAG._controlNames.append((name, cindex, kind))
         super().__init__(Rate.BLOCK, len(values), cindex)
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} '{self.name}'>"
+        return f"<{self.__class__.__name__} '{self.name}' {self.kind.name.lower()}>"
 
 
 class _GraphArgs(_Node):
@@ -157,7 +167,7 @@ def _convert(x):
 class DAG:
     _constants: list[float] = []
     _controls: list[float] = []
-    _controlNames: list[tuple[str, int]] = []
+    _controlNames: list[tuple[str, int, ControlKind]] = []
     _operations: list[_Node] = []
     _graph_slots = ('constants', 'controls', 'controlNames', 'operations')
     __slots__ = ('name', *_graph_slots)
@@ -166,10 +176,15 @@ class DAG:
         self._reset()
         self.name = func.__name__
 
-        def param(name, value):
-            if not isinstance(value, (list, range, tuple)):
+        def param(name, value, annotation):
+            kind = ControlKind.TRIGGER if annotation is Trigger else ControlKind.VALUE
+            if kind is ControlKind.TRIGGER:
+                if isinstance(value, (list, range, tuple)):
+                    raise ValueError(f"Trigger control '{name}' must be a scalar default value")
+                value = (float(value),)
+            elif not isinstance(value, (list, range, tuple)):
                 value = (value,)
-            return Control(name, *value)
+            return Control(name, *value, kind=kind)
         func = _WrapDefaults(func, param)
         func()
         for slot in self._graph_slots:
@@ -190,10 +205,11 @@ class DAG:
         pack('N'+'f'*len(self.constants), len(self.constants), *self.constants)
         pack('N'+'f'*len(self.controls), len(self.controls), *self.controls)
         pack('N', len(self.controlNames))
-        for cname, cindex in self.controlNames:
+        for cname, cindex, ckind in self.controlNames:
             name = bytes(cname, 'utf-8')
             pack(f'{len(name)+1}p', name)
             pack('N', cindex)
+            pack('B', ckind.value)
 
         pack('N', len(self.operations))
         for op in self.operations: buf.write(bytes(op))
@@ -206,19 +222,21 @@ class _WrapDefaults:
 
     def __init__(self, func, wrap=None):
         if not wrap:
-            wrap = lambda name, value: value
+            wrap = lambda name, value, annotation: value
 
         sig = inspect.signature(func)
+        annotations = inspect.get_annotations(func, eval_str=True)
         args = []
         kwargs = {}
     
         for param in sig.parameters.values():
             if param.default is param.empty:
                 raise ValueError(f"Parameter '{param.name}' has no default value")
+            annotation = annotations.get(param.name, param.empty)
             if param.kind in (param.POSITIONAL_OR_KEYWORD, param.POSITIONAL_ONLY):
-                args.append(wrap(param.name, param.default))
+                args.append(wrap(param.name, param.default, annotation))
             elif param.kind == param.KEYWORD_ONLY:
-                kwargs[param.name] = wrap(param.name, param.default)
+                kwargs[param.name] = wrap(param.name, param.default, annotation)
     
         self.func = func
         self.args = tuple(args)

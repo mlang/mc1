@@ -1,6 +1,8 @@
 import pytest
 
-from mc1 import DAG, DSP, Out, SinOsc, tone
+import mc1._core
+import mc1._test
+from mc1 import DAG, DSP, Out, SinOsc, Trigger, tone
 
 
 def test_dsp_defaults():
@@ -109,10 +111,44 @@ def _multi_control(freq=(440, 442)):
     Out.ar(0, SinOsc.ar(220))
 
 
+@DAG
+def _trigger_control(trig: Trigger = 0):
+    Out.ar(0, SinOsc.ar(220) * trig)
+
+
+@DAG
+def _annotated_value_control(freq: float = 440):
+    Out.ar(0, SinOsc.ar(freq))
+
+
+@DAG
+def _trigger_default_pulse(trig: Trigger = 1):
+    Out.ar(0, SinOsc.ar(220) * trig)
+
+
 def test_dsp_append_accepts_multi_width_control_sequence():
     dsp = DSP()
     dsp.compile(bytes(_multi_control))
     dsp.append("_multi_control", freq=[220, 330])
+
+
+def test_dsp_compile_accepts_trigger_control_annotation():
+    dsp = DSP()
+    dsp.compile(bytes(_trigger_control))
+    dsp.append("_trigger_control", trig=1)
+
+
+def test_dsp_compile_ignores_non_trigger_annotations():
+    dsp = DSP()
+    dsp.compile(bytes(_annotated_value_control))
+    dsp.append("_annotated_value_control", freq=220)
+
+
+def test_trigger_control_rejects_sequence_default():
+    with pytest.raises(ValueError, match="must be a scalar default value"):
+        @DAG
+        def bad_trigger(trig: Trigger = (0, 1)):
+            Out.ar(0, SinOsc.ar(220) * trig)
 
 
 def test_dsp_append_rejects_multi_width_control_wrong_length():
@@ -141,6 +177,21 @@ def test_dsp_set_accepts_multi_width_control_sequence():
     dsp.compile(bytes(_multi_control))
     module_id = dsp.append("_multi_control")
     dsp.set(module_id, freq=[220, 330])
+
+
+def test_dsp_append_rejects_sequence_value_for_trigger_control():
+    dsp = DSP()
+    dsp.compile(bytes(_trigger_control))
+    with pytest.raises(ValueError, match="must be a number"):
+        dsp.append("_trigger_control", trig=[1, 0])
+
+
+def test_dsp_set_rejects_sequence_value_for_trigger_control():
+    dsp = DSP()
+    dsp.compile(bytes(_trigger_control))
+    module_id = dsp.append("_trigger_control")
+    with pytest.raises(ValueError, match="must be a number"):
+        dsp.set(module_id, trig=[1, 0])
 
 
 def test_dsp_set_unknown_control_raises():
@@ -250,6 +301,26 @@ def test_dsp_insert_before_rejects_multi_width_control_wrong_length():
     anchor = dsp.append("_multi_control")
     with pytest.raises(ValueError, match="expects 2 values"):
         dsp.insert_before(anchor, "_multi_control", freq=[220])
+
+
+def test_compiled_controls_preserve_trigger_kind():
+    controls = mc1._test._compiled_controls(bytes(_trigger_control))
+
+    assert controls == [
+        {
+            "name": "trig",
+            "index": 0,
+            "width": 1,
+            "kind": "trigger",
+        }
+    ]
+
+
+def test_trigger_default_resets_after_first_block():
+    first_block, second_block = mc1._test._render_blocks(bytes(_trigger_default_pulse), blocks=2)
+
+    assert any(sample != 0.0 for sample in first_block)
+    assert all(sample == 0.0 for sample in second_block)
 
 
 def test_dsp_stale_anchor_insert_is_dropped():
