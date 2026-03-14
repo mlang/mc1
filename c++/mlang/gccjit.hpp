@@ -120,10 +120,6 @@ make_tabled_function(context gcc, std::string name, T period, size_t n, T(*f)(T)
   auto func = gcc.new_function(GCC_JIT_FUNCTION_ALWAYS_INLINE,
     fp_type, name, param, 0
   );
-  gcc_jit_function_add_attribute(
-    func.get_inner_function(),
-    GCC_JIT_FN_ATTRIBUTE_ALWAYS_INLINE
-  );
   auto x = func.get_param(0);
   auto i = func.new_local(gcc.get_type(GCC_JIT_TYPE_SIZE_T), "i");
   auto a = func.new_local(fp_type, "a");
