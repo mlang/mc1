@@ -950,6 +950,1096 @@ unsigned int default_process (void * state, const float * controls, float * abus
 }
 
 
+	.arch armv8-a
+	.file	"fake.c"
+	.text
+	.align	2
+	.p2align 5,,15
+	.type	ADSR_bbbbbba, %function
+ADSR_bbbbbba:
+.LFB1:
+	.cfi_startproc
+.L2:
+	movi	v25.2s, #0
+	fmov	s29, 1.0e+0
+	ldr	s31, [x0]
+	ldr	s24, [x0, 12]
+	ldp	w4, w3, [x0, 4]
+	fcmpe	s1, s25
+	fcsel	s30, s29, s25, mi
+	fcmpe	s2, s25
+	fcsel	s27, s29, s25, mi
+	fcmpe	s4, s25
+	fcsel	s25, s29, s25, mi
+	fcmp	s5, s29
+	cset	w6, eq
+	fcmpe	s0, #0.0
+	cset	w7, gt
+	bgt	.L3
+	fcmpe	s3, #0.0
+	bmi	.L4
+	cbz	w3, .L82
+	cbnz	w4, .L83
+	mov	x3, 0
+	.p2align 5,,15
+.L7:
+	str	wzr, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	movi	v31.2s, #0
+	cmp	x3, 32
+	beq	.L21
+.L5:
+	cmp	w4, 1
+	bne	.L132
+	fmov	s26, 1.0e+0
+	mov	w5, 17408
+	movk	w5, 0x472c, lsl 16
+	fmov	s23, w5
+	fsub	s28, s26, s30
+	fmul	s28, s28, s1
+	.p2align 5,,15
+.L8:
+	fcmpe	s28, #0.0
+	bls	.L86
+	fmul	s29, s28, s23
+	fdiv	s29, s26, s29
+	fadd	s31, s31, s29
+	fcmpe	s31, s26
+	bge	.L108
+	str	s31, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L8
+.L21:
+	str	s31, [x0]
+	stp	w4, w7, [x0, 4]
+	str	s24, [x0, 12]
+	ret
+	.p2align 2,,3
+.L3:
+	cmp	w3, 0
+	mov	x3, 0
+	ccmp	w4, 1, 4, ne
+	bne	.L47
+	fsub	s30, s29, s30
+	mov	w4, 17408
+	movk	w4, 0x472c, lsl 16
+	fmov	s28, w4
+	fmul	s1, s30, s1
+	.p2align 5,,15
+.L46:
+.L52:
+	fcmpe	s1, #0.0
+	bls	.L111
+	fmul	s30, s1, s28
+	fdiv	s30, s29, s30
+	fadd	s31, s31, s30
+	fcmpe	s31, s29
+	bge	.L103
+.L75:
+	str	s31, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L46
+	mov	w4, 1
+	b	.L21
+	.p2align 2,,3
+.L57:
+	movi	v26.2s, #0
+	fmul	s29, s3, s26
+	fsub	s31, s31, s29
+	fmul	s31, s31, s26
+.L71:
+	fadd	s31, s31, s29
+	mov	w4, 17408
+	movk	w4, 0x472c, lsl 16
+	fmov	s29, 1.0e+0
+	fmov	s26, w4
+	mov	w5, 2
+	mov	w4, 3
+	fsub	s29, s29, s31
+	fmul	s30, s30, s26
+	fdiv	s30, s29, s30
+	fsub	s30, s28, s30
+	fcmpe	s31, s30
+	fcsel	s31, s31, s30, ge
+	csel	w4, w4, w5, ge
+.L51:
+.L77:
+.L78:
+.L79:
+.L80:
+.L81:
+	str	s31, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	beq	.L21
+.L47:
+	fmov	s28, s31
+	cmp	w4, 2
+	beq	.L55
+	cmp	w4, 3
+	beq	.L49
+	cmp	w4, 4
+	bne	.L157
+.L50:
+.L66:
+	fmov	s30, 1.0e+0
+	fsub	s30, s30, s25
+	fmul	s30, s30, s4
+	fcmpe	s30, #0.0
+	bls	.L69
+	mov	w5, 17408
+	movk	w5, 0x472c, lsl 16
+	fmov	s30, w5
+	fmul	s30, s4, s30
+	fdiv	s30, s24, s30
+	fsub	s31, s31, s30
+	fcmpe	s31, #0.0
+	bls	.L69
+	b	.L81
+	.p2align 2,,3
+.L111:
+	fmov	s28, 1.0e+0
+.L48:
+.L55:
+	fmov	s31, 1.0e+0
+	fsub	s30, s31, s27
+	fmul	s30, s30, s2
+	fcmpe	s30, #0.0
+	bls	.L56
+	fcmpe	s3, #0.0
+	bmi	.L57
+	fcmpe	s3, s31
+	fmov	s29, s3
+	fsub	s31, s31, s3
+	bgt	.L71
+	movi	v26.2s, #0
+	fmul	s31, s31, s26
+	b	.L71
+	.p2align 2,,3
+.L69:
+	ldr	w4, [x2]
+	movi	v31.2s, #0
+	orr	w5, w6, w4
+	mov	w4, 0
+	str	w5, [x2]
+	b	.L81
+	.p2align 2,,3
+.L56:
+	fcmpe	s3, #0.0
+	bmi	.L112
+.L153:
+	fcmpe	s3, s31
+	fsub	s31, s31, s3
+	bgt	.L114
+	movi	v30.2s, #0
+	mov	w4, 3
+	fmadd	s31, s31, s30, s3
+	b	.L81
+	.p2align 2,,3
+.L114:
+	fadd	s31, s31, s3
+	mov	w4, 3
+	b	.L81
+	.p2align 2,,3
+.L103:
+	mov	w4, 2
+	fmov	s31, 1.0e+0
+	b	.L81
+	.p2align 2,,3
+.L49:
+	fcmpe	s3, #0.0
+	bmi	.L113
+	fmov	s31, 1.0e+0
+	b	.L153
+	.p2align 2,,3
+.L112:
+	movi	v30.2s, #0
+	mov	w4, 3
+	fmsub	s31, s3, s30, s31
+	fmul	s31, s31, s30
+	fmadd	s31, s3, s30, s31
+	b	.L81
+	.p2align 2,,3
+.L113:
+	movi	v30.2s, #0
+	fmov	s31, 1.0e+0
+	mov	w4, 3
+	fmsub	s31, s3, s30, s31
+	fmul	s31, s31, s30
+	fmadd	s31, s3, s30, s31
+	b	.L81
+.L4:
+	cbz	w3, .L158
+	mov	x3, 0
+	cbnz	w4, .L149
+	.p2align 5,,15
+.L40:
+	str	wzr, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L40
+.L151:
+	movi	v31.2s, #0
+	b	.L21
+.L82:
+	mov	x3, 0
+	b	.L5
+	.p2align 2,,3
+.L86:
+	fmov	s31, 1.0e+0
+.L9:
+	fmov	s26, 1.0e+0
+	fsub	s28, s26, s27
+	fmul	s28, s28, s2
+.L24:
+	fcmpe	s28, #0.0
+	bls	.L106
+	fcmpe	s3, s26
+	mov	w4, 17408
+	movk	w4, 0x472c, lsl 16
+	fmov	s22, w4
+	fsub	s29, s26, s3
+	fmov	s23, 1.0e+0
+	fmul	s22, s28, s22
+	bgt	.L13
+	movi	v21.2s, #0
+	fmul	s29, s29, s21
+	.p2align 5,,15
+.L13:
+	fadd	s29, s3, s29
+	fsub	s23, s23, s29
+	fdiv	s23, s23, s22
+	fsub	s31, s31, s23
+	fcmpe	s29, s31
+	bge	.L14
+	str	s31, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L24
+	mov	w4, 2
+	b	.L21
+	.p2align 2,,3
+.L108:
+	str	s26, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L86
+.L100:
+	mov	w4, 2
+	fmov	s31, 1.0e+0
+	b	.L21
+	.p2align 2,,3
+.L14:
+	str	s29, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	fmov	s24, s29
+	cmp	x3, 32
+	beq	.L89
+.L6:
+	fmov	s31, 1.0e+0
+	fsub	s31, s31, s25
+	fmul	s31, s31, s4
+.L20:
+	fcmpe	s31, #0.0
+	bls	.L19
+	mov	w4, 17408
+	movk	w4, 0x472c, lsl 16
+	fmov	s28, w4
+	fmul	s28, s4, s28
+	fdiv	s28, s24, s28
+	fsub	s29, s29, s28
+	fcmpe	s29, #0.0
+	bls	.L19
+	str	s29, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L20
+	fmov	s31, s29
+	mov	w4, 4
+	b	.L21
+	.p2align 2,,3
+.L19:
+	ldr	w4, [x2]
+	orr	w4, w6, w4
+	str	w4, [x2]
+	str	wzr, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	mov	w4, 0
+	cmp	x3, 32
+	bne	.L7
+	movi	v31.2s, #0
+	b	.L21
+	.p2align 2,,3
+.L106:
+	fcmpe	s3, s26
+	fsub	s26, s26, s3
+	bgt	.L12
+	movi	v24.2s, #0
+	fmadd	s24, s26, s24, s3
+	fmov	s29, s24
+	b	.L6
+	.p2align 2,,3
+.L12:
+	fadd	s24, s3, s26
+	fmov	s29, s24
+	b	.L6
+.L89:
+	fmov	s31, s29
+	mov	w4, 4
+	b	.L21
+.L149:
+	fmov	s24, s31
+	.p2align 5,,15
+.L38:
+	fmov	s30, 1.0e+0
+	mov	w4, 17408
+	movk	w4, 0x472c, lsl 16
+	fmov	s28, w4
+	fsub	s30, s30, s25
+	fmul	s30, s30, s4
+.L128:
+	fcmpe	s30, #0.0
+	bls	.L31
+	fmul	s29, s4, s28
+	fdiv	s29, s24, s29
+	fsub	s31, s31, s29
+	fcmpe	s31, #0.0
+	bls	.L31
+	str	s31, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L128
+	mov	w4, 4
+	b	.L21
+	.p2align 2,,3
+.L31:
+	ldr	w4, [x2]
+	orr	w6, w6, w4
+	str	w6, [x2]
+	str	wzr, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	mov	w4, 0
+	cmp	x3, 32
+	beq	.L151
+	str	wzr, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L40
+	b	.L151
+.L132:
+	cmp	w4, 2
+	beq	.L9
+	cmp	w4, 3
+	beq	.L84
+	cmp	w4, 4
+	bne	.L7
+	fmov	s29, s31
+	b	.L6
+.L83:
+	fmov	s24, s31
+	fmov	s29, s31
+	mov	x3, 0
+	b	.L6
+.L84:
+	fmov	s24, s31
+	fmov	s29, s31
+	b	.L6
+.L157:
+	movi	v31.2s, #0
+	b	.L81
+.L158:
+	cmp	w4, 1
+	bne	.L159
+	fsub	s30, s29, s30
+	mov	w5, 17408
+	movk	w5, 0x472c, lsl 16
+	mov	x3, 0
+	fmov	s26, w5
+	fmul	s28, s30, s1
+	.p2align 5,,15
+.L39:
+	fcmpe	s28, #0.0
+	bls	.L91
+	fmul	s30, s28, s26
+	fdiv	s30, s29, s30
+	fadd	s31, s31, s30
+	fcmpe	s31, s29
+	bge	.L29
+	str	s31, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L39
+	b	.L21
+	.p2align 2,,3
+.L29:
+	str	s29, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	beq	.L100
+.L91:
+	fmov	s31, 1.0e+0
+.L28:
+	fmov	s29, 1.0e+0
+	fsub	s27, s29, s27
+	fmul	s27, s27, s2
+.L45:
+	fcmpe	s27, #0.0
+	bls	.L110
+	movi	v26.2s, #0
+	mov	w4, 17408
+	movk	w4, 0x472c, lsl 16
+	fmov	s28, w4
+	fmul	s28, s27, s28
+	fmsub	s30, s3, s26, s29
+	fmul	s30, s30, s26
+	fmadd	s30, s3, s26, s30
+	fsub	s23, s29, s30
+	fdiv	s28, s23, s28
+	fsub	s31, s31, s28
+	fcmpe	s31, s30
+	bls	.L35
+	str	s31, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	cmp	x3, 32
+	bne	.L45
+	mov	w4, 2
+	b	.L21
+	.p2align 2,,3
+.L110:
+	movi	v31.2s, #0
+	fmsub	s30, s3, s31, s29
+	fmul	s30, s30, s31
+	fmadd	s31, s3, s31, s30
+	fmov	s24, s31
+	b	.L38
+	.p2align 2,,3
+.L35:
+	str	s26, [x1, x3, lsl 2]
+	add	x3, x3, 1
+	fmov	s24, s26
+	fmov	s31, s26
+	cmp	x3, 32
+	bne	.L38
+	mov	w4, 4
+	b	.L21
+.L159:
+	mov	x3, 0
+	cmp	w4, 2
+	beq	.L28
+	cmp	w4, 3
+	beq	.L149
+	cmp	w4, 4
+	beq	.L38
+	b	.L40
+	.cfi_endproc
+.LFE1:
+	.size	ADSR_bbbbbba, .-ADSR_bbbbbba
+	.align	2
+	.p2align 5,,15
+	.global	sinf_lookup
+	.type	sinf_lookup, %function
+sinf_lookup:
+.LFB0:
+	.cfi_startproc
+.L161:
+	mov	w0, 63875
+	movk	w0, 0x4222, lsl 16
+	fmov	s31, w0
+	adrp	x0, .LANCHOR0
+	add	x0, x0, :lo12:.LANCHOR0
+	fmul	s31, s0, s31
+	fcvtzu	x2, s31
+	lsl	x1, x2, 2
+	ucvtf	s29, x2
+	add	x2, x0, x1
+	ldr	s0, [x0, x1]
+	ldr	s30, [x2, 4]
+	fsub	s31, s31, s29
+	fsub	s30, s30, s0
+	fmadd	s0, s31, s30, s0
+	ret
+	.cfi_endproc
+.LFE0:
+	.size	sinf_lookup, .-sinf_lookup
+	.align	2
+	.p2align 5,,15
+	.global	default_init
+	.type	default_init, %function
+default_init:
+.LFB10:
+	.cfi_startproc
+.L163:
+	stp	xzr, xzr, [x0]
+	stp	xzr, xzr, [x0, 16]
+	str	xzr, [x0, 32]
+	ret
+	.cfi_endproc
+.LFE10:
+	.size	default_init, .-default_init
+	.align	2
+	.p2align 5,,15
+	.global	default_process
+	.type	default_process, %function
+default_process:
+.LFB11:
+	.cfi_startproc
+.L165:
+	sub	sp, sp, #1024
+	.cfi_def_cfa_offset 1024
+	stp	x29, x30, [sp]
+	.cfi_offset 29, -1024
+	.cfi_offset 30, -1016
+	mov	x29, sp
+	stp	x21, x22, [sp, 32]
+	.cfi_offset 21, -992
+	.cfi_offset 22, -984
+	mov	x21, x1
+	mov	x22, x2
+	stp	x19, x20, [sp, 16]
+	add	x2, sp, 124
+	add	x1, sp, 128
+	stp	x23, x24, [sp, 48]
+	.cfi_offset 19, -1008
+	.cfi_offset 20, -1000
+	.cfi_offset 23, -976
+	.cfi_offset 24, -968
+	mov	x23, x0
+	add	x19, sp, 384
+	stp	d11, d12, [sp, 64]
+	add	x20, sp, 512
+	stp	d13, d14, [sp, 80]
+	ldr	s4, [x21, 36]
+	ldr	s5, [x21, 56]
+	str	d15, [sp, 96]
+	.cfi_offset 75, -960
+	.cfi_offset 76, -952
+	.cfi_offset 77, -944
+	.cfi_offset 78, -936
+	.cfi_offset 79, -928
+	ldp	s0, s1, [x21, 20]
+	ldp	s2, s3, [x21, 28]
+	str	wzr, [sp, 124]
+	bl	ADSR_bbbbbba
+	movi	v5.2s, #0
+	ldp	s1, s2, [x21, 40]
+	add	x0, x0, 16
+	ldp	s3, s4, [x21, 48]
+	add	x1, sp, 256
+	ldr	s0, [x21, 20]
+	fmov	s11, s5
+	bl	ADSR_bbbbbba
+	ldr	s12, [x21]
+	ldr	s31, [x21, 16]
+	mov	w0, 4059
+	movk	w0, 0x40c9, lsl 16
+	ldr	s15, [x23, 32]
+	fmov	s14, w0
+	mov	w0, 26002
+	fmul	s12, s12, s31
+	movk	w0, 0x3915, lsl 16
+	fmov	s13, w0
+	.p2align 5,,15
+.L166:
+	fadd	s0, s15, s11
+	fcmpe	s0, s14
+	bge	.L178
+	fcmpe	s0, #0.0
+	bmi	.L196
+	b	.L169
+	.p2align 2,,3
+.L193:
+	fmov	s15, s0
+.L178:
+	fsub	s0, s0, s14
+	fadd	s0, s0, s11
+.L169:
+	bl	sinf_lookup
+	fmadd	s31, s12, s13, s15
+	str	s0, [x19]
+	fcmpe	s31, s14
+	bge	.L197
+	fcmpe	s31, #0.0
+	add	x19, x19, 4
+	bmi	.L176
+	fadd	s0, s31, s11
+	cmp	x19, x20
+	beq	.L175
+	fmov	s15, s0
+	b	.L169
+	.p2align 2,,3
+.L176:
+	fadd	s15, s31, s14
+	cmp	x20, x19
+	bne	.L166
+	fmov	s0, s15
+.L175:
+	ldp	q22, q23, [sp, 256]
+	mov	w0, 4059
+	ldp	q24, q25, [sp, 288]
+	movk	w0, 0x40c9, lsl 16
+	ldp	q26, q27, [sp, 320]
+	movi	v12.2s, #0
+	ldp	q6, q7, [sp, 384]
+	fmov	s15, w0
+	ldp	q11, q16, [sp, 416]
+	mov	w0, 26002
+	ldp	q17, q19, [sp, 448]
+	add	x24, sp, 640
+	ldp	q20, q21, [sp, 480]
+	str	s0, [x23, 32]
+	ldp	s30, s29, [x21, 8]
+	movk	w0, 0x3915, lsl 16
+	ldr	s31, [x21]
+	fmov	s13, w0
+	ldr	s14, [x23, 36]
+	mov	x19, 1
+	fmul	s30, s31, s30
+	fmul	s31, s31, s29
+	ldp	q28, q29, [sp, 352]
+	dup	v31.4s, v31.s[0]
+	fmul	v23.4s, v23.4s, v30.s[0]
+	fmul	v24.4s, v24.4s, v30.s[0]
+	fmul	v25.4s, v25.4s, v30.s[0]
+	fmul	v26.4s, v26.4s, v30.s[0]
+	fmul	v22.4s, v22.4s, v30.s[0]
+	fmul	v27.4s, v27.4s, v30.s[0]
+	fmul	v28.4s, v28.4s, v30.s[0]
+	fmul	v30.4s, v29.4s, v30.s[0]
+	mov	v29.16b, v31.16b
+	mov	v18.16b, v31.16b
+	fmla	v29.4s, v7.4s, v23.4s
+	mov	v23.16b, v31.16b
+	fmla	v18.4s, v6.4s, v22.4s
+	fmla	v23.4s, v11.4s, v24.4s
+	mov	v24.16b, v31.16b
+	stp	q18, q29, [sp, 512]
+	mov	v29.16b, v31.16b
+	fmla	v24.4s, v16.4s, v25.4s
+	mov	v25.16b, v31.16b
+	fmla	v29.4s, v20.4s, v28.4s
+	stp	q23, q24, [sp, 544]
+	fmla	v25.4s, v17.4s, v26.4s
+	mov	v26.16b, v31.16b
+	fmla	v31.4s, v21.4s, v30.4s
+	fmla	v26.4s, v19.4s, v27.4s
+	stp	q29, q31, [sp, 608]
+	stp	q25, q26, [sp, 576]
+	.p2align 5,,15
+.L179:
+	fadd	s0, s14, s12
+	fcmpe	s0, s15
+	bge	.L190
+	fcmpe	s0, #0.0
+	bmi	.L198
+	.p2align 5,,15
+.L189:
+	bl	sinf_lookup
+	add	x4, x20, x19, lsl 2
+	add	x3, x24, x19, lsl 2
+	ldr	s31, [x4, -4]
+	str	s0, [x3, -4]
+	fmadd	s0, s31, s13, s14
+	fcmpe	s0, s15
+	bge	.L199
+	fcmpe	s0, #0.0
+	add	x19, x19, 1
+	bmi	.L188
+	fadd	s0, s0, s12
+	cmp	x19, 33
+	beq	.L187
+	fmov	s14, s0
+	b	.L189
+	.p2align 2,,3
+.L196:
+	fadd	s0, s0, s14
+	b	.L169
+	.p2align 2,,3
+.L197:
+	fsub	s31, s31, s14
+	add	x19, x19, 4
+	fadd	s0, s31, s11
+	cmp	x19, x20
+	beq	.L175
+	fcmpe	s0, s14
+	fmov	s15, s0
+	bge	.L193
+	b	.L169
+	.p2align 2,,3
+.L188:
+	fadd	s14, s0, s15
+	cmp	x19, 33
+	bne	.L179
+	fmov	s0, s14
+.L187:
+	ldp	q24, q26, [sp, 640]
+	add	x1, x22, 128
+	ldp	q25, q28, [sp, 672]
+	ldp	q27, q30, [sp, 704]
+	ldp	q29, q31, [sp, 736]
+	ldp	q16, q15, [sp, 128]
+	ldp	q17, q18, [sp, 160]
+	ldp	q19, q20, [sp, 192]
+	ldp	q21, q22, [sp, 224]
+	str	s0, [x23, 36]
+	ldr	s23, [x21, 4]
+	fmul	v26.4s, v26.4s, v23.s[0]
+	fmul	v24.4s, v24.4s, v23.s[0]
+	fmul	v25.4s, v25.4s, v23.s[0]
+	fmul	v28.4s, v28.4s, v23.s[0]
+	fmul	v27.4s, v27.4s, v23.s[0]
+	fmul	v30.4s, v30.4s, v23.s[0]
+	fmul	v29.4s, v29.4s, v23.s[0]
+	fmul	v31.4s, v31.4s, v23.s[0]
+	fmul	v26.4s, v26.4s, v15.4s
+	fmov	v23.4s, 5.0e-1
+	fmul	v24.4s, v24.4s, v16.4s
+	fmul	v25.4s, v25.4s, v17.4s
+	fmul	v28.4s, v28.4s, v18.4s
+	fmul	v27.4s, v27.4s, v19.4s
+	fmul	v30.4s, v30.4s, v20.4s
+	fmul	v29.4s, v29.4s, v21.4s
+	fmul	v31.4s, v31.4s, v22.4s
+	fmul	v26.4s, v26.4s, v23.4s
+	fmul	v24.4s, v24.4s, v23.4s
+	fmul	v25.4s, v25.4s, v23.4s
+	fmul	v28.4s, v28.4s, v23.4s
+	fmul	v27.4s, v27.4s, v23.4s
+	fmul	v30.4s, v30.4s, v23.4s
+	stp	q24, q26, [x22]
+	fmul	v29.4s, v29.4s, v23.4s
+	stp	q25, q28, [x22, 32]
+	fmul	v31.4s, v31.4s, v23.4s
+	stp	q27, q30, [x22, 64]
+	str	q24, [x22, 128]
+	stp	q29, q31, [x22, 96]
+	stp	q26, q25, [x1, 16]
+	stp	q28, q27, [x1, 48]
+	stp	q30, q29, [x1, 80]
+	ldr	w0, [sp, 124]
+	str	q31, [x22, 240]
+	ldp	d11, d12, [sp, 64]
+	ldp	d13, d14, [sp, 80]
+	ldr	d15, [sp, 96]
+	ldp	x29, x30, [sp]
+	ldp	x19, x20, [sp, 16]
+	ldp	x21, x22, [sp, 32]
+	ldp	x23, x24, [sp, 48]
+	add	sp, sp, 1024
+	.cfi_remember_state
+	.cfi_restore 23
+	.cfi_restore 24
+	.cfi_restore 21
+	.cfi_restore 22
+	.cfi_restore 19
+	.cfi_restore 20
+	.cfi_restore 29
+	.cfi_restore 30
+	.cfi_restore 79
+	.cfi_restore 77
+	.cfi_restore 78
+	.cfi_restore 75
+	.cfi_restore 76
+	.cfi_def_cfa_offset 0
+	ret
+	.p2align 2,,3
+.L195:
+	.cfi_restore_state
+	fmov	s14, s0
+.L190:
+	fsub	s0, s0, s15
+	fadd	s0, s0, s12
+	b	.L189
+	.p2align 2,,3
+.L198:
+	fadd	s0, s0, s15
+	b	.L189
+	.p2align 2,,3
+.L199:
+	fsub	s0, s0, s15
+	add	x19, x19, 1
+	fadd	s0, s0, s12
+	cmp	x19, 33
+	beq	.L187
+	fcmpe	s0, s15
+	fmov	s14, s0
+	bge	.L195
+	b	.L189
+	.cfi_endproc
+.LFE11:
+	.size	default_process, .-default_process
+	.global	default_state_size
+	.data
+	.align	4
+	.set	.LANCHOR0,. + 0
+	.type	sinf_lookup__table, %object
+	.size	sinf_lookup__table, 1028
+sinf_lookup__table:
+	.word	0
+	.word	1019808432
+	.word	1028193072
+	.word	1033283845
+	.word	1036565814
+	.word	1039839859
+	.word	1041645699
+	.word	1043271843
+	.word	1044891074
+	.word	1046502419
+	.word	1048104909
+	.word	1049136788
+	.word	1049927730
+	.word	1050712805
+	.word	1051491540
+	.word	1052263466
+	.word	1053028118
+	.word	1053785035
+	.word	1054533760
+	.word	1055273845
+	.word	1056004842
+	.word	1056726312
+	.word	1057201213
+	.word	1057551770
+	.word	1057896922
+	.word	1058236459
+	.word	1058570176
+	.word	1058897874
+	.word	1059219354
+	.word	1059534422
+	.word	1059842890
+	.word	1060144571
+	.word	1060439283
+	.word	1060726850
+	.word	1061007098
+	.word	1061279857
+	.word	1061544963
+	.word	1061802258
+	.word	1062051586
+	.word	1062292797
+	.word	1062525746
+	.word	1062750291
+	.word	1062966299
+	.word	1063173637
+	.word	1063372184
+	.word	1063561817
+	.word	1063742424
+	.word	1063913895
+	.word	1064076126
+	.word	1064229022
+	.word	1064372488
+	.word	1064506440
+	.word	1064630795
+	.word	1064745479
+	.word	1064850424
+	.word	1064945565
+	.word	1065030847
+	.word	1065106216
+	.word	1065171628
+	.word	1065227044
+	.word	1065272429
+	.word	1065307757
+	.word	1065333007
+	.word	1065348163
+	.word	1065353216
+	.word	1065348163
+	.word	1065333007
+	.word	1065307757
+	.word	1065272429
+	.word	1065227043
+	.word	1065171628
+	.word	1065106216
+	.word	1065030846
+	.word	1064945565
+	.word	1064850424
+	.word	1064745479
+	.word	1064630794
+	.word	1064506439
+	.word	1064372488
+	.word	1064229022
+	.word	1064076126
+	.word	1063913894
+	.word	1063742424
+	.word	1063561817
+	.word	1063372183
+	.word	1063173638
+	.word	1062966298
+	.word	1062750290
+	.word	1062525744
+	.word	1062292797
+	.word	1062051586
+	.word	1061802257
+	.word	1061544964
+	.word	1061279856
+	.word	1061007096
+	.word	1060726848
+	.word	1060439283
+	.word	1060144570
+	.word	1059842888
+	.word	1059534422
+	.word	1059219353
+	.word	1058897872
+	.word	1058570173
+	.word	1058236458
+	.word	1057896921
+	.word	1057551768
+	.word	1057201213
+	.word	1056726309
+	.word	1056004838
+	.word	1055273846
+	.word	1054533759
+	.word	1053785031
+	.word	1053028112
+	.word	1052263466
+	.word	1051491538
+	.word	1050712800
+	.word	1049927731
+	.word	1049136786
+	.word	1048104901
+	.word	1046502408
+	.word	1044891073
+	.word	1043271837
+	.word	1041645690
+	.word	1039839862
+	.word	1036565808
+	.word	1033283829
+	.word	1028193021
+	.word	1019808422
+	.word	-1279541970
+	.word	-1127675132
+	.word	-1119290580
+	.word	-1114199796
+	.word	-1110917817
+	.word	-1107643763
+	.word	-1105837947
+	.word	-1104211799
+	.word	-1102592563
+	.word	-1100981229
+	.word	-1099378736
+	.word	-1098346856
+	.word	-1097555912
+	.word	-1096770842
+	.word	-1095992105
+	.word	-1095220177
+	.word	-1094455531
+	.word	-1093698611
+	.word	-1092949883
+	.word	-1092209797
+	.word	-1091478805
+	.word	-1090757334
+	.word	-1090282433
+	.word	-1089931877
+	.word	-1089586725
+	.word	-1089247187
+	.word	-1088913472
+	.word	-1088585774
+	.word	-1088264293
+	.word	-1087949224
+	.word	-1087640758
+	.word	-1087339076
+	.word	-1087044363
+	.word	-1086756798
+	.word	-1086476550
+	.word	-1086203793
+	.word	-1085938685
+	.word	-1085681389
+	.word	-1085432061
+	.word	-1085190849
+	.word	-1084957900
+	.word	-1084733354
+	.word	-1084517351
+	.word	-1084310011
+	.word	-1084111464
+	.word	-1083921830
+	.word	-1083741223
+	.word	-1083569752
+	.word	-1083407519
+	.word	-1083254627
+	.word	-1083111160
+	.word	-1082977208
+	.word	-1082852853
+	.word	-1082738168
+	.word	-1082633223
+	.word	-1082538081
+	.word	-1082452802
+	.word	-1082377432
+	.word	-1082312020
+	.word	-1082256604
+	.word	-1082211219
+	.word	-1082175890
+	.word	-1082150641
+	.word	-1082135485
+	.word	-1082130432
+	.word	-1082135485
+	.word	-1082150641
+	.word	-1082175891
+	.word	-1082211219
+	.word	-1082256605
+	.word	-1082312020
+	.word	-1082377432
+	.word	-1082452802
+	.word	-1082538083
+	.word	-1082633225
+	.word	-1082738170
+	.word	-1082852855
+	.word	-1082977208
+	.word	-1083111160
+	.word	-1083254627
+	.word	-1083407523
+	.word	-1083569755
+	.word	-1083741227
+	.word	-1083921834
+	.word	-1084111464
+	.word	-1084310011
+	.word	-1084517351
+	.word	-1084733359
+	.word	-1084957905
+	.word	-1085190854
+	.word	-1085432061
+	.word	-1085681390
+	.word	-1085938685
+	.word	-1086203793
+	.word	-1086476553
+	.word	-1086756801
+	.word	-1087044369
+	.word	-1087339076
+	.word	-1087640758
+	.word	-1087949227
+	.word	-1088264297
+	.word	-1088585777
+	.word	-1088913476
+	.word	-1089247194
+	.word	-1089586725
+	.word	-1089931877
+	.word	-1090282436
+	.word	-1090757341
+	.word	-1091478813
+	.word	-1092209812
+	.word	-1092949898
+	.word	-1093698612
+	.word	-1094455531
+	.word	-1095220185
+	.word	-1095992113
+	.word	-1096770850
+	.word	-1097555928
+	.word	-1098346873
+	.word	-1099378737
+	.word	-1100981230
+	.word	-1102592580
+	.word	-1104211817
+	.word	-1105837964
+	.word	-1107643830
+	.word	-1110917884
+	.word	-1114199799
+	.word	-1119290586
+	.word	-1127675273
+	.word	0
+	.zero	4
+	.type	default_state_size, %object
+	.size	default_state_size, 8
+default_state_size:
+	.xword	40
+	.ident	"GCC: (Debian 14.2.0-19) 14.2.0"
+	.section	.note.GNU-stack,"",@progbits
 process call 0
 i	ch0	ch1
 0	0	0

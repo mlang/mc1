@@ -7,24 +7,9 @@ from wurlitzer import pipes
 from mc1 import ADSR, DAG, Out, SinOsc, default, perft
 
 
-def _normalize_compile_output(output: str) -> str:
-    lines = output.splitlines(keepends=True)
-    try:
-        assembly_start = lines.index("\t.arch armv8-a\n")
-    except ValueError:
-        return output
-
-    try:
-        process_start = lines.index("process call 0\n", assembly_start)
-    except ValueError:
-        return "".join(lines[:assembly_start])
-
-    return "".join(lines[:assembly_start] + lines[process_start:])
-
-
 def compile(dag) -> str:
     with pipes() as (out, err): perf = perft(bytes(dag))
-    return _normalize_compile_output(err.read() + out.read())
+    return err.read() + out.read()
 
 
 @DAG
