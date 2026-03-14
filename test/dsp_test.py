@@ -321,6 +321,67 @@ def test_compiled_controls_preserve_trigger_kind():
     ]
 
 
+def test_default_compiled_controls_include_mod_env():
+    controls = mc1._test._compiled_controls(bytes(default))
+
+    assert [control["name"] for control in controls] == [
+        "freq",
+        "amp",
+        "index",
+        "carrier_ratio",
+        "mod_ratio",
+        "gate",
+        "attack",
+        "decay",
+        "sustain",
+        "release",
+        "mod_attack",
+        "mod_decay",
+        "mod_sustain",
+        "mod_release",
+        "done_action",
+    ]
+    assert all(control["width"] == 1 for control in controls)
+    assert all(control["kind"] == "value" for control in controls)
+
+
+def test_default_control_defaults_are_fm_oriented():
+    assert [name for name, _, _ in default.controlNames] == [
+        "freq",
+        "amp",
+        "index",
+        "carrier_ratio",
+        "mod_ratio",
+        "gate",
+        "attack",
+        "decay",
+        "sustain",
+        "release",
+        "mod_attack",
+        "mod_decay",
+        "mod_sustain",
+        "mod_release",
+        "done_action",
+    ]
+    assert default.controls == pytest.approx([
+        440.0,
+        0.2,
+        5.0,
+        1.0,
+        3.0,
+        1.0,
+        0.01,
+        0.60,
+        0.45,
+        0.35,
+        0.0,
+        0.20,
+        0.18,
+        0.15,
+        0.0,
+    ])
+
+
 def test_trigger_default_resets_after_first_block():
     first_block, second_block = mc1._test._render_blocks(bytes(_trigger_default_pulse), blocks=2)
 
@@ -394,6 +455,34 @@ def test_adsr_done_action_zero_keeps_module_in_runtime():
     )
 
     assert module_ids == [[1], [1], [1]]
+
+
+def test_default_mod_env_decays_timbre_faster_than_loudness():
+    rendered = mc1._test._render_control_blocks(
+        bytes(default),
+        [{"amp": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0}] + ([{}] * 11),
+        sample_rate=44100,
+        block_size=1024,
+        output_channels=2,
+    )
+
+    def left_channel(block):
+        return block[::2]
+
+    def mean_abs_second_difference(samples):
+        return sum(
+            abs(samples[index + 2] - (2 * samples[index + 1]) + samples[index])
+            for index in range(len(samples) - 2)
+        ) / (len(samples) - 2)
+
+    first_block = left_channel(rendered["blocks"][0])
+    sustain_block = left_channel(rendered["blocks"][-1])
+    sustain_level = sum(abs(sample) for sample in sustain_block) / len(sustain_block)
+    first_curvature = mean_abs_second_difference(first_block)
+    sustain_curvature = mean_abs_second_difference(sustain_block)
+
+    assert sustain_level > 0.1
+    assert first_curvature > sustain_curvature * 2
 
 
 def test_dsp_stale_anchor_insert_is_dropped():

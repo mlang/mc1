@@ -1,6 +1,6 @@
 float sinf_lookup (float x)
 {
-  float D.282;
+  float D.284;
   float b;
   float a;
   size_t i;
@@ -17,8 +17,8 @@ float sinf_lookup (float x)
   _5 = (float) i;
   _6 = x - _5;
   _7 = b - a;
-  D.282 = fmaf (_6, _7, a);
-  return D.282;
+  D.284 = fmaf (_6, _7, a);
+  return D.284;
 }
 
 
@@ -69,13 +69,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   cond:
   if (i <= 31) goto body; else goto done;
   body:
-  if (gate > 0.0) goto <D.284>; else goto <D.285>;
-  <D.284>:
-  iftmp.0 = 1;
-  goto <D.286>;
-  <D.285>:
-  iftmp.0 = 0;
+  if (gate > 0.0) goto <D.286>; else goto <D.287>;
   <D.286>:
+  iftmp.0 = 1;
+  goto <D.288>;
+  <D.287>:
+  iftmp.0 = 0;
+  <D.288>:
   if (iftmp.0 != 0) goto adsr_gate_on_check; else goto adsr_gate_fall_check;
   cont:
   i = i + 1;
@@ -102,13 +102,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_gate:
   if (stage == 1) goto adsr_attack_zero_time_check; else goto adsr_after_attack_zero;
   adsr_attack_zero_time_check:
-  if (attack < 0.0) goto <D.288>; else goto <D.289>;
-  <D.288>:
-  iftmp.1 = 1.0e+0;
-  goto <D.290>;
-  <D.289>:
-  iftmp.1 = 0.0;
+  if (attack < 0.0) goto <D.290>; else goto <D.291>;
   <D.290>:
+  iftmp.1 = 1.0e+0;
+  goto <D.292>;
+  <D.291>:
+  iftmp.1 = 0.0;
+  <D.292>:
   _1 = 1.0e+0 - iftmp.1;
   _2 = attack * _1;
   if (_2 <= 0.0) goto adsr_attack_zero_apply; else goto adsr_after_attack_zero;
@@ -119,61 +119,61 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_attack_zero:
   if (stage == 2) goto adsr_decay_zero_time_check; else goto adsr_after_decay_zero;
   adsr_decay_zero_time_check:
-  if (decay < 0.0) goto <D.292>; else goto <D.293>;
-  <D.292>:
-  iftmp.2 = 1.0e+0;
-  goto <D.294>;
-  <D.293>:
-  iftmp.2 = 0.0;
+  if (decay < 0.0) goto <D.294>; else goto <D.295>;
   <D.294>:
+  iftmp.2 = 1.0e+0;
+  goto <D.296>;
+  <D.295>:
+  iftmp.2 = 0.0;
+  <D.296>:
   _3 = 1.0e+0 - iftmp.2;
   _4 = decay * _3;
   if (_4 <= 0.0) goto adsr_decay_zero_apply; else goto adsr_after_decay_zero;
   adsr_decay_zero_apply:
-  if (sustain < 0.0) goto <D.296>; else goto <D.297>;
-  <D.296>:
-  iftmp.3 = 1.0e+0;
-  goto <D.298>;
-  <D.297>:
-  iftmp.3 = 0.0;
+  if (sustain < 0.0) goto <D.298>; else goto <D.299>;
   <D.298>:
+  iftmp.3 = 1.0e+0;
+  goto <D.300>;
+  <D.299>:
+  iftmp.3 = 0.0;
+  <D.300>:
   _5 = 1.0e+0 - iftmp.3;
   _6 = sustain * _5;
-  if (sustain < 0.0) goto <D.300>; else goto <D.301>;
-  <D.300>:
-  iftmp.4 = 1.0e+0;
-  goto <D.302>;
-  <D.301>:
-  iftmp.4 = 0.0;
+  if (sustain < 0.0) goto <D.302>; else goto <D.303>;
   <D.302>:
+  iftmp.4 = 1.0e+0;
+  goto <D.304>;
+  <D.303>:
+  iftmp.4 = 0.0;
+  <D.304>:
   _7 = 1.0e+0 - iftmp.4;
   _8 = sustain * _7;
   _9 = 1.0e+0 - _8;
-  if (sustain < 0.0) goto <D.305>; else goto <D.306>;
-  <D.305>:
-  iftmp.6 = 1.0e+0;
-  goto <D.307>;
-  <D.306>:
-  iftmp.6 = 0.0;
+  if (sustain < 0.0) goto <D.307>; else goto <D.308>;
   <D.307>:
+  iftmp.6 = 1.0e+0;
+  goto <D.309>;
+  <D.308>:
+  iftmp.6 = 0.0;
+  <D.309>:
   _10 = 1.0e+0 - iftmp.6;
   _11 = sustain * _10;
-  if (_11 > 1.0e+0) goto <D.308>; else goto <D.309>;
-  <D.308>:
-  iftmp.5 = 1.0e+0;
-  goto <D.310>;
-  <D.309>:
-  iftmp.5 = 0.0;
+  if (_11 > 1.0e+0) goto <D.310>; else goto <D.311>;
   <D.310>:
+  iftmp.5 = 1.0e+0;
+  goto <D.312>;
+  <D.311>:
+  iftmp.5 = 0.0;
+  <D.312>:
   _12 = iftmp.5 * _9;
   level = _6 + _12;
-  if (gate > 0.0) goto <D.312>; else goto <D.313>;
-  <D.312>:
-  iftmp.7 = 1;
-  goto <D.314>;
-  <D.313>:
-  iftmp.7 = 0;
+  if (gate > 0.0) goto <D.314>; else goto <D.315>;
   <D.314>:
+  iftmp.7 = 1;
+  goto <D.316>;
+  <D.315>:
+  iftmp.7 = 0;
+  <D.316>:
   if (iftmp.7 != 0) goto adsr_decay_zero_sustain_apply; else goto adsr_decay_zero_release_apply;
   adsr_decay_zero_sustain_apply:
   stage = 3;
@@ -197,13 +197,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_sustain_release:
   if (stage == 4) goto adsr_release_zero_time_check; else goto adsr_after_release_zero;
   adsr_release_zero_time_check:
-  if (release < 0.0) goto <D.316>; else goto <D.317>;
-  <D.316>:
-  iftmp.8 = 1.0e+0;
-  goto <D.318>;
-  <D.317>:
-  iftmp.8 = 0.0;
+  if (release < 0.0) goto <D.318>; else goto <D.319>;
   <D.318>:
+  iftmp.8 = 1.0e+0;
+  goto <D.320>;
+  <D.319>:
+  iftmp.8 = 0.0;
+  <D.320>:
   _17 = 1.0e+0 - iftmp.8;
   _18 = release * _17;
   if (_18 <= 0.0) goto adsr_release_zero_apply; else goto adsr_after_release_zero;
@@ -219,13 +219,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_release_zero:
   if (stage == 1) goto adsr_stage_attack_apply; else goto adsr_stage_decay_check;
   adsr_stage_attack_apply:
-  if (attack < 0.0) goto <D.320>; else goto <D.321>;
-  <D.320>:
-  iftmp.9 = 1.0e+0;
-  goto <D.322>;
-  <D.321>:
-  iftmp.9 = 0.0;
+  if (attack < 0.0) goto <D.322>; else goto <D.323>;
   <D.322>:
+  iftmp.9 = 1.0e+0;
+  goto <D.324>;
+  <D.323>:
+  iftmp.9 = 0.0;
+  <D.324>:
   _23 = 1.0e+0 - iftmp.9;
   _24 = attack * _23;
   _25 = _24 * 4.41e+4;
@@ -239,139 +239,139 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_stage_decay_check:
   if (stage == 2) goto adsr_stage_decay_apply; else goto adsr_stage_sustain_check;
   adsr_stage_decay_apply:
-  if (sustain < 0.0) goto <D.324>; else goto <D.325>;
-  <D.324>:
-  iftmp.10 = 1.0e+0;
-  goto <D.326>;
-  <D.325>:
-  iftmp.10 = 0.0;
+  if (sustain < 0.0) goto <D.326>; else goto <D.327>;
   <D.326>:
+  iftmp.10 = 1.0e+0;
+  goto <D.328>;
+  <D.327>:
+  iftmp.10 = 0.0;
+  <D.328>:
   _27 = 1.0e+0 - iftmp.10;
   _28 = sustain * _27;
-  if (sustain < 0.0) goto <D.328>; else goto <D.329>;
-  <D.328>:
-  iftmp.11 = 1.0e+0;
-  goto <D.330>;
-  <D.329>:
-  iftmp.11 = 0.0;
+  if (sustain < 0.0) goto <D.330>; else goto <D.331>;
   <D.330>:
+  iftmp.11 = 1.0e+0;
+  goto <D.332>;
+  <D.331>:
+  iftmp.11 = 0.0;
+  <D.332>:
   _29 = 1.0e+0 - iftmp.11;
   _30 = sustain * _29;
   _31 = 1.0e+0 - _30;
-  if (sustain < 0.0) goto <D.333>; else goto <D.334>;
-  <D.333>:
-  iftmp.13 = 1.0e+0;
-  goto <D.335>;
-  <D.334>:
-  iftmp.13 = 0.0;
+  if (sustain < 0.0) goto <D.335>; else goto <D.336>;
   <D.335>:
+  iftmp.13 = 1.0e+0;
+  goto <D.337>;
+  <D.336>:
+  iftmp.13 = 0.0;
+  <D.337>:
   _32 = 1.0e+0 - iftmp.13;
   _33 = sustain * _32;
-  if (_33 > 1.0e+0) goto <D.336>; else goto <D.337>;
-  <D.336>:
-  iftmp.12 = 1.0e+0;
-  goto <D.338>;
-  <D.337>:
-  iftmp.12 = 0.0;
+  if (_33 > 1.0e+0) goto <D.338>; else goto <D.339>;
   <D.338>:
+  iftmp.12 = 1.0e+0;
+  goto <D.340>;
+  <D.339>:
+  iftmp.12 = 0.0;
+  <D.340>:
   _34 = iftmp.12 * _31;
   _35 = _28 + _34;
   _36 = 1.0e+0 - _35;
-  if (decay < 0.0) goto <D.340>; else goto <D.341>;
-  <D.340>:
-  iftmp.14 = 1.0e+0;
-  goto <D.342>;
-  <D.341>:
-  iftmp.14 = 0.0;
+  if (decay < 0.0) goto <D.342>; else goto <D.343>;
   <D.342>:
+  iftmp.14 = 1.0e+0;
+  goto <D.344>;
+  <D.343>:
+  iftmp.14 = 0.0;
+  <D.344>:
   _37 = 1.0e+0 - iftmp.14;
   _38 = decay * _37;
   _39 = _38 * 4.41e+4;
   _40 = _36 / _39;
   level = level - _40;
-  if (sustain < 0.0) goto <D.344>; else goto <D.345>;
-  <D.344>:
-  iftmp.15 = 1.0e+0;
-  goto <D.346>;
-  <D.345>:
-  iftmp.15 = 0.0;
+  if (sustain < 0.0) goto <D.346>; else goto <D.347>;
   <D.346>:
+  iftmp.15 = 1.0e+0;
+  goto <D.348>;
+  <D.347>:
+  iftmp.15 = 0.0;
+  <D.348>:
   _41 = 1.0e+0 - iftmp.15;
   _42 = sustain * _41;
-  if (sustain < 0.0) goto <D.348>; else goto <D.349>;
-  <D.348>:
-  iftmp.16 = 1.0e+0;
-  goto <D.350>;
-  <D.349>:
-  iftmp.16 = 0.0;
+  if (sustain < 0.0) goto <D.350>; else goto <D.351>;
   <D.350>:
+  iftmp.16 = 1.0e+0;
+  goto <D.352>;
+  <D.351>:
+  iftmp.16 = 0.0;
+  <D.352>:
   _43 = 1.0e+0 - iftmp.16;
   _44 = sustain * _43;
   _45 = 1.0e+0 - _44;
-  if (sustain < 0.0) goto <D.353>; else goto <D.354>;
-  <D.353>:
-  iftmp.18 = 1.0e+0;
-  goto <D.355>;
-  <D.354>:
-  iftmp.18 = 0.0;
+  if (sustain < 0.0) goto <D.355>; else goto <D.356>;
   <D.355>:
+  iftmp.18 = 1.0e+0;
+  goto <D.357>;
+  <D.356>:
+  iftmp.18 = 0.0;
+  <D.357>:
   _46 = 1.0e+0 - iftmp.18;
   _47 = sustain * _46;
-  if (_47 > 1.0e+0) goto <D.356>; else goto <D.357>;
-  <D.356>:
-  iftmp.17 = 1.0e+0;
-  goto <D.358>;
-  <D.357>:
-  iftmp.17 = 0.0;
+  if (_47 > 1.0e+0) goto <D.358>; else goto <D.359>;
   <D.358>:
+  iftmp.17 = 1.0e+0;
+  goto <D.360>;
+  <D.359>:
+  iftmp.17 = 0.0;
+  <D.360>:
   _48 = iftmp.17 * _45;
   _49 = _42 + _48;
   if (level <= _49) goto adsr_stage_decay_finish; else goto adsr_sample_done;
   adsr_stage_decay_finish:
-  if (sustain < 0.0) goto <D.360>; else goto <D.361>;
-  <D.360>:
-  iftmp.19 = 1.0e+0;
-  goto <D.362>;
-  <D.361>:
-  iftmp.19 = 0.0;
+  if (sustain < 0.0) goto <D.362>; else goto <D.363>;
   <D.362>:
+  iftmp.19 = 1.0e+0;
+  goto <D.364>;
+  <D.363>:
+  iftmp.19 = 0.0;
+  <D.364>:
   _50 = 1.0e+0 - iftmp.19;
   _51 = sustain * _50;
-  if (sustain < 0.0) goto <D.364>; else goto <D.365>;
-  <D.364>:
-  iftmp.20 = 1.0e+0;
-  goto <D.366>;
-  <D.365>:
-  iftmp.20 = 0.0;
+  if (sustain < 0.0) goto <D.366>; else goto <D.367>;
   <D.366>:
+  iftmp.20 = 1.0e+0;
+  goto <D.368>;
+  <D.367>:
+  iftmp.20 = 0.0;
+  <D.368>:
   _52 = 1.0e+0 - iftmp.20;
   _53 = sustain * _52;
   _54 = 1.0e+0 - _53;
-  if (sustain < 0.0) goto <D.369>; else goto <D.370>;
-  <D.369>:
-  iftmp.22 = 1.0e+0;
-  goto <D.371>;
-  <D.370>:
-  iftmp.22 = 0.0;
+  if (sustain < 0.0) goto <D.371>; else goto <D.372>;
   <D.371>:
+  iftmp.22 = 1.0e+0;
+  goto <D.373>;
+  <D.372>:
+  iftmp.22 = 0.0;
+  <D.373>:
   _55 = 1.0e+0 - iftmp.22;
   _56 = sustain * _55;
-  if (_56 > 1.0e+0) goto <D.372>; else goto <D.373>;
-  <D.372>:
-  iftmp.21 = 1.0e+0;
-  goto <D.374>;
-  <D.373>:
-  iftmp.21 = 0.0;
+  if (_56 > 1.0e+0) goto <D.374>; else goto <D.375>;
   <D.374>:
+  iftmp.21 = 1.0e+0;
+  goto <D.376>;
+  <D.375>:
+  iftmp.21 = 0.0;
+  <D.376>:
   _57 = iftmp.21 * _54;
   level = _51 + _57;
-  if (gate > 0.0) goto <D.376>; else goto <D.377>;
-  <D.376>:
-  iftmp.23 = 1;
-  goto <D.378>;
-  <D.377>:
-  iftmp.23 = 0;
+  if (gate > 0.0) goto <D.378>; else goto <D.379>;
   <D.378>:
+  iftmp.23 = 1;
+  goto <D.380>;
+  <D.379>:
+  iftmp.23 = 0;
+  <D.380>:
   if (iftmp.23 != 0) goto adsr_stage_decay_finish_sustain; else goto adsr_stage_decay_finish_release;
   adsr_stage_decay_finish_sustain:
   stage = 3;
@@ -383,54 +383,54 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_stage_sustain_check:
   if (stage == 3) goto adsr_stage_sustain_apply; else goto adsr_stage_release_check;
   adsr_stage_sustain_apply:
-  if (sustain < 0.0) goto <D.380>; else goto <D.381>;
-  <D.380>:
-  iftmp.24 = 1.0e+0;
-  goto <D.382>;
-  <D.381>:
-  iftmp.24 = 0.0;
+  if (sustain < 0.0) goto <D.382>; else goto <D.383>;
   <D.382>:
+  iftmp.24 = 1.0e+0;
+  goto <D.384>;
+  <D.383>:
+  iftmp.24 = 0.0;
+  <D.384>:
   _58 = 1.0e+0 - iftmp.24;
   _59 = sustain * _58;
-  if (sustain < 0.0) goto <D.384>; else goto <D.385>;
-  <D.384>:
-  iftmp.25 = 1.0e+0;
-  goto <D.386>;
-  <D.385>:
-  iftmp.25 = 0.0;
+  if (sustain < 0.0) goto <D.386>; else goto <D.387>;
   <D.386>:
+  iftmp.25 = 1.0e+0;
+  goto <D.388>;
+  <D.387>:
+  iftmp.25 = 0.0;
+  <D.388>:
   _60 = 1.0e+0 - iftmp.25;
   _61 = sustain * _60;
   _62 = 1.0e+0 - _61;
-  if (sustain < 0.0) goto <D.389>; else goto <D.390>;
-  <D.389>:
-  iftmp.27 = 1.0e+0;
-  goto <D.391>;
-  <D.390>:
-  iftmp.27 = 0.0;
+  if (sustain < 0.0) goto <D.391>; else goto <D.392>;
   <D.391>:
+  iftmp.27 = 1.0e+0;
+  goto <D.393>;
+  <D.392>:
+  iftmp.27 = 0.0;
+  <D.393>:
   _63 = 1.0e+0 - iftmp.27;
   _64 = sustain * _63;
-  if (_64 > 1.0e+0) goto <D.392>; else goto <D.393>;
-  <D.392>:
-  iftmp.26 = 1.0e+0;
-  goto <D.394>;
-  <D.393>:
-  iftmp.26 = 0.0;
+  if (_64 > 1.0e+0) goto <D.394>; else goto <D.395>;
   <D.394>:
+  iftmp.26 = 1.0e+0;
+  goto <D.396>;
+  <D.395>:
+  iftmp.26 = 0.0;
+  <D.396>:
   _65 = iftmp.26 * _62;
   level = _59 + _65;
   goto adsr_sample_done;
   adsr_stage_release_check:
   if (stage == 4) goto adsr_stage_release_apply; else goto adsr_stage_idle_apply;
   adsr_stage_release_apply:
-  if (release < 0.0) goto <D.396>; else goto <D.397>;
-  <D.396>:
-  iftmp.28 = 1.0e+0;
-  goto <D.398>;
-  <D.397>:
-  iftmp.28 = 0.0;
+  if (release < 0.0) goto <D.398>; else goto <D.399>;
   <D.398>:
+  iftmp.28 = 1.0e+0;
+  goto <D.400>;
+  <D.399>:
+  iftmp.28 = 0.0;
+  <D.400>:
   _66 = 1.0e+0 - iftmp.28;
   _67 = release * _66;
   _68 = _67 * 4.41e+4;
@@ -479,33 +479,33 @@ void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
   body:
   _1 = phase + phase;
   _2 = phase + phase;
-  if (_2 >= 6.283185482025146484375e+0) goto <D.400>; else goto <D.401>;
-  <D.400>:
-  iftmp.29 = 1.0e+0;
-  goto <D.402>;
-  <D.401>:
-  iftmp.29 = 0.0;
+  if (_2 >= 6.283185482025146484375e+0) goto <D.402>; else goto <D.403>;
   <D.402>:
+  iftmp.29 = 1.0e+0;
+  goto <D.404>;
+  <D.403>:
+  iftmp.29 = 0.0;
+  <D.404>:
   _3 = iftmp.29 * 6.283185482025146484375e+0;
   _4 = _1 - _3;
   _5 = phase + phase;
   _6 = phase + phase;
-  if (_6 >= 6.283185482025146484375e+0) goto <D.405>; else goto <D.406>;
-  <D.405>:
-  iftmp.31 = 1.0e+0;
-  goto <D.407>;
-  <D.406>:
-  iftmp.31 = 0.0;
+  if (_6 >= 6.283185482025146484375e+0) goto <D.407>; else goto <D.408>;
   <D.407>:
+  iftmp.31 = 1.0e+0;
+  goto <D.409>;
+  <D.408>:
+  iftmp.31 = 0.0;
+  <D.409>:
   _7 = iftmp.31 * 6.283185482025146484375e+0;
   _8 = _5 - _7;
-  if (_8 < 0.0) goto <D.408>; else goto <D.409>;
-  <D.408>:
-  iftmp.30 = 1.0e+0;
-  goto <D.410>;
-  <D.409>:
-  iftmp.30 = 0.0;
+  if (_8 < 0.0) goto <D.410>; else goto <D.411>;
   <D.410>:
+  iftmp.30 = 1.0e+0;
+  goto <D.412>;
+  <D.411>:
+  iftmp.30 = 0.0;
+  <D.412>:
   _9 = iftmp.30 * 6.283185482025146484375e+0;
   _10 = _4 + _9;
   _11 = i * 4;
@@ -516,35 +516,35 @@ void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
   _15 = phase + _14;
   _16 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _17 = phase + _16;
-  if (_17 >= 6.283185482025146484375e+0) goto <D.412>; else goto <D.413>;
-  <D.412>:
-  iftmp.32 = 1.0e+0;
-  goto <D.414>;
-  <D.413>:
-  iftmp.32 = 0.0;
+  if (_17 >= 6.283185482025146484375e+0) goto <D.414>; else goto <D.415>;
   <D.414>:
+  iftmp.32 = 1.0e+0;
+  goto <D.416>;
+  <D.415>:
+  iftmp.32 = 0.0;
+  <D.416>:
   _18 = iftmp.32 * 6.283185482025146484375e+0;
   _19 = _15 - _18;
   _20 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _21 = phase + _20;
   _22 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _23 = phase + _22;
-  if (_23 >= 6.283185482025146484375e+0) goto <D.417>; else goto <D.418>;
-  <D.417>:
-  iftmp.34 = 1.0e+0;
-  goto <D.419>;
-  <D.418>:
-  iftmp.34 = 0.0;
+  if (_23 >= 6.283185482025146484375e+0) goto <D.419>; else goto <D.420>;
   <D.419>:
+  iftmp.34 = 1.0e+0;
+  goto <D.421>;
+  <D.420>:
+  iftmp.34 = 0.0;
+  <D.421>:
   _24 = iftmp.34 * 6.283185482025146484375e+0;
   _25 = _21 - _24;
-  if (_25 < 0.0) goto <D.420>; else goto <D.421>;
-  <D.420>:
-  iftmp.33 = 1.0e+0;
-  goto <D.422>;
-  <D.421>:
-  iftmp.33 = 0.0;
+  if (_25 < 0.0) goto <D.422>; else goto <D.423>;
   <D.422>:
+  iftmp.33 = 1.0e+0;
+  goto <D.424>;
+  <D.423>:
+  iftmp.33 = 0.0;
+  <D.424>:
   _26 = iftmp.33 * 6.283185482025146484375e+0;
   phase = _19 + _26;
   goto cont;
@@ -658,33 +658,33 @@ void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, floa
   body:
   _1 = phase + phase;
   _2 = phase + phase;
-  if (_2 >= 6.283185482025146484375e+0) goto <D.424>; else goto <D.425>;
-  <D.424>:
-  iftmp.35 = 1.0e+0;
-  goto <D.426>;
-  <D.425>:
-  iftmp.35 = 0.0;
+  if (_2 >= 6.283185482025146484375e+0) goto <D.426>; else goto <D.427>;
   <D.426>:
+  iftmp.35 = 1.0e+0;
+  goto <D.428>;
+  <D.427>:
+  iftmp.35 = 0.0;
+  <D.428>:
   _3 = iftmp.35 * 6.283185482025146484375e+0;
   _4 = _1 - _3;
   _5 = phase + phase;
   _6 = phase + phase;
-  if (_6 >= 6.283185482025146484375e+0) goto <D.429>; else goto <D.430>;
-  <D.429>:
-  iftmp.37 = 1.0e+0;
-  goto <D.431>;
-  <D.430>:
-  iftmp.37 = 0.0;
+  if (_6 >= 6.283185482025146484375e+0) goto <D.431>; else goto <D.432>;
   <D.431>:
+  iftmp.37 = 1.0e+0;
+  goto <D.433>;
+  <D.432>:
+  iftmp.37 = 0.0;
+  <D.433>:
   _7 = iftmp.37 * 6.283185482025146484375e+0;
   _8 = _5 - _7;
-  if (_8 < 0.0) goto <D.432>; else goto <D.433>;
-  <D.432>:
-  iftmp.36 = 1.0e+0;
-  goto <D.434>;
-  <D.433>:
-  iftmp.36 = 0.0;
+  if (_8 < 0.0) goto <D.434>; else goto <D.435>;
   <D.434>:
+  iftmp.36 = 1.0e+0;
+  goto <D.436>;
+  <D.435>:
+  iftmp.36 = 0.0;
+  <D.436>:
   _9 = iftmp.36 * 6.283185482025146484375e+0;
   _10 = _4 + _9;
   _11 = i * 4;
@@ -701,13 +701,13 @@ void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, floa
   _21 = *_20;
   _22 = _21 * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _23 = phase + _22;
-  if (_23 >= 6.283185482025146484375e+0) goto <D.436>; else goto <D.437>;
-  <D.436>:
-  iftmp.38 = 1.0e+0;
-  goto <D.438>;
-  <D.437>:
-  iftmp.38 = 0.0;
+  if (_23 >= 6.283185482025146484375e+0) goto <D.438>; else goto <D.439>;
   <D.438>:
+  iftmp.38 = 1.0e+0;
+  goto <D.440>;
+  <D.439>:
+  iftmp.38 = 0.0;
+  <D.440>:
   _24 = iftmp.38 * 6.283185482025146484375e+0;
   _25 = _18 - _24;
   _26 = i * 4;
@@ -720,22 +720,22 @@ void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, floa
   _33 = *_32;
   _34 = _33 * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _35 = phase + _34;
-  if (_35 >= 6.283185482025146484375e+0) goto <D.441>; else goto <D.442>;
-  <D.441>:
-  iftmp.40 = 1.0e+0;
-  goto <D.443>;
-  <D.442>:
-  iftmp.40 = 0.0;
+  if (_35 >= 6.283185482025146484375e+0) goto <D.443>; else goto <D.444>;
   <D.443>:
+  iftmp.40 = 1.0e+0;
+  goto <D.445>;
+  <D.444>:
+  iftmp.40 = 0.0;
+  <D.445>:
   _36 = iftmp.40 * 6.283185482025146484375e+0;
   _37 = _30 - _36;
-  if (_37 < 0.0) goto <D.444>; else goto <D.445>;
-  <D.444>:
-  iftmp.39 = 1.0e+0;
-  goto <D.446>;
-  <D.445>:
-  iftmp.39 = 0.0;
+  if (_37 < 0.0) goto <D.446>; else goto <D.447>;
   <D.446>:
+  iftmp.39 = 1.0e+0;
+  goto <D.448>;
+  <D.447>:
+  iftmp.39 = 0.0;
+  <D.448>:
   _38 = iftmp.39 * 6.283185482025146484375e+0;
   phase = _25 + _38;
   goto cont;
@@ -840,38 +840,43 @@ void Out_baa (float * dst, const float * a)
 void default_init (void * state)
 {
   entry:
-  MEM[(struct default_state *)state].s11.level = 0.0;
-  MEM[(struct default_state *)state].s11.stage = 0;
-  MEM[(struct default_state *)state].s11.last_gate = 0;
-  MEM[(struct default_state *)state].s11.release_start = 0.0;
-  MEM[(struct default_state *)state].s14.phase = 0.0;
-  MEM[(struct default_state *)state].s21.phase = 0.0;
+  MEM[(struct default_state *)state].s15.level = 0.0;
+  MEM[(struct default_state *)state].s15.stage = 0;
+  MEM[(struct default_state *)state].s15.last_gate = 0;
+  MEM[(struct default_state *)state].s15.release_start = 0.0;
+  MEM[(struct default_state *)state].s17.level = 0.0;
+  MEM[(struct default_state *)state].s17.stage = 0;
+  MEM[(struct default_state *)state].s17.last_gate = 0;
+  MEM[(struct default_state *)state].s17.release_start = 0.0;
+  MEM[(struct default_state *)state].s20.phase = 0.0;
+  MEM[(struct default_state *)state].s27.phase = 0.0;
   return;
 }
 
 
 unsigned int default_process (void * state, const float * controls, float * abus)
 {
-  unsigned int D.447;
-  float e25[64];
+  unsigned int D.449;
+  float e31[64];
+  float e29[32];
+  float e28[32];
+  float e27[32];
+  float e25[32];
+  float e24;
   float e23[32];
   float e22[32];
-  float e21[32];
-  float e19[32];
+  float e21;
+  float e20[32];
   float e18;
   float e17[32];
-  float e16[32];
-  float e15;
-  float e14[32];
-  float e12;
-  float e11[32];
+  float e15[32];
   unsigned int done_action;
 
   try
     {
       entry:
       done_action = 0;
-      _1 = &MEM[(struct default_state *)state].s11;
+      _1 = &MEM[(struct default_state *)state].s15;
       _2 = controls + 20;
       _3 = *_2;
       _4 = controls + 24;
@@ -882,1500 +887,416 @@ unsigned int default_process (void * state, const float * controls, float * abus
       _9 = *_8;
       _10 = controls + 36;
       _11 = *_10;
-      _12 = controls + 40;
+      _12 = controls + 56;
       _13 = *_12;
-      ADSR_bbbbbba (_1, &e11[0], _3, _5, _7, _9, _11, _13, &done_action);
-      _14 = *controls;
-      _15 = controls + 16;
+      ADSR_bbbbbba (_1, &e15[0], _3, _5, _7, _9, _11, _13, &done_action);
+      _14 = &MEM[(struct default_state *)state].s17;
+      _15 = controls + 20;
       _16 = *_15;
-      e12 = _14 * _16;
-      _17 = &MEM[(struct default_state *)state].s14;
-      SinOsc_bba (_17, &e14[0], e12, 0.0);
-      _18 = *controls;
-      _19 = controls + 8;
+      _17 = controls + 40;
+      _18 = *_17;
+      _19 = controls + 44;
       _20 = *_19;
-      e15 = _18 * _20;
-      Mul_baa (&e16[0], e15, &e11[0]);
-      Mul_aaa (&e17[0], &e14[0], &e16[0]);
-      _21 = *controls;
-      _22 = controls + 12;
-      _23 = *_22;
-      e18 = _21 * _23;
-      Add_baa (&e19[0], e18, &e17[0]);
-      _24 = &MEM[(struct default_state *)state].s21;
-      SinOsc_aba (_24, &e21[0], &e19[0], 0.0);
-      _25 = controls + 4;
-      _26 = *_25;
-      Mul_aba (&e22[0], &e21[0], _26);
-      Mul_aaa (&e23[0], &e22[0], &e11[0]);
-      Pan_aba (&e25[0], &e23[0], 0.0);
-      Out_baa (abus, &e25[0]);
-      _27 = abus + 128;
-      _28 = &e25[0] + 128;
-      Out_baa (_27, _28);
-      D.447 = done_action;
-      return D.447;
+      _21 = controls + 48;
+      _22 = *_21;
+      _23 = controls + 52;
+      _24 = *_23;
+      ADSR_bbbbbba (_14, &e17[0], _16, _18, _20, _22, _24, 0.0, &done_action);
+      _25 = *controls;
+      _26 = controls + 16;
+      _27 = *_26;
+      e18 = _25 * _27;
+      _28 = &MEM[(struct default_state *)state].s20;
+      SinOsc_bba (_28, &e20[0], e18, 0.0);
+      _29 = *controls;
+      _30 = controls + 8;
+      _31 = *_30;
+      e21 = _29 * _31;
+      Mul_baa (&e22[0], e21, &e17[0]);
+      Mul_aaa (&e23[0], &e20[0], &e22[0]);
+      _32 = *controls;
+      _33 = controls + 12;
+      _34 = *_33;
+      e24 = _32 * _34;
+      Add_baa (&e25[0], e24, &e23[0]);
+      _35 = &MEM[(struct default_state *)state].s27;
+      SinOsc_aba (_35, &e27[0], &e25[0], 0.0);
+      _36 = controls + 4;
+      _37 = *_36;
+      Mul_aba (&e28[0], &e27[0], _37);
+      Mul_aaa (&e29[0], &e28[0], &e15[0]);
+      Pan_aba (&e31[0], &e29[0], 0.0);
+      Out_baa (abus, &e31[0]);
+      _38 = abus + 128;
+      _39 = &e31[0] + 128;
+      Out_baa (_38, _39);
+      D.449 = done_action;
+      return D.449;
     }
   finally
     {
+      e31 = {CLOBBER(eos)};
+      e29 = {CLOBBER(eos)};
+      e28 = {CLOBBER(eos)};
+      e27 = {CLOBBER(eos)};
       e25 = {CLOBBER(eos)};
       e23 = {CLOBBER(eos)};
       e22 = {CLOBBER(eos)};
-      e21 = {CLOBBER(eos)};
-      e19 = {CLOBBER(eos)};
+      e20 = {CLOBBER(eos)};
       e17 = {CLOBBER(eos)};
-      e16 = {CLOBBER(eos)};
-      e14 = {CLOBBER(eos)};
-      e11 = {CLOBBER(eos)};
+      e15 = {CLOBBER(eos)};
       done_action = {CLOBBER(eos)};
     }
 }
 
 
-	.arch armv8-a
-	.file	"fake.c"
-	.text
-	.align	2
-	.p2align 5,,15
-	.global	sinf_lookup
-	.type	sinf_lookup, %function
-sinf_lookup:
-.LFB0:
-	.cfi_startproc
-.L2:
-	mov	w0, 63875
-	movk	w0, 0x4222, lsl 16
-	fmov	s31, w0
-	adrp	x0, .LANCHOR0
-	add	x0, x0, :lo12:.LANCHOR0
-	fmul	s31, s0, s31
-	fcvtzu	x2, s31
-	lsl	x1, x2, 2
-	ucvtf	s29, x2
-	add	x2, x0, x1
-	ldr	s0, [x0, x1]
-	ldr	s30, [x2, 4]
-	fsub	s31, s31, s29
-	fsub	s30, s30, s0
-	fmadd	s0, s31, s30, s0
-	ret
-	.cfi_endproc
-.LFE0:
-	.size	sinf_lookup, .-sinf_lookup
-	.align	2
-	.p2align 5,,15
-	.global	default_init
-	.type	default_init, %function
-default_init:
-.LFB10:
-	.cfi_startproc
-.L5:
-	stp	xzr, xzr, [x0]
-	str	xzr, [x0, 16]
-	ret
-	.cfi_endproc
-.LFE10:
-	.size	default_init, .-default_init
-	.align	2
-	.p2align 5,,15
-	.global	default_process
-	.type	default_process, %function
-default_process:
-.LFB11:
-	.cfi_startproc
-.L7:
-	sub	sp, sp, #1008
-	.cfi_def_cfa_offset 1008
-	movi	v28.2s, #0
-	fmov	s30, 1.0e+0
-	stp	x29, x30, [sp]
-	.cfi_offset 29, -1008
-	.cfi_offset 30, -1000
-	mov	x29, sp
-	stp	x19, x20, [sp, 16]
-	.cfi_offset 19, -992
-	.cfi_offset 20, -984
-	add	x19, sp, 368
-	stp	x21, x22, [sp, 32]
-	.cfi_offset 21, -976
-	.cfi_offset 22, -968
-	mov	x21, x1
-	mov	x22, x0
-	stp	x23, x24, [sp, 48]
-	.cfi_offset 23, -960
-	.cfi_offset 24, -952
-	mov	x23, x2
-	stp	d11, d12, [sp, 80]
-	stp	d13, d14, [sp, 96]
-	ldr	s31, [x0]
-	ldr	s22, [x0, 12]
-	str	x25, [sp, 64]
-	str	d15, [sp, 72]
-	.cfi_offset 75, -928
-	.cfi_offset 76, -920
-	.cfi_offset 77, -912
-	.cfi_offset 78, -904
-	.cfi_offset 25, -944
-	.cfi_offset 79, -936
-	ldp	s19, s20, [x1, 20]
-	ldp	s26, s29, [x1, 28]
-	fcmpe	s20, s28
-	ldp	s24, s18, [x1, 36]
-	ldp	w1, w3, [x0, 4]
-	fcsel	s27, s30, s28, mi
-	fcmpe	s26, s28
-	add	x0, sp, 240
-	fcsel	s25, s30, s28, mi
-	fcmpe	s29, s30
-	fcsel	s21, s30, s28, gt
-	fcmpe	s24, s28
-	fcsel	s23, s30, s28, mi
-	fcmp	s18, s30
-	cset	w2, eq
-	fcmpe	s19, s28
-	cset	w4, gt
-	bgt	.L8
-	fcmpe	s29, s28
-	bmi	.L9
-	cbz	w3, .L110
-	cbnz	w1, .L111
-	add	x0, sp, 244
-	mov	w20, 0
-	str	s28, [sp, 240]
-.L12:
-	str	wzr, [x0], 4
-	movi	v31.2s, #0
-	cmp	x19, x0
-	beq	.L19
-.L10:
-	cmp	w1, 1
-	bne	.L188
-	fmov	s28, 1.0e+0
-	mov	w3, 17408
-	movk	w3, 0x472c, lsl 16
-	fmov	s18, w3
-	fsub	s19, s28, s27
-	fmul	s19, s19, s20
-.L27:
-	fcmpe	s19, #0.0
-	bls	.L116
-	fmul	s30, s20, s18
-	fdiv	s30, s28, s30
-	fadd	s31, s31, s30
-	fcmpe	s31, s28
-	bge	.L143
-	str	s31, [x0], 4
-	cmp	x19, x0
-	bne	.L27
-	.p2align 5,,15
-.L19:
-	str	s31, [x22]
-	mov	w0, 4059
-	str	s22, [x22, 12]
-	movk	w0, 0x40c9, lsl 16
-	ldr	s13, [x21]
-	movi	v11.2s, #0
-	ldr	s31, [x21, 16]
-	fmov	s14, w0
-	ldr	s15, [x22, 16]
-	mov	w0, 26002
-	add	x24, sp, 496
-	movk	w0, 0x3915, lsl 16
-	fmul	s13, s13, s31
-	fmov	s12, w0
-	stp	w1, w4, [x22, 4]
-	.p2align 5,,15
-.L44:
-	fadd	s0, s15, s11
-	fcmpe	s0, s14
-	bge	.L95
-	fcmpe	s0, #0.0
-	bmi	.L146
-	.p2align 5,,15
-.L94:
-	bl	sinf_lookup
-	fmadd	s31, s13, s12, s15
-	str	s0, [x19]
-	fcmpe	s31, s14
-	bge	.L147
-	fcmpe	s31, #0.0
-	add	x19, x19, 4
-	bmi	.L93
-	fadd	s0, s31, s11
-	cmp	x19, x24
-	beq	.L92
-	fmov	s15, s0
-	b	.L94
-	.p2align 2,,3
-.L8:
-	cbnz	w3, .L214
-.L42:
-	fmov	s28, 1.0e+0
-	mov	w1, 17408
-	movk	w1, 0x472c, lsl 16
-	fmov	s19, w1
-	fsub	s27, s28, s27
-	fmul	s27, s27, s20
-.L78:
-	fcmpe	s27, #0.0
-	bls	.L129
-	fmul	s30, s20, s19
-	fdiv	s30, s28, s30
-	fadd	s31, s31, s30
-	fcmpe	s31, s28
-	bge	.L60
-	str	s31, [x0], 4
-	cmp	x0, x19
-	bne	.L78
-	mov	w20, 0
-	mov	w1, 1
-	b	.L19
-	.p2align 2,,3
-.L129:
-	mov	w20, 0
-	fmov	s31, 1.0e+0
-.L46:
-.L51:
-	fmov	s30, 1.0e+0
-	fsub	s28, s30, s25
-	fmul	s28, s28, s26
-	fcmpe	s28, #0.0
-	bls	.L54
-	fcmpe	s29, #0.0
-	bmi	.L145
-	fsub	s28, s30, s29
-	fmadd	s28, s28, s21, s29
-	fsub	s30, s30, s28
-.L64:
-	mov	w1, 17408
-	movk	w1, 0x472c, lsl 16
-	fmov	s27, w1
-	fmul	s27, s26, s27
-	fdiv	s30, s30, s27
-	fsub	s31, s31, s30
-	fcmpe	s28, s31
-	bge	.L71
-	mov	w1, 2
-	str	s31, [x0], 4
-	cmp	x19, x0
-	beq	.L19
-.L84:
-	cmp	w1, 2
-	beq	.L46
-	cmp	w1, 3
-	bne	.L215
-.L48:
-	fcmpe	s29, #0.0
-	bmi	.L65
-	fmov	s30, 1.0e+0
-.L213:
-	fcmpe	s29, s30
-	fsub	s30, s30, s29
-	bgt	.L58
-	movi	v31.2s, #0
-	fmadd	s31, s30, s31, s29
-	b	.L59
-	.p2align 2,,3
-.L58:
-	fadd	s31, s29, s30
-.L59:
-	mov	w1, 3
-	str	s31, [x0], 4
-	cmp	x19, x0
-	bne	.L84
-	b	.L19
-	.p2align 2,,3
-.L93:
-	fadd	s15, s31, s14
-	cmp	x19, x24
-	bne	.L44
-	fmov	s0, s15
-.L92:
-	ldp	q28, q27, [sp, 240]
-	mov	w0, 4059
-	ldp	q7, q6, [sp, 304]
-	movk	w0, 0x40c9, lsl 16
-	ldp	q5, q4, [sp, 336]
-	movi	v12.2s, #0
-	ldp	q22, q16, [sp, 368]
-	fmov	s15, w0
-	ldp	q17, q19, [sp, 400]
-	mov	w0, 26002
-	ldp	q20, q21, [sp, 432]
-	add	x25, sp, 624
-	ldp	q23, q26, [sp, 464]
-	str	s0, [x22, 16]
-	ldp	s30, s29, [x21, 8]
-	movk	w0, 0x3915, lsl 16
-	ldr	s31, [x21]
-	fmov	s13, w0
-	ldr	s14, [x22, 20]
-	mov	x19, 1
-	stp	q4, q28, [sp, 112]
-	fmul	s30, s31, s30
-	fmul	s31, s31, s29
-	stp	q6, q5, [sp, 208]
-	ldp	q29, q11, [sp, 272]
-	dup	v31.4s, v31.s[0]
-	fmul	v25.4s, v28.4s, v30.s[0]
-	fmul	v18.4s, v29.4s, v30.s[0]
-	stp	q27, q29, [sp, 144]
-	mov	v29.16b, v31.16b
-	stp	q11, q7, [sp, 176]
-	fmul	v24.4s, v27.4s, v30.s[0]
-	fmul	v27.4s, v11.4s, v30.s[0]
-	fmla	v29.4s, v22.4s, v25.4s
-	mov	v25.16b, v31.16b
-	fmul	v28.4s, v7.4s, v30.s[0]
-	fmul	v22.4s, v6.4s, v30.s[0]
-	fmla	v25.4s, v16.4s, v24.4s
-	fmul	v24.4s, v5.4s, v30.s[0]
-	fmul	v30.4s, v4.4s, v30.s[0]
-	stp	q29, q25, [sp, 496]
-	mov	v29.16b, v31.16b
-	mov	v25.16b, v31.16b
-	fmla	v29.4s, v17.4s, v18.4s
-	fmla	v25.4s, v19.4s, v27.4s
-	mov	v27.16b, v31.16b
-	stp	q29, q25, [sp, 528]
-	fmla	v27.4s, v20.4s, v28.4s
-	mov	v29.16b, v31.16b
-	mov	v28.16b, v31.16b
-	fmla	v31.4s, v26.4s, v30.4s
-	fmla	v29.4s, v23.4s, v24.4s
-	fmla	v28.4s, v21.4s, v22.4s
-	stp	q29, q31, [sp, 592]
-	stp	q27, q28, [sp, 560]
-	.p2align 5,,15
-.L97:
-	fadd	s0, s14, s12
-	fcmpe	s0, s15
-	bge	.L108
-	fcmpe	s0, #0.0
-	bmi	.L148
-	.p2align 5,,15
-.L107:
-	bl	sinf_lookup
-	add	x4, x24, x19, lsl 2
-	add	x3, x25, x19, lsl 2
-	ldr	s31, [x4, -4]
-	str	s0, [x3, -4]
-	fmadd	s0, s31, s13, s14
-	fcmpe	s0, s15
-	bge	.L149
-	fcmpe	s0, #0.0
-	add	x19, x19, 1
-	bmi	.L106
-	fadd	s0, s0, s12
-	cmp	x19, 33
-	beq	.L105
-	fmov	s14, s0
-	b	.L107
-	.p2align 2,,3
-.L137:
-	fmov	s15, s0
-.L95:
-	fsub	s0, s0, s14
-	fadd	s0, s0, s11
-	b	.L94
-	.p2align 2,,3
-.L146:
-	fadd	s0, s0, s14
-	b	.L94
-	.p2align 2,,3
-.L147:
-	fsub	s31, s31, s14
-	add	x19, x19, 4
-	fadd	s0, s31, s11
-	cmp	x24, x19
-	beq	.L92
-	fcmpe	s0, s14
-	fmov	s15, s0
-	bge	.L137
-	b	.L94
-	.p2align 2,,3
-.L54:
-	fcmpe	s29, #0.0
-	bmi	.L144
-	b	.L213
-	.p2align 2,,3
-.L144:
-	movi	v31.2s, #0
-	fmsub	s30, s29, s31, s30
-	fmul	s30, s30, s31
-	fmadd	s31, s29, s31, s30
-	b	.L59
-	.p2align 2,,3
-.L60:
-	mov	w20, 0
-	mov	w1, 2
-	fmov	s31, 1.0e+0
-	str	s28, [x0], 4
-	cmp	x19, x0
-	bne	.L84
-.L34:
-	mov	w20, 0
-	mov	w1, 2
-	fmov	s31, 1.0e+0
-	b	.L19
-	.p2align 2,,3
-.L71:
-	fmov	s31, s28
-	mov	w1, 3
-	str	s28, [x0], 4
-	cmp	x19, x0
-	bne	.L84
-	b	.L19
-	.p2align 2,,3
-.L145:
-	movi	v27.2s, #0
-	fmsub	s28, s29, s27, s30
-	fmul	s28, s28, s27
-	fmadd	s28, s29, s27, s28
-	fsub	s30, s30, s28
-	b	.L64
-	.p2align 2,,3
-.L106:
-	fadd	s14, s0, s15
-	cmp	x19, 33
-	bne	.L97
-	fmov	s0, s14
-.L105:
-	ldp	q24, q26, [sp, 624]
-	add	x1, x23, 128
-	ldp	q25, q28, [sp, 656]
-	mov	w0, w20
-	ldp	q27, q30, [sp, 688]
-	ldp	q29, q31, [sp, 720]
-	str	s0, [x22, 20]
-	fmov	v23.4s, 5.0e-1
-	ldr	s22, [x21, 4]
-	fmul	v26.4s, v26.4s, v22.s[0]
-	fmul	v24.4s, v24.4s, v22.s[0]
-	fmul	v25.4s, v25.4s, v22.s[0]
-	fmul	v28.4s, v28.4s, v22.s[0]
-	fmul	v27.4s, v27.4s, v22.s[0]
-	fmul	v30.4s, v30.4s, v22.s[0]
-	fmul	v29.4s, v29.4s, v22.s[0]
-	fmul	v31.4s, v31.4s, v22.s[0]
-	ldr	q22, [sp, 144]
-	fmul	v26.4s, v26.4s, v22.4s
-	ldr	q22, [sp, 128]
-	fmul	v26.4s, v26.4s, v23.4s
-	fmul	v24.4s, v24.4s, v22.4s
-	ldr	q22, [sp, 160]
-	fmul	v24.4s, v24.4s, v23.4s
-	fmul	v25.4s, v25.4s, v22.4s
-	ldr	q22, [sp, 176]
-	str	q24, [x23, 128]
-	fmul	v28.4s, v28.4s, v22.4s
-	ldr	q22, [sp, 192]
-	fmul	v25.4s, v25.4s, v23.4s
-	fmul	v28.4s, v28.4s, v23.4s
-	fmul	v27.4s, v27.4s, v22.4s
-	ldr	q22, [sp, 208]
-	fmul	v27.4s, v27.4s, v23.4s
-	fmul	v30.4s, v30.4s, v22.4s
-	ldr	q22, [sp, 224]
-	fmul	v30.4s, v30.4s, v23.4s
-	fmul	v29.4s, v29.4s, v22.4s
-	ldr	q22, [sp, 112]
-	stp	q24, q26, [x23]
-	fmul	v29.4s, v29.4s, v23.4s
-	stp	q25, q28, [x23, 32]
-	fmul	v31.4s, v31.4s, v22.4s
-	stp	q27, q30, [x23, 64]
-	fmul	v31.4s, v31.4s, v23.4s
-	stp	q29, q31, [x23, 96]
-	stp	q26, q25, [x1, 16]
-	stp	q28, q27, [x1, 48]
-	stp	q30, q29, [x1, 80]
-	str	q31, [x23, 240]
-	ldr	d15, [sp, 72]
-	ldp	d11, d12, [sp, 80]
-	ldp	d13, d14, [sp, 96]
-	ldp	x29, x30, [sp]
-	ldr	x25, [sp, 64]
-	ldp	x19, x20, [sp, 16]
-	ldp	x21, x22, [sp, 32]
-	ldp	x23, x24, [sp, 48]
-	add	sp, sp, 1008
-	.cfi_remember_state
-	.cfi_restore 25
-	.cfi_restore 23
-	.cfi_restore 24
-	.cfi_restore 21
-	.cfi_restore 22
-	.cfi_restore 19
-	.cfi_restore 20
-	.cfi_restore 29
-	.cfi_restore 30
-	.cfi_restore 79
-	.cfi_restore 77
-	.cfi_restore 78
-	.cfi_restore 75
-	.cfi_restore 76
-	.cfi_def_cfa_offset 0
-	ret
-	.p2align 2,,3
-.L139:
-	.cfi_restore_state
-	fmov	s14, s0
-.L108:
-	fsub	s0, s0, s15
-	fadd	s0, s0, s12
-	b	.L107
-	.p2align 2,,3
-.L148:
-	fadd	s0, s0, s15
-	b	.L107
-	.p2align 2,,3
-.L149:
-	fsub	s0, s0, s15
-	add	x19, x19, 1
-	fadd	s0, s0, s12
-	cmp	x19, 33
-	beq	.L105
-	fcmpe	s0, s15
-	fmov	s14, s0
-	bge	.L139
-	b	.L107
-	.p2align 2,,3
-.L65:
-	movi	v30.2s, #0
-	fmov	s31, 1.0e+0
-	fmsub	s31, s29, s30, s31
-	fmul	s31, s31, s30
-	fmadd	s31, s29, s30, s31
-	b	.L59
-.L214:
-.L43:
-	cmp	w1, 1
-	beq	.L42
-	mov	w20, 0
-	b	.L84
-	.p2align 2,,3
-.L9:
-	cbz	w3, .L216
-	mov	w20, 0
-	cbz	w1, .L217
-	fmov	s22, s31
-	b	.L31
-	.p2align 2,,3
-.L216:
-	cmp	w1, 1
-	bne	.L189
-	fsub	s27, s30, s27
-	mov	w3, 17408
-	movk	w3, 0x472c, lsl 16
-	fmov	s21, w3
-	fmul	s27, s27, s20
-	.p2align 5,,15
-.L29:
-	fcmpe	s27, #0.0
-	bls	.L121
-	fmul	s28, s20, s21
-	fdiv	s28, s30, s28
-	fadd	s31, s31, s28
-	fcmpe	s31, s30
-	bge	.L33
-	str	s31, [x0], 4
-	cmp	x0, x19
-	bne	.L29
-	mov	w20, 0
-	b	.L19
-	.p2align 2,,3
-.L33:
-	str	s30, [x0], 4
-	cmp	x0, x19
-	beq	.L34
-.L121:
-	fmov	s31, 1.0e+0
-.L30:
-	fmov	s28, 1.0e+0
-	fsub	s25, s28, s25
-	fmul	s25, s25, s26
-.L35:
-	fcmpe	s25, #0.0
-	bls	.L39
-	movi	v21.2s, #0
-	mov	w1, 17408
-	movk	w1, 0x472c, lsl 16
-	fmov	s27, w1
-	fmul	s27, s26, s27
-	fmsub	s30, s29, s21, s28
-	fmul	s30, s30, s21
-	fmadd	s30, s29, s21, s30
-	fsub	s20, s28, s30
-	fdiv	s27, s20, s27
-	fsub	s31, s31, s27
-	fcmpe	s30, s31
-	bge	.L41
-	str	s31, [x0], 4
-	cmp	x19, x0
-	bne	.L35
-	mov	w20, 0
-	mov	w1, 2
-	b	.L19
-	.p2align 2,,3
-.L39:
-	movi	v31.2s, #0
-	mov	w20, 0
-	fmsub	s30, s29, s31, s28
-	fmul	s30, s30, s31
-	fmadd	s31, s29, s31, s30
-	fmov	s22, s31
-.L31:
-	fmov	s29, 1.0e+0
-	fsub	s29, s29, s23
-	fmul	s29, s29, s24
-.L176:
-	fcmpe	s29, #0.0
-	mov	w1, 17408
-	movk	w1, 0x472c, lsl 16
-	fmov	s30, w1
-	bls	.L36
-	fmul	s30, s24, s30
-	fdiv	s30, s22, s30
-	fsub	s31, s31, s30
-	fcmpe	s31, #0.0
-	bls	.L37
-	str	s31, [x0], 4
-	cmp	x0, x19
-	bne	.L176
-	mov	w1, 4
-	b	.L19
-	.p2align 2,,3
-.L36:
-	str	wzr, [x0], 4
-	orr	w20, w20, w2
-	mov	w1, 0
-	cmp	x0, x19
-	beq	.L207
-.L32:
-	str	wzr, [x0], 4
-	movi	v31.2s, #0
-	cmp	x0, x19
-	beq	.L19
-.L38:
-	cmp	w1, 4
-	beq	.L31
-	b	.L32
-	.p2align 2,,3
-.L41:
-	fmov	s22, s21
-	fmov	s31, s21
-	mov	w20, 0
-	str	s21, [x0], 4
-	cmp	x19, x0
-	bne	.L31
-	mov	w1, 4
-	b	.L19
-	.p2align 2,,3
-.L37:
-	str	wzr, [x0], 4
-	orr	w20, w20, w2
-	mov	w1, 0
-	cmp	x19, x0
-	bne	.L32
-.L207:
-	movi	v31.2s, #0
-	b	.L19
-.L110:
-	mov	w20, 0
-	b	.L10
-	.p2align 2,,3
-.L116:
-	fmov	s31, 1.0e+0
-.L24:
-	fmov	s28, 1.0e+0
-	fsub	s19, s28, s25
-	fmul	s19, s19, s26
-.L20:
-	fcmpe	s19, #0.0
-	bls	.L140
-	fsub	s30, s28, s29
-	mov	w1, 17408
-	movk	w1, 0x472c, lsl 16
-	fmov	s18, w1
-	fmul	s18, s26, s18
-	fmadd	s30, s30, s21, s29
-	fsub	s17, s28, s30
-	fdiv	s18, s17, s18
-	fsub	s31, s31, s18
-	fcmpe	s30, s31
-	bge	.L141
-	str	s31, [x0], 4
-	cmp	x19, x0
-	bne	.L20
-	mov	w1, 2
-	b	.L19
-	.p2align 2,,3
-.L143:
-	str	s28, [x0], 4
-	cmp	x0, x19
-	bne	.L116
-	mov	w1, 2
-	fmov	s31, 1.0e+0
-	b	.L19
-	.p2align 2,,3
-.L141:
-	fmov	s22, s30
-	fmov	s31, s30
-	mov	w1, 4
-	str	s30, [x0], 4
-	cmp	x0, x19
-	beq	.L19
-.L11:
-	fmov	s31, 1.0e+0
-	fsub	s31, s31, s23
-	fmul	s31, s31, s24
-.L175:
-	fcmpe	s31, #0.0
-	bls	.L23
-	mov	w1, 17408
-	movk	w1, 0x472c, lsl 16
-	fmov	s28, w1
-	fmul	s28, s24, s28
-	fdiv	s28, s22, s28
-	fsub	s30, s30, s28
-	fcmpe	s30, #0.0
-	bls	.L23
-	str	s30, [x0], 4
-	cmp	x0, x19
-	bne	.L175
-	fmov	s31, s30
-	mov	w1, 4
-	b	.L19
-	.p2align 2,,3
-.L23:
-	str	wzr, [x0], 4
-	orr	w20, w20, w2
-	mov	w1, 0
-	cmp	x0, x19
-	bne	.L12
-	movi	v31.2s, #0
-	b	.L19
-	.p2align 2,,3
-.L140:
-	fcmpe	s29, s28
-	fsub	s28, s28, s29
-	bgt	.L15
-	movi	v22.2s, #0
-	fmadd	s22, s28, s22, s29
-	fmov	s30, s22
-	b	.L11
-	.p2align 2,,3
-.L15:
-	fadd	s22, s29, s28
-	fmov	s30, s22
-	b	.L11
-.L215:
-	mov	w3, 17408
-	fmov	s28, 1.0e+0
-	movk	w3, 0x472c, lsl 16
-	fmov	s27, w3
-	cmp	w1, 4
-	bne	.L83
-.L49:
-	.p2align 5,,15
-.L67:
-	fsub	s30, s28, s23
-	fmul	s30, s30, s24
-	fcmpe	s30, #0.0
-	bls	.L70
-	fmul	s30, s24, s27
-	fdiv	s30, s22, s30
-	fsub	s31, s31, s30
-	fcmpe	s31, #0.0
-	bls	.L75
-	str	s31, [x0], 4
-	cmp	x0, x19
-	bne	.L67
-	b	.L19
-	.p2align 2,,3
-.L70:
-	str	wzr, [x0], 4
-	orr	w20, w20, w2
-	cmp	x19, x0
-	beq	.L209
-.L132:
-	mov	w1, 0
-.L50:
-.L79:
-.L80:
-.L81:
-.L82:
-.L83:
-	str	wzr, [x0], 4
-	movi	v31.2s, #0
-	cmp	x0, x19
-	bne	.L84
-	b	.L19
-	.p2align 2,,3
-.L75:
-	str	wzr, [x0], 4
-	orr	w20, w20, w2
-	cmp	x0, x19
-	bne	.L132
-.L209:
-	movi	v31.2s, #0
-	mov	w1, 0
-	b	.L19
-.L188:
-	cmp	w1, 2
-	beq	.L24
-	cmp	w1, 3
-	bne	.L218
-	fmov	s22, s31
-	fmov	s30, s31
-	b	.L11
-.L111:
-	fmov	s22, s31
-	fmov	s30, s31
-	mov	w20, 0
-	b	.L11
-.L218:
-	fmov	s30, s31
-	cmp	w1, 4
-	beq	.L11
-	b	.L12
-.L189:
-	cmp	w1, 2
-	beq	.L30
-	cmp	w1, 3
-	bne	.L219
-	fmov	s22, s31
-	mov	w20, 0
-	b	.L31
-.L217:
-	add	x0, sp, 244
-	str	s28, [sp, 240]
-	b	.L32
-.L219:
-	mov	w20, 0
-	b	.L38
-	.cfi_endproc
-.LFE11:
-	.size	default_process, .-default_process
-	.global	default_state_size
-	.data
-	.align	4
-	.set	.LANCHOR0,. + 0
-	.type	sinf_lookup__table, %object
-	.size	sinf_lookup__table, 1028
-sinf_lookup__table:
-	.word	0
-	.word	1019808432
-	.word	1028193072
-	.word	1033283845
-	.word	1036565814
-	.word	1039839859
-	.word	1041645699
-	.word	1043271843
-	.word	1044891074
-	.word	1046502419
-	.word	1048104909
-	.word	1049136788
-	.word	1049927730
-	.word	1050712805
-	.word	1051491540
-	.word	1052263466
-	.word	1053028118
-	.word	1053785035
-	.word	1054533760
-	.word	1055273845
-	.word	1056004842
-	.word	1056726312
-	.word	1057201213
-	.word	1057551770
-	.word	1057896922
-	.word	1058236459
-	.word	1058570176
-	.word	1058897874
-	.word	1059219354
-	.word	1059534422
-	.word	1059842890
-	.word	1060144571
-	.word	1060439283
-	.word	1060726850
-	.word	1061007098
-	.word	1061279857
-	.word	1061544963
-	.word	1061802258
-	.word	1062051586
-	.word	1062292797
-	.word	1062525746
-	.word	1062750291
-	.word	1062966299
-	.word	1063173637
-	.word	1063372184
-	.word	1063561817
-	.word	1063742424
-	.word	1063913895
-	.word	1064076126
-	.word	1064229022
-	.word	1064372488
-	.word	1064506440
-	.word	1064630795
-	.word	1064745479
-	.word	1064850424
-	.word	1064945565
-	.word	1065030847
-	.word	1065106216
-	.word	1065171628
-	.word	1065227044
-	.word	1065272429
-	.word	1065307757
-	.word	1065333007
-	.word	1065348163
-	.word	1065353216
-	.word	1065348163
-	.word	1065333007
-	.word	1065307757
-	.word	1065272429
-	.word	1065227043
-	.word	1065171628
-	.word	1065106216
-	.word	1065030846
-	.word	1064945565
-	.word	1064850424
-	.word	1064745479
-	.word	1064630794
-	.word	1064506439
-	.word	1064372488
-	.word	1064229022
-	.word	1064076126
-	.word	1063913894
-	.word	1063742424
-	.word	1063561817
-	.word	1063372183
-	.word	1063173638
-	.word	1062966298
-	.word	1062750290
-	.word	1062525744
-	.word	1062292797
-	.word	1062051586
-	.word	1061802257
-	.word	1061544964
-	.word	1061279856
-	.word	1061007096
-	.word	1060726848
-	.word	1060439283
-	.word	1060144570
-	.word	1059842888
-	.word	1059534422
-	.word	1059219353
-	.word	1058897872
-	.word	1058570173
-	.word	1058236458
-	.word	1057896921
-	.word	1057551768
-	.word	1057201213
-	.word	1056726309
-	.word	1056004838
-	.word	1055273846
-	.word	1054533759
-	.word	1053785031
-	.word	1053028112
-	.word	1052263466
-	.word	1051491538
-	.word	1050712800
-	.word	1049927731
-	.word	1049136786
-	.word	1048104901
-	.word	1046502408
-	.word	1044891073
-	.word	1043271837
-	.word	1041645690
-	.word	1039839862
-	.word	1036565808
-	.word	1033283829
-	.word	1028193021
-	.word	1019808422
-	.word	-1279541970
-	.word	-1127675132
-	.word	-1119290580
-	.word	-1114199796
-	.word	-1110917817
-	.word	-1107643763
-	.word	-1105837947
-	.word	-1104211799
-	.word	-1102592563
-	.word	-1100981229
-	.word	-1099378736
-	.word	-1098346856
-	.word	-1097555912
-	.word	-1096770842
-	.word	-1095992105
-	.word	-1095220177
-	.word	-1094455531
-	.word	-1093698611
-	.word	-1092949883
-	.word	-1092209797
-	.word	-1091478805
-	.word	-1090757334
-	.word	-1090282433
-	.word	-1089931877
-	.word	-1089586725
-	.word	-1089247187
-	.word	-1088913472
-	.word	-1088585774
-	.word	-1088264293
-	.word	-1087949224
-	.word	-1087640758
-	.word	-1087339076
-	.word	-1087044363
-	.word	-1086756798
-	.word	-1086476550
-	.word	-1086203793
-	.word	-1085938685
-	.word	-1085681389
-	.word	-1085432061
-	.word	-1085190849
-	.word	-1084957900
-	.word	-1084733354
-	.word	-1084517351
-	.word	-1084310011
-	.word	-1084111464
-	.word	-1083921830
-	.word	-1083741223
-	.word	-1083569752
-	.word	-1083407519
-	.word	-1083254627
-	.word	-1083111160
-	.word	-1082977208
-	.word	-1082852853
-	.word	-1082738168
-	.word	-1082633223
-	.word	-1082538081
-	.word	-1082452802
-	.word	-1082377432
-	.word	-1082312020
-	.word	-1082256604
-	.word	-1082211219
-	.word	-1082175890
-	.word	-1082150641
-	.word	-1082135485
-	.word	-1082130432
-	.word	-1082135485
-	.word	-1082150641
-	.word	-1082175891
-	.word	-1082211219
-	.word	-1082256605
-	.word	-1082312020
-	.word	-1082377432
-	.word	-1082452802
-	.word	-1082538083
-	.word	-1082633225
-	.word	-1082738170
-	.word	-1082852855
-	.word	-1082977208
-	.word	-1083111160
-	.word	-1083254627
-	.word	-1083407523
-	.word	-1083569755
-	.word	-1083741227
-	.word	-1083921834
-	.word	-1084111464
-	.word	-1084310011
-	.word	-1084517351
-	.word	-1084733359
-	.word	-1084957905
-	.word	-1085190854
-	.word	-1085432061
-	.word	-1085681390
-	.word	-1085938685
-	.word	-1086203793
-	.word	-1086476553
-	.word	-1086756801
-	.word	-1087044369
-	.word	-1087339076
-	.word	-1087640758
-	.word	-1087949227
-	.word	-1088264297
-	.word	-1088585777
-	.word	-1088913476
-	.word	-1089247194
-	.word	-1089586725
-	.word	-1089931877
-	.word	-1090282436
-	.word	-1090757341
-	.word	-1091478813
-	.word	-1092209812
-	.word	-1092949898
-	.word	-1093698612
-	.word	-1094455531
-	.word	-1095220185
-	.word	-1095992113
-	.word	-1096770850
-	.word	-1097555928
-	.word	-1098346873
-	.word	-1099378737
-	.word	-1100981230
-	.word	-1102592580
-	.word	-1104211817
-	.word	-1105837964
-	.word	-1107643830
-	.word	-1110917884
-	.word	-1114199799
-	.word	-1119290586
-	.word	-1127675273
-	.word	0
-	.zero	4
-	.type	default_state_size, %object
-	.size	default_state_size, 8
-default_state_size:
-	.xword	24
-	.ident	"GCC: (Debian 14.2.0-19) 14.2.0"
-	.section	.note.GNU-stack,"",@progbits
 process call 0
 i	ch0	ch1
 0	0	0
-1	1.13639e-06	1.13639e-06
-2	3.40267e-06	3.40267e-06
-3	6.78293e-06	6.78293e-06
-4	1.12534e-05	1.12534e-05
-5	1.67809e-05	1.67809e-05
-6	2.33238e-05	2.33238e-05
-7	3.0834e-05	3.0834e-05
-8	3.92502e-05	3.92502e-05
-9	4.85145e-05	4.85145e-05
-10	5.85423e-05	5.85423e-05
-11	6.92681e-05	6.92681e-05
-12	8.05936e-05	8.05936e-05
-13	9.24367e-05	9.24367e-05
-14	0.000104695	0.000104695
-15	0.000117266	0.000117266
-16	0.000130053	0.000130053
-17	0.000142927	0.000142927
-18	0.000155806	0.000155806
-19	0.000168534	0.000168534
-20	0.000181038	0.000181038
-21	0.000193169	0.000193169
-22	0.000204831	0.000204831
-23	0.000215902	0.000215902
-24	0.000226262	0.000226262
-25	0.000235821	0.000235821
-26	0.000244434	0.000244434
-27	0.000252048	0.000252048
-28	0.000258498	0.000258498
-29	0.000263755	0.000263755
-30	0.00026768	0.00026768
-31	0.000270224	0.000270224
+1	2.84099e-05	2.84099e-05
+2	0.000124433	0.000124433
+3	0.000320993	0.000320993
+4	0.000632652	0.000632652
+5	0.00103873	0.00103873
+6	0.00147023	0.00147023
+7	0.00181244	0.00181244
+8	0.00193371	0.00193371
+9	0.00173359	0.00173359
+10	0.00118889	0.00118889
+11	0.000368829	0.000368829
+12	-0.00059074	-0.00059074
+13	-0.00154052	-0.00154052
+14	-0.00236826	-0.00236826
+15	-0.00302383	-0.00302383
+16	-0.00351313	-0.00351313
+17	-0.00387427	-0.00387427
+18	-0.00414657	-0.00414657
+19	-0.00434866	-0.00434866
+20	-0.00446337	-0.00446337
+21	-0.00443658	-0.00443658
+22	-0.00418892	-0.00418892
+23	-0.00364053	-0.00364053
+24	-0.0027469	-0.0027469
+25	-0.00152711	-0.00152711
+26	-7.38774e-05	-7.38774e-05
+27	0.00146578	0.00146578
+28	0.00293262	0.00293262
+29	0.00420014	0.00420014
+30	0.0052027	0.0052027
+31	0.00593386	0.00593386
 
 process call 1
 i	ch0	ch1
-0	0.000271295	0.000271295
-1	0.000270825	0.000270825
-2	0.000268768	0.000268768
-3	0.000265043	0.000265043
-4	0.000259649	0.000259649
-5	0.000252495	0.000252495
-6	0.000243618	0.000243618
-7	0.000232942	0.000232942
-8	0.000220512	0.000220512
-9	0.000206296	0.000206296
-10	0.000190329	0.000190329
-11	0.000172626	0.000172626
-12	0.000153221	0.000153221
-13	0.000132167	0.000132167
-14	0.000109504	0.000109504
-15	8.53179e-05	8.53179e-05
-16	5.96626e-05	5.96626e-05
-17	3.26429e-05	3.26429e-05
-18	4.34391e-06	4.34391e-06
-19	-2.51232e-05	-2.51232e-05
-20	-5.56436e-05	-5.56436e-05
-21	-8.70926e-05	-8.70926e-05
-22	-0.00011934	-0.00011934
-23	-0.000152233	-0.000152233
-24	-0.000185645	-0.000185645
-25	-0.00021938	-0.00021938
-26	-0.000253324	-0.000253324
-27	-0.000287261	-0.000287261
-28	-0.000321055	-0.000321055
-29	-0.000354512	-0.000354512
-30	-0.000387447	-0.000387447
-31	-0.000419716	-0.000419716
+0	0.0064213	0.0064213
+1	0.00669024	0.00669024
+2	0.00672932	0.00672932
+3	0.00646829	0.00646829
+4	0.00577994	0.00577994
+5	0.00451126	0.00451126
+6	0.00255518	0.00255518
+7	-6.29152e-05	-6.29152e-05
+8	-0.00310669	-0.00310669
+9	-0.00612523	-0.00612523
+10	-0.00855433	-0.00855433
+11	-0.00989806	-0.00989806
+12	-0.00990985	-0.00990985
+13	-0.00867841	-0.00867841
+14	-0.00656831	-0.00656831
+15	-0.00407043	-0.00407043
+16	-0.00164029	-0.00164029
+17	0.000400165	0.000400165
+18	0.00187493	0.00187493
+19	0.00271337	0.00271337
+20	0.00289341	0.00289341
+21	0.00240266	0.00240266
+22	0.00123383	0.00123383
+23	-0.000588651	-0.000588651
+24	-0.00296595	-0.00296595
+25	-0.00569316	-0.00569316
+26	-0.00846398	-0.00846398
+27	-0.0109291	-0.0109291
+28	-0.0127903	-0.0127903
+29	-0.0138907	-0.0138907
+30	-0.0142592	-0.0142592
+31	-0.014088	-0.014088
 
 process call 2
 i	ch0	ch1
-0	-0.000451064	-0.000451064
-1	-0.000481406	-0.000481406
-2	-0.000510462	-0.000510462
-3	-0.000538141	-0.000538141
-4	-0.000564223	-0.000564223
-5	-0.000588548	-0.000588548
-6	-0.000610993	-0.000610993
-7	-0.000631316	-0.000631316
-8	-0.000649499	-0.000649499
-9	-0.000665248	-0.000665248
-10	-0.000678582	-0.000678582
-11	-0.000689281	-0.000689281
-12	-0.000697297	-0.000697297
-13	-0.000702519	-0.000702519
-14	-0.000704833	-0.000704833
-15	-0.000704241	-0.000704241
-16	-0.000700568	-0.000700568
-17	-0.000693921	-0.000693921
-18	-0.000684076	-0.000684076
-19	-0.000671201	-0.000671201
-20	-0.000655133	-0.000655133
-21	-0.000635997	-0.000635997
-22	-0.000613722	-0.000613722
-23	-0.000588397	-0.000588397
-24	-0.000560034	-0.000560034
-25	-0.000528696	-0.000528696
-26	-0.000494468	-0.000494468
-27	-0.000457398	-0.000457398
-28	-0.000417634	-0.000417634
-29	-0.000375219	-0.000375219
-30	-0.000330352	-0.000330352
-31	-0.000283086	-0.000283086
+0	-0.0136615	-0.0136615
+1	-0.0132778	-0.0132778
+2	-0.0131749	-0.0131749
+3	-0.0134846	-0.0134846
+4	-0.014202	-0.014202
+5	-0.0151558	-0.0151558
+6	-0.015993	-0.015993
+7	-0.0162022	-0.0162022
+8	-0.0152032	-0.0152032
+9	-0.0125392	-0.0125392
+10	-0.00808797	-0.00808797
+11	-0.00222032	-0.00222032
+12	0.00422722	0.00422722
+13	0.0101992	0.0101992
+14	0.0147783	0.0147783
+15	0.0174845	0.0174845
+16	0.0183603	0.0183603
+17	0.0178644	0.0178644
+18	0.0166442	0.0166442
+19	0.0153214	0.0153214
+20	0.0143701	0.0143701
+21	0.0140784	0.0140784
+22	0.0145465	0.0145465
+23	0.015707	0.015707
+24	0.0173281	0.0173281
+25	0.0190342	0.0190342
+26	0.0203527	0.0203527
+27	0.0208178	0.0208178
+28	0.0200971	0.0200971
+29	0.0181082	0.0181082
+30	0.0150593	0.0150593
+31	0.01139	0.01139
 
 process call 3
 i	ch0	ch1
-0	-0.000233649	-0.000233649
-1	-0.000182139	-0.000182139
-2	-0.000128778	-0.000128778
-3	-7.37272e-05	-7.37272e-05
-4	-1.72002e-05	-1.72002e-05
-5	4.05962e-05	4.05962e-05
-6	9.94329e-05	9.94329e-05
-7	0.000159085	0.000159085
-8	0.000219284	0.000219284
-9	0.000279817	0.000279817
-10	0.000340358	0.000340358
-11	0.000400703	0.000400703
-12	0.000460532	0.000460532
-13	0.000519583	0.000519583
-14	0.0005776	0.0005776
-15	0.000634226	0.000634226
-16	0.000689298	0.000689298
-17	0.000742393	0.000742393
-18	0.000793368	0.000793368
-19	0.000841893	0.000841893
-20	0.000887703	0.000887703
-21	0.000930643	0.000930643
-22	0.000970295	0.000970295
-23	0.00100665	0.00100665
-24	0.00103932	0.00103932
-25	0.00106824	0.00106824
-26	0.0010932	0.0010932
-27	0.00111398	0.00111398
-28	0.0011306	0.0011306
-29	0.00114269	0.00114269
-30	0.00115043	0.00115043
-31	0.00115348	0.00115348
+0	0.00764164	0.00764164
+1	0.00432345	0.00432345
+2	0.00182418	0.00182418
+3	0.000401932	0.000401932
+4	0.000214795	0.000214795
+5	0.0013591	0.0013591
+6	0.0038694	0.0038694
+7	0.0076573	0.0076573
+8	0.0124041	0.0124041
+9	0.017457	0.017457
+10	0.0218189	0.0218189
+11	0.0243255	0.0243255
+12	0.0239839	0.0239839
+13	0.0203709	0.0203709
+14	0.0138715	0.0138715
+15	0.00558787	0.00558787
+16	-0.00305274	-0.00305274
+17	-0.0107817	-0.0107817
+18	-0.0168368	-0.0168368
+19	-0.0210384	-0.0210384
+20	-0.0236425	-0.0236425
+21	-0.0250954	-0.0250954
+22	-0.0258151	-0.0258151
+23	-0.026039	-0.026039
+24	-0.0257784	-0.0257784
+25	-0.0248387	-0.0248387
+26	-0.0228964	-0.0228964
+27	-0.0196366	-0.0196366
+28	-0.014916	-0.014916
+29	-0.00888159	-0.00888159
+30	-0.00199904	-0.00199904
+31	0.00504633	0.00504633
 
 process call 4
 i	ch0	ch1
-0	0.00115199	0.00115199
-1	0.00114576	0.00114576
-2	0.00113486	0.00113486
-3	0.00111925	0.00111925
-4	0.00109892	0.00109892
-5	0.00107396	0.00107396
-6	0.0010443	0.0010443
-7	0.00101016	0.00101016
-8	0.000971423	0.000971423
-9	0.000928393	0.000928393
-10	0.000880958	0.000880958
-11	0.000829473	0.000829473
-12	0.000773834	0.000773834
-13	0.000714428	0.000714428
-14	0.00065123	0.00065123
-15	0.000584588	0.000584588
-16	0.000514578	0.000514578
-17	0.000441515	0.000441515
-18	0.000365568	0.000365568
-19	0.000287033	0.000287033
-20	0.000206155	0.000206155
-21	0.000123229	0.000123229
-22	3.85568e-05	3.85568e-05
-23	-4.75461e-05	-4.75461e-05
-24	-0.000134755	-0.000134755
-25	-0.000222697	-0.000222697
-26	-0.000311055	-0.000311055
-27	-0.000399406	-0.000399406
-28	-0.000487417	-0.000487417
-29	-0.00057468	-0.00057468
-30	-0.000660781	-0.000660781
-31	-0.000745408	-0.000745408
+0	0.0115459	0.0115459
+1	0.0169655	0.0169655
+2	0.0210506	0.0210506
+3	0.0238219	0.0238219
+4	0.0254608	0.0254608
+5	0.0261449	0.0261449
+6	0.0259303	0.0259303
+7	0.0246579	0.0246579
+8	0.0219684	0.0219684
+9	0.0174024	0.0174024
+10	0.0106328	0.0106328
+11	0.00174732	0.00174732
+12	-0.008509	-0.008509
+13	-0.0187082	-0.0187082
+14	-0.0270482	-0.0270482
+15	-0.0319185	-0.0319185
+16	-0.0324879	-0.0324879
+17	-0.0289848	-0.0289848
+18	-0.0225487	-0.0225487
+19	-0.0147487	-0.0147487
+20	-0.00706458	-0.00706458
+21	-0.000552429	-0.000552429
+22	0.00422009	0.00422009
+23	0.00705151	0.00705151
+24	0.00792722	0.00792722
+25	0.00688232	0.00688232
+26	0.00396097	0.00396097
+27	-0.000727496	-0.000727496
+28	-0.0069051	-0.0069051
+29	-0.014036	-0.014036
+30	-0.0213334	-0.0213334
+31	-0.0278848	-0.0278848
 
 process call 5
 i	ch0	ch1
-0	-0.000828002	-0.000828002
-1	-0.000908348	-0.000908348
-2	-0.00098593	-0.00098593
-3	-0.00106042	-0.00106042
-4	-0.0011315	-0.0011315
-5	-0.00119864	-0.00119864
-6	-0.00126173	-0.00126173
-7	-0.00132023	-0.00132023
-8	-0.00137399	-0.00137399
-9	-0.00142272	-0.00142272
-10	-0.00146603	-0.00146603
-11	-0.00150394	-0.00150394
-12	-0.00153592	-0.00153592
-13	-0.0015621	-0.0015621
-14	-0.00158216	-0.00158216
-15	-0.00159604	-0.00159604
-16	-0.00160371	-0.00160371
-17	-0.00160492	-0.00160492
-18	-0.00159992	-0.00159992
-19	-0.00158832	-0.00158832
-20	-0.00157055	-0.00157055
-21	-0.00154623	-0.00154623
-22	-0.0015158	-0.0015158
-23	-0.00147901	-0.00147901
-24	-0.00143623	-0.00143623
-25	-0.00138736	-0.00138736
-26	-0.0013327	-0.0013327
-27	-0.00127226	-0.00127226
-28	-0.00120633	-0.00120633
-29	-0.00113501	-0.00113501
-30	-0.00105856	-0.00105856
-31	-0.000977155	-0.000977155
+0	-0.0328944	-0.0328944
+1	-0.0359115	-0.0359115
+2	-0.0369589	-0.0369589
+3	-0.0364906	-0.0364906
+4	-0.0352228	-0.0352228
+5	-0.0339158	-0.0339158
+6	-0.0331997	-0.0331997
+7	-0.0334427	-0.0334427
+8	-0.0346835	-0.0346835
+9	-0.0365731	-0.0365731
+10	-0.0383518	-0.0383518
+11	-0.0388837	-0.0388837
+12	-0.0368626	-0.0368626
+13	-0.0311877	-0.0311877
+14	-0.0214584	-0.0214584
+15	-0.00835576	-0.00835576
+16	0.00636202	0.00636202
+17	0.0203396	0.0203396
+18	0.0314178	0.0314178
+19	0.0383275	0.0383275
+20	0.0409952	0.0409952
+21	0.0403224	0.0403224
+22	0.0377254	0.0377254
+23	0.0346283	0.0346283
+24	0.0321439	0.0321439
+25	0.0309742	0.0309742
+26	0.0314019	0.0314019
+27	0.0333292	0.0333292
+28	0.0363297	0.0363297
+29	0.0396625	0.0396625
+30	0.0423848	0.0423848
+31	0.0435295	0.0435295
 
 process call 6
 i	ch0	ch1
-0	-0.000891072	-0.000891072
-1	-0.000800547	-0.000800547
-2	-0.000705862	-0.000705862
-3	-0.00060732	-0.00060732
-4	-0.000505216	-0.000505216
-5	-0.000399919	-0.000399919
-6	-0.000291747	-0.000291747
-7	-0.000181119	-0.000181119
-8	-6.83957e-05	-6.83957e-05
-9	4.59783e-05	4.59783e-05
-10	0.000161564	0.000161564
-11	0.000277923	0.000277923
-12	0.000394552	0.000394552
-13	0.000510983	0.000510983
-14	0.000626725	0.000626725
-15	0.000741204	0.000741204
-16	0.000854026	0.000854026
-17	0.000964488	0.000964488
-18	0.00107224	0.00107224
-19	0.00117669	0.00117669
-20	0.0012773	0.0012773
-21	0.00137373	0.00137373
-22	0.00146523	0.00146523
-23	0.00155161	0.00155161
-24	0.00163234	0.00163234
-25	0.00170694	0.00170694
-26	0.00177527	0.00177527
-27	0.00183664	0.00183664
-28	0.00189108	0.00189108
-29	0.00193818	0.00193818
-30	0.00197765	0.00197765
-31	0.00200958	0.00200958
+0	0.0423661	0.0423661
+1	0.03864	0.03864
+2	0.0326831	0.0326831
+3	0.0253193	0.0253193
+4	0.0176291	0.0176291
+5	0.0106602	0.0106602
+6	0.00523627	0.00523627
+7	0.00190291	0.00190291
+8	0.000982451	0.000982451
+9	0.00265416	0.00265416
+10	0.00697681	0.00697681
+11	0.0138006	0.0138006
+12	0.0225816	0.0225816
+13	0.032185	0.032185
+14	0.0408263	0.0408263
+15	0.0463331	0.0463331
+16	0.0467481	0.0467481
+17	0.0410545	0.0410545
+18	0.0297028	0.0297028
+19	0.0145514	0.0145514
+20	-0.00176876	-0.00176876
+21	-0.0167653	-0.0167653
+22	-0.0287998	-0.0287998
+23	-0.0373279	-0.0373279
+24	-0.0426966	-0.0426966
+25	-0.0457008	-0.0457008
+26	-0.047152	-0.047152
+27	-0.0475834	-0.0475834
+28	-0.0471369	-0.0471369
+29	-0.0455456	-0.0455456
+30	-0.0422891	-0.0422891
+31	-0.0368199	-0.0368199
 
 process call 7
 i	ch0	ch1
-0	0.00203335	0.00203335
-1	0.00204934	0.00204934
-2	0.0020571	0.0020571
-3	0.00205685	0.00205685
-4	0.00204843	0.00204843
-5	0.00203191	0.00203191
-6	0.00200741	0.00200741
-7	0.00197484	0.00197484
-8	0.00193454	0.00193454
-9	0.00188637	0.00188637
-10	0.00183078	0.00183078
-11	0.00176761	0.00176761
-12	0.0016974	0.0016974
-13	0.00162002	0.00162002
-14	0.00153602	0.00153602
-15	0.00144532	0.00144532
-16	0.0013485	0.0013485
-17	0.00124555	0.00124555
-18	0.00113703	0.00113703
-19	0.00102303	0.00102303
-20	0.000904102	0.000904102
-21	0.000780412	0.000780412
-22	0.000652533	0.000652533
-23	0.000520709	0.000520709
-24	0.000385529	0.000385529
-25	0.000247334	0.000247334
-26	0.000106707	0.000106707
-27	-3.5881e-05	-3.5881e-05
-28	-0.000179869	-0.000179869
-29	-0.000324693	-0.000324693
-30	-0.000469753	-0.000469753
-31	-0.000614478	-0.000614478
+0	-0.0288179	-0.0288179
+1	-0.018456	-0.018456
+2	-0.0064516	-0.0064516
+3	0.00604299	0.00604299
+4	0.0177709	0.0177709
+5	0.0277198	0.0277198
+6	0.0353472	0.0353472
+7	0.0406068	0.0406068
+8	0.0437712	0.0437712
+9	0.0451835	0.0451835
+10	0.04501	0.04501
+11	0.0430688	0.0430688
+12	0.0388373	0.0388373
+13	0.0315801	0.0315801
+14	0.0207022	0.0207022
+15	0.00620091	0.00620091
+16	-0.0108866	-0.0108866
+17	-0.0283742	-0.0283742
+18	-0.043316	-0.043316
+19	-0.0528969	-0.0528969
+20	-0.0554235	-0.0554235
+21	-0.0509301	-0.0509301
+22	-0.0410533	-0.0410533
+23	-0.0283376	-0.0283376
+24	-0.0153351	-0.0153351
+25	-0.00397487	-0.00397487
+26	0.00463373	0.00463373
+27	0.0100527	0.0100527
+28	0.0122231	0.0122231
+29	0.0112159	0.0112159
+30	0.00712582	0.00712582
+31	0.000126452	0.000126452
 
 process call 8
 i	ch0	ch1
-0	-0.000758148	-0.000758148
-1	-0.00090026	-0.00090026
-2	-0.00104001	-0.00104001
-3	-0.00117686	-0.00117686
-4	-0.00131016	-0.00131016
-5	-0.00143912	-0.00143912
-6	-0.00156335	-0.00156335
-7	-0.001682	-0.001682
-8	-0.0017946	-0.0017946
-9	-0.00190071	-0.00190071
-10	-0.00199944	-0.00199944
-11	-0.00209071	-0.00209071
-12	-0.00217385	-0.00217385
-13	-0.00224846	-0.00224846
-14	-0.00231446	-0.00231446
-15	-0.002371	-0.002371
-16	-0.0024184	-0.0024184
-17	-0.00245614	-0.00245614
-18	-0.00248414	-0.00248414
-19	-0.00250246	-0.00250246
-20	-0.00251065	-0.00251065
-21	-0.00250926	-0.00250926
-22	-0.00249765	-0.00249765
-23	-0.00247653	-0.00247653
-24	-0.00244549	-0.00244549
-25	-0.00240506	-0.00240506
-26	-0.00235508	-0.00235508
-27	-0.002296	-0.002296
-28	-0.00222779	-0.00222779
-29	-0.00215089	-0.00215089
-30	-0.00206534	-0.00206534
-31	-0.00197162	-0.00197162
+0	-0.00937818	-0.00937818
+1	-0.0206016	-0.0206016
+2	-0.032349	-0.032349
+3	-0.0431831	-0.0431831
+4	-0.051773	-0.051773
+5	-0.0572759	-0.0572759
+6	-0.059566	-0.059566
+7	-0.059239	-0.059239
+8	-0.0573711	-0.0573711
+9	-0.0551811	-0.0551811
+10	-0.053708	-0.053708
+11	-0.0536354	-0.0536354
+12	-0.0551242	-0.0551242
+13	-0.0577558	-0.0577558
+14	-0.0604784	-0.0604784
+15	-0.0616363	-0.0616363
+16	-0.0592402	-0.0592402
+17	-0.0514744	-0.0514744
+18	-0.0374768	-0.0374768
+19	-0.0179461	-0.0179461
+20	0.00471435	0.00471435
+21	0.0269884	0.0269884
+22	0.045393	0.045393
+23	0.0576425	0.0576425
+24	0.063229	0.063229
+25	0.0632615	0.0632615
+26	0.0598012	0.0598012
+27	0.0550759	0.0550759
+28	0.0509268	0.0509268
+29	0.0485563	0.0485563
+30	0.0485375	0.0485375
+31	0.0508429	0.0508429
 
 process call 9
 i	ch0	ch1
-0	-0.00186978	-0.00186978
-1	-0.00176036	-0.00176036
-2	-0.00164342	-0.00164342
-3	-0.00151957	-0.00151957
-4	-0.00138888	-0.00138888
-5	-0.001252	-0.001252
-6	-0.00110908	-0.00110908
-7	-0.000960769	-0.000960769
-8	-0.000807323	-0.000807323
-9	-0.000649392	-0.000649392
-10	-0.000487363	-0.000487363
-11	-0.000321872	-0.000321872
-12	-0.000153449	-0.000153449
-13	1.72698e-05	1.72698e-05
-14	0.000189648	0.000189648
-15	0.00036299	0.00036299
-16	0.000536637	0.000536637
-17	0.000709752	0.000709752
-18	0.000881713	0.000881713
-19	0.00105162	0.00105162
-20	0.00121876	0.00121876
-21	0.00138241	0.00138241
-22	0.00154154	0.00154154
-23	0.00169566	0.00169566
-24	0.00184381	0.00184381
-25	0.00198528	0.00198528
-26	0.00211956	0.00211956
-27	0.00224559	0.00224559
-28	0.00236306	0.00236306
-29	0.00247142	0.00247142
-30	0.00256977	0.00256977
-31	0.00265814	0.00265814
+0	0.0549241	0.0549241
+1	0.0597635	0.0597635
+2	0.0640032	0.0640032
+3	0.0661744	0.0661744
+4	0.0651073	0.0651073
+5	0.0602587	0.0602587
+6	0.0519362	0.0519362
+7	0.041246	0.041246
+8	0.0297334	0.0297334
+9	0.0189963	0.0189963
+10	0.0103399	0.0103399
+11	0.0046589	0.0046589
+12	0.00248713	0.00248713
+13	0.00411793	0.00411793
+14	0.00966014	0.00966014
+15	0.0189496	0.0189496
+16	0.0313086	0.0313086
+17	0.0452513	0.0452513
+18	0.0583521	0.0583521
+19	0.0675292	0.0675292
+20	0.0697957	0.0697957
+21	0.0633309	0.0633309
+22	0.0483229	0.0483229
+23	0.0270883	0.0270883
+24	0.00329488	0.00329488
+25	-0.019295	-0.019295
+26	-0.0379778	-0.0379778
+27	-0.0516115	-0.0516115
+28	-0.0604419	-0.0604419
+29	-0.0655174	-0.0655174
+30	-0.0680481	-0.0680481
+31	-0.0689173	-0.0689173
 
