@@ -8,9 +8,18 @@ namespace mc1 {
 
 struct module_instance;
 
+enum class module_insert_mode : uint8_t {
+  append,
+  prepend,
+  before,
+  after,
+};
+
 struct start_module final {
   uint32_t module_id{};
   module_instance* module{};
+  module_insert_mode insert_mode{module_insert_mode::append};
+  uint32_t anchor_module_id{};
 };
 
 struct stop_module final {

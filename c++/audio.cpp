@@ -103,4 +103,9 @@ void audio_device::stop() noexcept
   }
 }
 
+bool audio_device::started() const noexcept
+{
+  return started_;
+}
+
 } // namespace mc1

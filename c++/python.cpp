@@ -18,6 +18,7 @@
 #include "runtime.hpp"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 
 namespace mc1 {
 
@@ -181,44 +182,13 @@ class DSP
     }
   }
 
-public:
-  DSP(
-      long sample_rate = 44100,
-      long block_size = 32,
-      long input_channels = 0,
-      long output_channels = 2)
-  : sample_rate_{validate_positive(sample_rate, "sample_rate")}
-  , block_size_{static_cast<size_t>(validate_positive(block_size, "block_size"))}
-  , input_channels_{validate_non_negative(input_channels, "input_channels")}
-  , output_channels_{validate_output_channels(input_channels_, output_channels)}
-  , runtime_{sample_rate_, block_size_, input_channels_, output_channels_}
-  {}
-
-  void compile_graph(pybind11::bytes b)
+  uint32_t create_module(
+      std::string_view synth_name,
+      module_insert_mode insert_mode,
+      uint32_t anchor_module_id,
+      const char* action,
+      pybind11::kwargs controls)
   {
-    reap_retired_modules();
-
-    auto bytes = std::as_bytes(std::span(std::string_view(b)));
-    auto dag = DAG::parse(bytes);
-    if (!dag) {
-      throw pybind11::value_error("invalid DAG bytes");
-    }
-
-    try {
-      auto result = compile(*dag, sample_rate_, block_size_);
-      auto compiled_synth = result[dag->name];
-      compiled_synths_by_name_.insert_or_assign(dag->name, std::move(compiled_synth));
-    } catch (const pybind11::error_already_set&) {
-      throw;
-    } catch (const std::exception& ex) {
-      throw pybind11::value_error(std::string("compile failed: ") + ex.what());
-    }
-  }
-
-  uint32_t add(std::string_view synth_name, pybind11::kwargs controls)
-  {
-    reap_retired_modules();
-
     auto compiled_synth_it = compiled_synths_by_name_.find(std::string(synth_name));
     if (compiled_synth_it == compiled_synths_by_name_.end()) {
       throw pybind11::value_error(std::format("unknown synth '{}'", synth_name));
@@ -260,12 +230,95 @@ public:
     auto* instance_ptr = instance.get();
     modules_by_id_.insert_or_assign(module_id, std::move(instance));
     try {
-      enqueue_command(start_module{module_id, instance_ptr}, "add failed");
+      enqueue_command(
+          start_module{
+            .module_id = module_id,
+            .module = instance_ptr,
+            .insert_mode = insert_mode,
+            .anchor_module_id = anchor_module_id,
+          },
+          action);
       return module_id;
     } catch (...) {
       modules_by_id_.erase(module_id);
       throw;
     }
+  }
+
+public:
+  DSP(
+      long sample_rate = 44100,
+      long block_size = 32,
+      long input_channels = 0,
+      long output_channels = 2)
+  : sample_rate_{validate_positive(sample_rate, "sample_rate")}
+  , block_size_{static_cast<size_t>(validate_positive(block_size, "block_size"))}
+  , input_channels_{validate_non_negative(input_channels, "input_channels")}
+  , output_channels_{validate_output_channels(input_channels_, output_channels)}
+  , runtime_{sample_rate_, block_size_, input_channels_, output_channels_}
+  {}
+
+  void compile_graph(pybind11::bytes b)
+  {
+    reap_retired_modules();
+
+    auto bytes = std::as_bytes(std::span(std::string_view(b)));
+    auto dag = DAG::parse(bytes);
+    if (!dag) {
+      throw pybind11::value_error("invalid DAG bytes");
+    }
+
+    try {
+      auto result = compile(*dag, sample_rate_, block_size_);
+      auto compiled_synth = result[dag->name];
+      compiled_synths_by_name_.insert_or_assign(dag->name, std::move(compiled_synth));
+    } catch (const pybind11::error_already_set&) {
+      throw;
+    } catch (const std::exception& ex) {
+      throw pybind11::value_error(std::string("compile failed: ") + ex.what());
+    }
+  }
+
+  uint32_t append(std::string_view synth_name, pybind11::kwargs controls)
+  {
+    reap_retired_modules();
+    return create_module(synth_name, module_insert_mode::append, 0, "append failed", controls);
+  }
+
+  uint32_t prepend(std::string_view synth_name, pybind11::kwargs controls)
+  {
+    reap_retired_modules();
+    return create_module(synth_name, module_insert_mode::prepend, 0, "prepend failed", controls);
+  }
+
+  uint32_t insert_before(long before_module_id, std::string_view synth_name, pybind11::kwargs controls)
+  {
+    reap_retired_modules();
+
+    auto validated_module_id = validate_non_negative(before_module_id, "before_module_id");
+    get_module_instance(validated_module_id);
+
+    return create_module(
+        synth_name,
+        module_insert_mode::before,
+        validated_module_id,
+        "insert_before failed",
+        controls);
+  }
+
+  uint32_t insert_after(long after_module_id, std::string_view synth_name, pybind11::kwargs controls)
+  {
+    reap_retired_modules();
+
+    auto validated_module_id = validate_non_negative(after_module_id, "after_module_id");
+    get_module_instance(validated_module_id);
+
+    return create_module(
+        synth_name,
+        module_insert_mode::after,
+        validated_module_id,
+        "insert_after failed",
+        controls);
   }
 
   void set(long module_id, pybind11::kwargs controls)
@@ -331,6 +384,19 @@ public:
     runtime_.stop();
   }
 
+  std::vector<uint32_t> module_ids()
+  {
+    reap_retired_modules();
+
+    if (runtime_.started()) {
+      throw pybind11::value_error("module_ids is only available while DSP is stopped");
+    }
+
+    auto ids = runtime_.module_ids();
+    reap_retired_modules();
+    return ids;
+  }
+
   uint32_t sample_rate() const { return sample_rate_; }
   size_t block_size() const { return block_size_; }
   uint32_t input_channels() const { return input_channels_; }
@@ -366,8 +432,12 @@ PYBIND11_MODULE(_core, m, py::mod_gil_not_used())
   .def_property_readonly("block_size", &DSP::block_size)
   .def_property_readonly("input_channels", &DSP::input_channels)
   .def_property_readonly("output_channels", &DSP::output_channels)
+  .def_property_readonly("module_ids", &DSP::module_ids)
   .def("compile", &DSP::compile_graph, py::arg("dag_bytes"))
-  .def("add", &DSP::add, py::arg("synth_name"))
+  .def("append", &DSP::append, py::arg("synth_name"))
+  .def("prepend", &DSP::prepend, py::arg("synth_name"))
+  .def("insert_before", &DSP::insert_before, py::arg("before_module_id"), py::arg("synth_name"))
+  .def("insert_after", &DSP::insert_after, py::arg("after_module_id"), py::arg("synth_name"))
   .def("set", &DSP::set, py::arg("module_id"))
   .def("remove", &DSP::remove, py::arg("module_id"))
   .def("start", &DSP::start)

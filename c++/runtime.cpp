@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <variant>
 
 namespace mc1 {
@@ -59,6 +60,20 @@ bool runtime::try_pop_retired(retire_token& token) noexcept
   return retired_modules_.try_pop(token);
 }
 
+void runtime::retire_module(module_instance* module) noexcept
+{
+  if (module == nullptr) return;
+  retired_modules_.try_push(retire_token{module});
+}
+
+void runtime::drain_commands() noexcept
+{
+  rt_command command;
+  while (commands_.try_pop(command)) {
+    apply_command(command);
+  }
+}
+
 void runtime::start()
 {
   audio_device_->start();
@@ -67,6 +82,23 @@ void runtime::start()
 void runtime::stop() noexcept
 {
   audio_device_->stop();
+}
+
+bool runtime::started() const noexcept
+{
+  return audio_device_->started();
+}
+
+std::vector<uint32_t> runtime::module_ids()
+{
+  drain_commands();
+
+  std::vector<uint32_t> ids;
+  ids.reserve(modules_.size());
+  for (auto* module : modules_) {
+    ids.push_back(module->module_id);
+  }
+  return ids;
 }
 
 module_instance* runtime::find_module(uint32_t module_id) noexcept
@@ -83,9 +115,41 @@ void runtime::apply_command(const rt_command& command) noexcept
 
   std::visit(overloaded{
     [this](const start_module& payload) noexcept {
-      if (find_module(payload.module_id) != nullptr) return;
-      if (modules_.size() >= modules_.capacity()) return;
-      modules_.push_back(payload.module);
+      if (find_module(payload.module_id) != nullptr) {
+        retire_module(payload.module);
+        return;
+      }
+      if (modules_.size() >= modules_.capacity()) {
+        retire_module(payload.module);
+        return;
+      }
+
+      auto insert_at = modules_.end();
+      switch (payload.insert_mode) {
+      case module_insert_mode::append:
+        insert_at = modules_.end();
+        break;
+      case module_insert_mode::prepend:
+        insert_at = modules_.begin();
+        break;
+      case module_insert_mode::before:
+      case module_insert_mode::after: {
+        auto anchor = std::find_if(
+            modules_.begin(),
+            modules_.end(),
+            [&payload](module_instance* module) {
+              return module != nullptr && module->module_id == payload.anchor_module_id;
+            });
+        if (anchor == modules_.end()) {
+          retire_module(payload.module);
+          return;
+        }
+        insert_at = payload.insert_mode == module_insert_mode::before ? anchor : std::next(anchor);
+        break;
+      }
+      }
+
+      modules_.insert(insert_at, payload.module);
     },
     [this](const stop_module& payload) noexcept {
       auto it = std::find_if(modules_.begin(), modules_.end(), [&payload](module_instance* module) {
@@ -97,8 +161,7 @@ void runtime::apply_command(const rt_command& command) noexcept
       retire_token token{module};
       if (!retired_modules_.try_push(token)) return;
 
-      *it = modules_.back();
-      modules_.pop_back();
+      modules_.erase(it);
     },
     [this](const set_control_value& payload) noexcept {
       auto* module = find_module(payload.module_id);
@@ -143,10 +206,7 @@ void runtime::process(float* output, const float* input, uint32_t frame_count)
 {
   assert(frame_count % block_size_ == 0);
 
-  rt_command command;
-  while (commands_.try_pop(command)) {
-    apply_command(command);
-  }
+  drain_commands();
 
   const size_t total_frames = static_cast<size_t>(frame_count);
 

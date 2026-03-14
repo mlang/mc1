@@ -26,6 +26,7 @@ public:
 
   void start();
   void stop() noexcept;
+  bool started() const noexcept;
 
 private:
   ma_device device_{};

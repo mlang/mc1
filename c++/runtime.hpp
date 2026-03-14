@@ -48,6 +48,8 @@ public:
 
   void start();
   void stop() noexcept;
+  bool started() const noexcept;
+  std::vector<uint32_t> module_ids();
 
   void process(float* output, const float* input, uint32_t frame_count);
 
@@ -63,6 +65,8 @@ private:
   boost::container::static_vector<module_instance*, max_modules> modules_{};
   std::unique_ptr<audio_device> audio_device_;
 
+  void retire_module(module_instance* module) noexcept;
+  void drain_commands() noexcept;
   module_instance* find_module(uint32_t module_id) noexcept;
   void apply_command(const rt_command& command) noexcept;
   void render_block(float* output, const float* input, size_t frame_offset) noexcept;
