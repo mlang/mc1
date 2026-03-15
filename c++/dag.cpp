@@ -44,22 +44,33 @@ parse_n(std::span<const std::byte> &bytes, size_t count, Parser &&parser)
   return values;
 }
 
-} // namespace
+std::expected<DAG::ControlName, mlang::parse_error> parse_ControlName(std::span<const std::byte> &bytes)
+{
+  return get_pstring(bytes).and_then([&](std::string name) {
+    return get_value<size_t>(bytes).and_then([&](size_t index) {
+      return parse_control_kind(bytes).and_then([&](control_kind kind) -> std::expected<DAG::ControlName, mlang::parse_error> {
+        return DAG::ControlName{std::move(name), index, kind};
+      });
+    });
+  });
+}
 
-std::expected<DAG::op, mlang::parse_error> DAG::op::parse(std::span<const std::byte> &bytes)
+std::expected<DAG::op, mlang::parse_error> parse_op(std::span<const std::byte> &bytes)
 {
   return get_pstring(bytes).and_then([&](std::string name) {
     return get_value<char>(bytes).and_then([&](char rate) {
       return get_value<size_t>(bytes).and_then([&](size_t num_out) {
         return get_value<size_t>(bytes).and_then([&](size_t nargs) {
           return get_values<size_t>(bytes, nargs);
-	}).and_then([&](std::vector<size_t> args) -> std::expected<op, mlang::parse_error> {
-          return op{ std::move(name), rate, num_out, std::move(args) };
+        }).and_then([&](std::vector<size_t> args) -> std::expected<DAG::op, mlang::parse_error> {
+          return DAG::op{std::move(name), rate, num_out, std::move(args)};
         });
       });
     });
   });
 }
+
+} // namespace
 
 std::expected<DAG, mlang::parse_error> DAG::parse(std::span<const std::byte> &bytes)
 {
@@ -71,21 +82,10 @@ std::expected<DAG, mlang::parse_error> DAG::parse(std::span<const std::byte> &by
         return get_values<float>(bytes, nctrlvals);
       }).and_then([&](std::vector<float> ctrlvals) {
         return get_value<size_t>(bytes).and_then([&](size_t nctrlnames) {
-          return parse_n<ControlName>(bytes, nctrlnames,
-            [](std::span<const std::byte> &bytes) -> std::expected<ControlName, mlang::parse_error>
-            {
-              return get_pstring(bytes).and_then([&](std::string name) {
-                return get_value<size_t>(bytes).and_then([&](size_t index) {
-                  return parse_control_kind(bytes).and_then([&](control_kind kind) -> std::expected<ControlName, mlang::parse_error> {
-                    return ControlName{ std::move(name), index, kind };
-                  });
-                });
-              });
-            }
-          );
+          return parse_n<ControlName>(bytes, nctrlnames, &parse_ControlName);
         }).and_then([&](std::vector<ControlName> control_names) {
           return get_value<size_t>(bytes).and_then([&](size_t nops) {
-            return parse_n<op>(bytes, nops, &op::parse);
+            return parse_n<op>(bytes, nops, &parse_op);
           }).and_then([&](std::vector<op> ops) -> std::expected<DAG, mlang::parse_error> {
             return DAG{
               std::move(name), std::move(consts), std::move(ctrlvals),

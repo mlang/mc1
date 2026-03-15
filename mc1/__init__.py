@@ -53,6 +53,7 @@ __all__ = (
     "perft",
 )
 
+@DAG
 def default(
     freq=440,
     amp=0.2,

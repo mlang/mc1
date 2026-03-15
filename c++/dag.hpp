@@ -33,8 +33,6 @@ struct DAG final {
     char rate;
     size_t num_out;
     std::vector<size_t> args;
-
-    static std::expected<op, mlang::parse_error> parse(std::span<const std::byte>&);
   };
   std::vector<op> ops;
 
