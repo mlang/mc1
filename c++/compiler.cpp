@@ -9,8 +9,8 @@
 #include <cmath>
 #include <cstdint>
 #include <algorithm>
+#include <initializer_list>
 #include <memory>
-#include <numbers>
 #include <optional>
 #include <print>
 #include <ranges>
@@ -44,6 +44,7 @@ struct StateTypeBase
 
 template<class> inline constexpr enum gcc_jit_types jit_type_v;
 template<> inline constexpr enum gcc_jit_types jit_type_v<void>   = GCC_JIT_TYPE_VOID;
+template<> inline constexpr enum gcc_jit_types jit_type_v<int>    = GCC_JIT_TYPE_INT;
 template<> inline constexpr enum gcc_jit_types jit_type_v<float>  = GCC_JIT_TYPE_FLOAT;
 template<> inline constexpr enum gcc_jit_types jit_type_v<size_t> = GCC_JIT_TYPE_SIZE_T;
 template<> inline constexpr enum gcc_jit_types jit_type_v<uint32_t> = GCC_JIT_TYPE_UNSIGNED_INT;
@@ -154,43 +155,150 @@ public:
     return std::format("{}_{}", graph.name, base);
   }
 
-  gccjit::rvalue new_float(float value)
+  template<class T> gccjit::rvalue zero()
   {
-    return gcc.new_rvalue(type<float>(), static_cast<double>(value));
+    return gcc.zero(type<T>());
+  }
+
+  template<class T> gccjit::rvalue one()
+  {
+    return gcc.one(type<T>());
+  }
+
+  gccjit::rvalue new_float(double value)
+  {
+    return gcc.new_rvalue(type<float>(), value);
+  }
+
+  gccjit::rvalue new_int(int value)
+  {
+    return gcc.new_rvalue(type<int>(), value);
+  }
+
+  gccjit::rvalue new_size_t(size_t value)
+  {
+    return gcc.new_rvalue(type<size_t>(), long(value));
+  }
+
+  gccjit::rvalue block_size_value()
+  {
+    return new_size_t(block_size);
+  }
+
+  gccjit::rvalue sample_rate_value()
+  {
+    return new_float(static_cast<float>(sample_rate));
+  }
+
+  gccjit::rvalue int_from_bool(gccjit::rvalue value)
+  {
+    return gcc.new_cast(value, type<int>());
+  }
+
+  gccjit::rvalue float_from_bool(gccjit::rvalue value)
+  {
+    return gcc.new_cast(int_from_bool(value), type<float>());
+  }
+
+  gccjit::rvalue u32_from_bool(gccjit::rvalue value)
+  {
+    return gcc.new_cast(int_from_bool(value), type<uint32_t>());
+  }
+
+  gccjit::rvalue planar_channel_offset(size_t channel)
+  {
+    return new_size_t(block_size * channel);
+  }
+
+  gccjit::lvalue planar_sample(gccjit::rvalue buffer, gccjit::rvalue index, size_t channel = 0)
+  {
+    return gcc.new_array_access(buffer, index + planar_channel_offset(channel));
+  }
+
+  gccjit::rvalue planar_channel_ptr(gccjit::rvalue buffer, size_t channel)
+  {
+    return planar_sample(buffer, zero<size_t>(), channel).get_address();
+  }
+
+  gccjit::rvalue audio_bus_ptr(gccjit::param abus, gccjit::rvalue bus_index, size_t channel = 0)
+  {
+    return planar_sample(abus, bus_index * block_size_value(), channel).get_address();
+  }
+
+  gccjit::rvalue sample_at(char rate, gccjit::param p_arg, gccjit::lvalue lv_i)
+  {
+    return rate == 'a' ? p_arg[lv_i] : p_arg;
+  }
+
+  gccjit::rvalue non_negative(gccjit::rvalue value)
+  {
+    return value * (one<float>() - float_from_bool(value < zero<float>()));
+  }
+
+  gccjit::rvalue clamp_unit(gccjit::rvalue value)
+  {
+    auto clamped_low = non_negative(value);
+    return clamped_low + ((one<float>() - clamped_low) * float_from_bool(clamped_low > one<float>()));
+  }
+
+  void accumulate_done_action(gccjit::block block, gccjit::lvalue accum, gccjit::rvalue done_value)
+  {
+    block.add_assignment(accum, gcc.new_binary_op(
+      GCC_JIT_BINARY_OP_BITWISE_OR,
+      type<uint32_t>(),
+      accum,
+      u32_from_bool(done_value == one<float>())
+    ));
+  }
+
+  std::optional<gccjit::type> optional_struct_type(
+    std::string_view name,
+    std::vector<gccjit::field> fields
+  )
+  {
+    if (fields.empty()) return std::nullopt;
+    return gcc.new_struct_type(std::string(name), fields);
+  }
+
+  std::optional<gccjit::lvalue> state_field(
+    gccjit::param raw_state,
+    std::optional<gccjit::type> graph_state,
+    std::optional<gccjit::field> field
+  )
+  {
+    if (!graph_state || !field) return std::nullopt;
+
+    auto p_graph_state = gcc.new_cast(raw_state, graph_state->get_pointer());
+    return p_graph_state.dereference().access_field(*field);
   }
 
   gccjit::rvalue wrap_tau(gccjit::rvalue phase)
   {
-    auto t_int = gcc.get_type(GCC_JIT_TYPE_INT);
     auto tau = new_float(static_cast<float>(2.0 * std::numbers::pi_v<double>));
 
-    auto wrapped_hi = gcc.new_cast(phase >= tau, t_int);
-    auto wrapped_hi_f = gcc.new_cast(wrapped_hi, type<float>());
+    auto wrapped_hi_f = float_from_bool(phase >= tau);
     auto out = phase - (tau * wrapped_hi_f);
 
-    auto wrapped_lo = gcc.new_cast(out < gcc.zero(type<float>()), t_int);
-    auto wrapped_lo_f = gcc.new_cast(wrapped_lo, type<float>());
+    auto wrapped_lo_f = float_from_bool(out < zero<float>());
     return out + (tau * wrapped_lo_f);
   }
 
   gccjit::block loop(gccjit::function fn, gccjit::block entry, auto &&body_fn)
   {
-    auto c_BS_size = gcc.new_rvalue(type<size_t>(), long(block_size));
-
     auto cond  = fn.new_block("cond");
     auto body  = fn.new_block("body");
     auto cont  = fn.new_block("cont");
     auto done  = fn.new_block("done");
 
     gccjit::lvalue i = fn.new_local(type<size_t>(), "i");
-    entry.add_assignment(i, gcc.zero(type<size_t>()));
+    entry.add_assignment(i, zero<size_t>());
     entry.end_with_jump(cond);
 
-    cond.end_with_conditional(i < c_BS_size, body, done);
+    cond.end_with_conditional(i < block_size_value(), body, done);
 
     body_fn(body, cont, i);
 
-    cont.add_assignment(i, i + gcc.one(type<size_t>()));
+    cont.add_assignment(i, i + one<size_t>());
     cont.end_with_jump(cond);
 
     return done;
@@ -258,10 +366,7 @@ public:
   {
     assert(rvalue.get_inner_rvalue() != nullptr);
     assert(rate() == 'a');
-
-    auto c_i = ctx.gcc.new_rvalue(ctx.type<size_t>(), long(ctx.block_size * channel));
-
-    return ctx.gcc.new_array_access(rvalue, c_i).get_address();
+    return ctx.planar_channel_ptr(rvalue, channel);
   }
 
   gccjit::param new_param(std::string param_name)
@@ -306,30 +411,56 @@ class GraphArgs : public CodegenNode
 protected:
   std::vector<CodegenNode*> args;
 
-  gccjit::rvalue new_proc_local(
-    gccjit::function f,
-    gccjit::block b,
-    std::variant<gccjit::function, gccjit::rvalue> v,
-    std::optional<gccjit::rvalue> state_ptr = std::nullopt
-  )
+  gccjit::lvalue new_output_local(gccjit::function f) const
   {
-    auto var = f.new_local(
+    return f.new_local(
       rate() == 'a'
         ? ctx.type<float>(int(ctx.block_size * output_count()))
         : ctx.type<float>(),
       std::format("e{}", vertex_index)
     );
+  }
+
+  gccjit::rvalue sample_arg(size_t index, gccjit::param p_arg, gccjit::lvalue lv_i) const
+  {
+    return ctx.sample_at(args[index]->rate(), p_arg, lv_i);
+  }
+
+  std::vector<gccjit::rvalue> kernel_call_args(
+    std::optional<gccjit::lvalue> out = std::nullopt,
+    std::optional<gccjit::rvalue> state_ptr = std::nullopt,
+    std::initializer_list<gccjit::rvalue> extra_args = {}
+  ) const
+  {
+    std::vector<gccjit::rvalue> call_args;
+    call_args.reserve(args.size() + extra_args.size() + (out ? 1 : 0) + (state_ptr ? 1 : 0));
+
+    if (state_ptr) call_args.push_back(*state_ptr);
+    if (out) call_args.push_back(ctx.planar_channel_ptr(*out, 0));
+    for (auto *op : args) call_args.push_back(op->get_rvalue());
+    for (auto arg : extra_args) call_args.push_back(arg);
+
+    return call_args;
+  }
+
+  gccjit::rvalue new_proc_local(
+    gccjit::function f,
+    gccjit::block b,
+    std::variant<gccjit::function, gccjit::rvalue> v,
+    std::optional<gccjit::rvalue> state_ptr = std::nullopt,
+    std::initializer_list<gccjit::rvalue> extra_args = {}
+  )
+  {
+    auto var = new_output_local(f);
     auto maybe_call = overload{
       [&](gccjit::function kernel)
       {
-        std::vector<gccjit::rvalue> call_args;
-        call_args.reserve(args.size() + (rate() == 'a') + (state_ptr ? 1 : 0));
-
-        if (state_ptr) call_args.push_back(*state_ptr);
-        if (rate() == 'a') call_args.push_back(var[0].get_address());
-        for (auto *op : args) call_args.push_back(op->get_rvalue());
-
-        return ctx.gcc.new_call(kernel, call_args);            // kernel writes to out_ptr
+        auto call_args = kernel_call_args(
+          rate() == 'a' ? std::optional<gccjit::lvalue>{var} : std::nullopt,
+          state_ptr,
+          extra_args
+        );
+        return ctx.gcc.new_call(kernel, call_args);
       },
       [](gccjit::rvalue rv) { return rv; }
     };
@@ -337,7 +468,7 @@ protected:
     if (rate() == 'a') {
       b.add_eval(std::visit(maybe_call, v));
 
-      return var[0].get_address();
+      return ctx.planar_channel_ptr(var, 0);
     }
 
     // assign scalar rvalue
@@ -414,11 +545,8 @@ struct In final : GraphArgs
     assert(sig == "ba");
     assert(args.size() == 1);
 
-    auto abus = f.get_param(2);
     auto idx = ctx.gcc.new_cast(args[0]->get_rvalue(), ctx.type<size_t>());
-    auto c_bs = ctx.gcc.new_rvalue(ctx.type<size_t>(), long(ctx.block_size));
-
-    rvalue = abus[idx * c_bs].get_address();
+    rvalue = ctx.audio_bus_ptr(f.get_param(2), idx);
   }
 };
 
@@ -432,7 +560,6 @@ class Out final : public GraphArgs
     if (sig != "baa") return std::nullopt;
 
     auto t_float_ptr = ctx.type<float*>();
-    auto t_const_float_ptr = ctx.type<const float*>();
 
     // void Out_baa(float *dst, const float *src)
     auto p_dst = ctx.gcc.new_param(t_float_ptr, "dst");
@@ -472,18 +599,14 @@ public:
     assert(args.size() == 2);
     assert(kernel);
 
-    auto abus = f.get_param(2);
-
     auto idx = ctx.gcc.new_cast(args[0]->get_rvalue(), ctx.type<size_t>());
-    auto c_bs = ctx.gcc.new_rvalue(ctx.type<size_t>(), long(ctx.block_size));
 
     for (size_t ch = 0; ch < args[1]->output_count(); ch++) {
-      auto c_ch = ctx.gcc.new_rvalue(ctx.type<size_t>(), long(ch));
-      auto dst = abus[(idx + c_ch) * c_bs].get_address();
+      auto dst = ctx.audio_bus_ptr(f.get_param(2), idx, ch);
       b.add_eval((*kernel)(dst, args[1]->get_rvalue(ch)));
     }
 
-    rvalue = abus[idx * c_bs].get_address();
+    rvalue = ctx.audio_bus_ptr(f.get_param(2), idx);
   }
 };
 
@@ -521,8 +644,8 @@ class BinOp final : public GraphArgs
       ctx.loop(kernel, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i) {
         auto lv_r_i = p_r[lv_i];
 
-        gccjit::rvalue ra = (args[0]->rate() == 'a') ? p_a[lv_i] : p_a;
-        gccjit::rvalue rb = (args[1]->rate() == 'a') ? p_b[lv_i] : p_b;
+        auto ra = sample_arg(0, p_a, lv_i);
+        auto rb = sample_arg(1, p_b, lv_i);
 
         auto expr = ctx.gcc.new_binary_op(op_kind, ctx.type<float>(), ra, rb);
         body.add_assignment(lv_r_i, expr);
@@ -620,13 +743,11 @@ class SinOsc final : public GraphArgs
       auto lv_phase = k.new_local(ctx.type<float>(), "phase");
       entry.add_assignment(lv_phase, p_st.dereference_field(ST.phase));
 
-      auto tau_over_sr = ctx.gcc.new_rvalue(
-        ctx.type<float>(), (2.0 * std::numbers::pi_v<double>) / double(ctx.sample_rate)
-      );
+      auto tau_over_sr = ctx.new_float((2.0 * std::numbers::pi_v<double>) / double(ctx.sample_rate));
 
       auto after_loop = ctx.loop(k, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i) {
-        gccjit::rvalue freq  = (args[0]->rate() == 'a') ? p_freq[lv_i] : p_freq;
-        gccjit::rvalue phofs = (args[1]->rate() == 'a') ? p_phase[lv_i] : p_phase;
+        auto freq = sample_arg(0, p_freq, lv_i);
+        auto phofs = sample_arg(1, p_phase, lv_i);
 
         auto outv = ctx.sinf(ctx.wrap_tau(lv_phase + phofs));
         body.add_assignment(p_out[lv_i], outv);
@@ -662,7 +783,7 @@ public:
   void emit_init(gccjit::block b, std::optional<gccjit::lvalue> state_field) override
   {
     assert(state_field);
-    b.add_assignment(state_field->access_field(ST.phase), ctx.gcc.zero(ctx.type<float>()));
+    b.add_assignment(state_field->access_field(ST.phase), ctx.zero<float>());
   }
 
   void emit_proc(
@@ -707,7 +828,7 @@ class ADSR final : public GraphArgs
 
   static StateType make_state_type(Context &ctx)
   {
-    auto t_int = ctx.gcc.get_type(GCC_JIT_TYPE_INT);
+    auto t_int = ctx.type<int>();
     auto fld_level = ctx.gcc.new_field(ctx.type<float>(), "level");
     auto fld_stage = ctx.gcc.new_field(t_int, "stage");
     auto fld_last_gate = ctx.gcc.new_field(t_int, "last_gate");
@@ -736,7 +857,7 @@ class ADSR final : public GraphArgs
     auto t_state_ptr = ST.st.get_pointer();
     auto t_float = ctx.type<float>();
     auto t_float_ptr = ctx.type<float*>();
-    auto t_int = ctx.gcc.get_type(GCC_JIT_TYPE_INT);
+    auto t_int = ctx.type<int>();
     auto t_u32 = ctx.type<uint32_t>();
 
     auto p_st = ctx.gcc.new_param(t_state_ptr, "st");
@@ -759,50 +880,18 @@ class ADSR final : public GraphArgs
       auto lv_stage = k.new_local(t_int, "stage");
       auto lv_last_gate = k.new_local(t_int, "last_gate");
       auto lv_release_start = k.new_local(t_float, "release_start");
-      auto zero_size_t = ctx.gcc.zero(ctx.type<size_t>());
+      auto zero_size_t = ctx.zero<size_t>();
       auto lv_done_action_accum = p_done_action_accum[zero_size_t];
 
-      auto zero_f = ctx.gcc.zero(t_float);
-      auto one_f = ctx.gcc.one(t_float);
-      auto zero_i = ctx.gcc.zero(t_int);
-      auto sample_rate = ctx.new_float(static_cast<float>(ctx.sample_rate));
-      auto c_stage_idle = ctx.gcc.new_rvalue(t_int, adsr_stage_idle);
-      auto c_stage_attack = ctx.gcc.new_rvalue(t_int, adsr_stage_attack);
-      auto c_stage_decay = ctx.gcc.new_rvalue(t_int, adsr_stage_decay);
-      auto c_stage_sustain = ctx.gcc.new_rvalue(t_int, adsr_stage_sustain);
-      auto c_stage_release = ctx.gcc.new_rvalue(t_int, adsr_stage_release);
-
-      auto sample_arg = [&](size_t index, gccjit::param p_arg, gccjit::lvalue lv_i) -> gccjit::rvalue
-      {
-        return args[index]->rate() == 'a' ? p_arg[lv_i] : p_arg;
-      };
-
-      auto non_negative = [&](gccjit::rvalue value) -> gccjit::rvalue
-      {
-        auto is_negative = ctx.gcc.new_cast(value < zero_f, t_int);
-        auto is_negative_f = ctx.gcc.new_cast(is_negative, t_float);
-        return value * (one_f - is_negative_f);
-      };
-
-      auto clamp_unit = [&](gccjit::rvalue value) -> gccjit::rvalue
-      {
-        auto clamped_low = non_negative(value);
-        auto is_high = ctx.gcc.new_cast(clamped_low > one_f, t_int);
-        auto is_high_f = ctx.gcc.new_cast(is_high, t_float);
-        return clamped_low + ((one_f - clamped_low) * is_high_f);
-      };
-
-      auto set_action_if_done = [&](gccjit::block block, gccjit::rvalue done_value)
-      {
-        auto done_is_one = ctx.gcc.new_cast(done_value == one_f, t_int);
-        auto done_is_one_u32 = ctx.gcc.new_cast(done_is_one, t_u32);
-        block.add_assignment(lv_done_action_accum, ctx.gcc.new_binary_op(
-          GCC_JIT_BINARY_OP_BITWISE_OR,
-          t_u32,
-          lv_done_action_accum,
-          done_is_one_u32
-        ));
-      };
+      auto zero_f = ctx.zero<float>();
+      auto one_f = ctx.one<float>();
+      auto zero_i = ctx.zero<int>();
+      auto sample_rate = ctx.sample_rate_value();
+      auto c_stage_idle = ctx.new_int(adsr_stage_idle);
+      auto c_stage_attack = ctx.new_int(adsr_stage_attack);
+      auto c_stage_decay = ctx.new_int(adsr_stage_decay);
+      auto c_stage_sustain = ctx.new_int(adsr_stage_sustain);
+      auto c_stage_release = ctx.new_int(adsr_stage_release);
 
       entry.add_assignment(lv_level, p_st.dereference_field(ST.level));
       entry.add_assignment(lv_stage, p_st.dereference_field(ST.stage));
@@ -812,12 +901,12 @@ class ADSR final : public GraphArgs
       auto after_loop = ctx.loop(k, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i)
       {
         auto gate = sample_arg(0, p_gate, lv_i);
-        auto attack = non_negative(sample_arg(1, p_attack, lv_i));
-        auto decay = non_negative(sample_arg(2, p_decay, lv_i));
-        auto sustain = clamp_unit(sample_arg(3, p_sustain, lv_i));
-        auto release = non_negative(sample_arg(4, p_release, lv_i));
+        auto attack = ctx.non_negative(sample_arg(1, p_attack, lv_i));
+        auto decay = ctx.non_negative(sample_arg(2, p_decay, lv_i));
+        auto sustain = ctx.clamp_unit(sample_arg(3, p_sustain, lv_i));
+        auto release = ctx.non_negative(sample_arg(4, p_release, lv_i));
         auto done_value = sample_arg(5, p_done_value, lv_i);
-        auto gate_on = ctx.gcc.new_cast(gate > zero_f, t_int);
+        auto gate_on = ctx.int_from_bool(gate > zero_f);
 
         auto gate_on_check = k.new_block("adsr_gate_on_check");
         auto gate_rise_apply = k.new_block("adsr_gate_rise_apply");
@@ -916,7 +1005,7 @@ class ADSR final : public GraphArgs
         );
         release_zero_apply.add_assignment(lv_level, zero_f);
         release_zero_apply.add_assignment(lv_stage, c_stage_idle);
-        set_action_if_done(release_zero_apply, done_value);
+        ctx.accumulate_done_action(release_zero_apply, lv_done_action_accum, done_value);
         release_zero_apply.end_with_jump(after_release_zero);
 
         after_release_zero.end_with_conditional(lv_stage == c_stage_attack,
@@ -966,7 +1055,7 @@ class ADSR final : public GraphArgs
         );
         stage_release_finish.add_assignment(lv_level, zero_f);
         stage_release_finish.add_assignment(lv_stage, c_stage_idle);
-        set_action_if_done(stage_release_finish, done_value);
+        ctx.accumulate_done_action(stage_release_finish, lv_done_action_accum, done_value);
         stage_release_finish.end_with_jump(sample_done);
 
         stage_idle_apply.add_assignment(lv_level, zero_f);
@@ -1005,11 +1094,10 @@ public:
   void emit_init(gccjit::block b, std::optional<gccjit::lvalue> state_field) override
   {
     assert(state_field);
-    auto t_int = ctx.gcc.get_type(GCC_JIT_TYPE_INT);
-    b.add_assignment(state_field->access_field(ST.level), ctx.gcc.zero(ctx.type<float>()));
-    b.add_assignment(state_field->access_field(ST.stage), ctx.gcc.zero(t_int));
-    b.add_assignment(state_field->access_field(ST.last_gate), ctx.gcc.zero(t_int));
-    b.add_assignment(state_field->access_field(ST.release_start), ctx.gcc.zero(ctx.type<float>()));
+    b.add_assignment(state_field->access_field(ST.level), ctx.zero<float>());
+    b.add_assignment(state_field->access_field(ST.stage), ctx.zero<int>());
+    b.add_assignment(state_field->access_field(ST.last_gate), ctx.zero<int>());
+    b.add_assignment(state_field->access_field(ST.release_start), ctx.zero<float>());
   }
 
   void emit_proc(
@@ -1023,25 +1111,7 @@ public:
     assert(state_field);
     assert(done_action);
     assert(kernel);
-
-    auto out = f.new_local(
-      ctx.type<float>(int(ctx.block_size * output_count())),
-      std::format("e{}", vertex_index)
-    );
-    auto call_args = std::vector<gccjit::rvalue>{
-      state_field->get_address(),
-      out[0].get_address(),
-      args[0]->get_rvalue(),
-      args[1]->get_rvalue(),
-      args[2]->get_rvalue(),
-      args[3]->get_rvalue(),
-      args[4]->get_rvalue(),
-      args[5]->get_rvalue(),
-      done_action->get_address(),
-    };
-    b.add_eval(ctx.gcc.new_call(*kernel, call_args));
-
-    rvalue = out[0].get_address();
+    rvalue = new_proc_local(f, b, *kernel, state_field->get_address(), {done_action->get_address()});
   }
 };
 
@@ -1065,21 +1135,17 @@ class Pan final : public GraphArgs
     {
       auto entry = k.new_block("entry");
       ctx.loop(k, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i) {
-        gccjit::rvalue in  = (args[0]->rate() == 'a') ? p_in[lv_i] : p_in;
-        gccjit::rvalue pan = (args[1]->rate() == 'a') ? p_pan[lv_i] : p_pan;
+        auto in = sample_arg(0, p_in, lv_i);
+        auto pan = sample_arg(1, p_pan, lv_i);
 
-        auto one  = ctx.gcc.one(ctx.type<float>());
-        auto half = ctx.gcc.new_rvalue(ctx.type<float>(), 0.5);
+        auto one = ctx.one<float>();
+        auto half = ctx.new_float(0.5f);
 
         auto l = in * ((one - pan) * half);
         auto r = in * ((one + pan) * half);
 
-        auto c_bs = ctx.gcc.new_rvalue(ctx.type<size_t>(), long(ctx.block_size));
-        auto c_0 = ctx.gcc.zero(ctx.type<size_t>());
-        auto c_1 = ctx.gcc.one(ctx.type<size_t>());
-
-        body.add_assignment(p_out[lv_i + c_0 * c_bs], l);
-        body.add_assignment(p_out[lv_i + c_1 * c_bs], r);
+        body.add_assignment(ctx.planar_sample(p_out, lv_i, 0), l);
+        body.add_assignment(ctx.planar_sample(p_out, lv_i, 1), r);
         body.end_with_jump(cont);
       }).end_with_return();
     }
@@ -1280,17 +1346,11 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
 
   auto state_struct = state_field_list.empty()
     ? std::optional<gccjit::type>{}
-    : std::optional<gccjit::type>{ctx.gcc.new_struct_type(
-        ctx.graph_symbol("state"), state_field_list
-      )};
+    : ctx.optional_struct_type(ctx.graph_symbol("state"), state_field_list);
 
   auto make_node_state = [&](gccjit::param p_state, size_t i) -> std::optional<gccjit::lvalue>
   {
-    if (!state_struct || !state_fields[i]) return std::nullopt;
-
-    auto p_graph_state = ctx.gcc.new_cast(p_state, state_struct->get_pointer());
-    auto lv_graph_state = p_graph_state.dereference();
-    return lv_graph_state.access_field(*state_fields[i]);
+    return ctx.state_field(p_state, state_struct, state_fields[i]);
   };
 
   auto init_args = std::vector{
@@ -1321,7 +1381,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     auto entry = process.new_block("entry");
     auto p_state = process.get_param(0);
     auto done_action = process.new_local(t_u32, "done_action");
-    entry.add_assignment(done_action, ctx.gcc.zero(t_u32));
+    entry.add_assignment(done_action, ctx.zero<uint32_t>());
     for (size_t i = 0; i < nodes.size(); i++) {
       nodes[i]->emit_proc(process, entry, make_node_state(p_state, i), done_action);
     }
@@ -1332,7 +1392,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     GCC_JIT_GLOBAL_EXPORTED, t_size_t, ctx.graph_symbol("state_size")
   );
   if (!state_struct) {
-    state_size.set_initializer_rvalue(ctx.gcc.zero(t_size_t));
+    state_size.set_initializer_rvalue(ctx.zero<size_t>());
   } else {
     state_size.set_initializer_rvalue(new_sizeof(*state_struct));
   }
