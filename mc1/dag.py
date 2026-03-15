@@ -100,6 +100,10 @@ class Control(_Node):
 
 class _GraphArgs(_Node):
     def __new__(cls, *args, **kwargs):
+        """Build one node, or a tuple of nodes for list/tuple/range inputs.
+
+        Scalars are broadcast, and shorter sequences wrap to the longest input.
+        """
         sequence_types = (list, range, tuple)
         lengths = [len(arg) for arg in args if isinstance(arg, sequence_types)]
         lengths.extend(len(v)
