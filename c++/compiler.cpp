@@ -5,6 +5,7 @@
 #include <numbers>
 
 #include "mlang/gccjit.hpp"
+#include "mlang/math.hpp"
 
 #include <cassert>
 #include <chrono>
@@ -60,7 +61,7 @@ struct Context
   Context(unsigned int sample_rate, size_t block_size, DAG const& graph)
   : gcc{gccjit::context::acquire()}
   , sample_rate{sample_rate}, block_size{block_size}, graph{graph}
-  , sinf{mlang::gccjit::make_tabled_function(gcc, "sinf_lookup", std::numbers::pi_v<float> * 2.0f, 256, std::sinf)}
+  , sinf{mlang::gccjit::make_tabled_function(gcc, "sinf_lookup", mlang::numbers::tau_v<float>, 256, std::sinf)}
   , kernelCache{}, stateCache{}
   {}
 
@@ -230,7 +231,7 @@ struct Context
 
   gccjit::rvalue wrap_tau(gccjit::rvalue phase)
   {
-    auto tau = new_float(static_cast<float>(2.0 * std::numbers::pi_v<double>));
+    auto tau = new_float(mlang::numbers::tau_v<float>);
 
     auto wrapped_hi_f = float_from_bool(phase >= tau);
     auto out = phase - (tau * wrapped_hi_f);
@@ -789,7 +790,7 @@ class SinOsc final : public GraphArgs
       auto lv_phase = k.new_local(ctx.type<float>(), "phase");
       entry.add_assignment(lv_phase, p_st.dereference_field(ST.phase));
 
-      auto tau_over_sr = ctx.new_float((2.0 * std::numbers::pi_v<double>) / double(ctx.sample_rate));
+      auto tau_over_sr = ctx.new_float(mlang::numbers::tau_v<double> / double(ctx.sample_rate));
 
       auto after_loop = ctx.loop(k, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i) {
         auto freq = sample_arg(0, p_freq, lv_i);
