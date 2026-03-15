@@ -1,4 +1,10 @@
-"""A DSL to describe and serialize signal graphs"""
+"""Core Python graph objects used to build and serialize MiniCollider DAGs.
+
+Most users work with the public classes exported from `mc1`: decorate a
+function with `@DAG`, create opcode nodes such as `SinOsc.ar(...)`, combine
+them with ordinary Python operators, and finally serialize the captured graph
+with `bytes(...)`.
+"""
 
 import enum
 import inspect
@@ -10,6 +16,18 @@ __all__ = ('ADSR', 'In', 'Out', 'Pan', 'SinOsc', 'Trigger', 'DAG')
 
 
 class Trigger:
+    """Annotation marker for trigger-style controls in a `@DAG` function.
+
+    A parameter annotated as `Trigger` is compiled as a scalar trigger control
+    instead of a regular value control.
+
+    Example:
+
+        >>> @DAG
+        ... def ping(trig: Trigger = 0):
+        ...     Out.ar(0, SinOsc.ar(220) * trig)
+    """
+
     pass
 
 
@@ -76,6 +94,7 @@ def _div_bounds(left, right):
     return (min(quotients), max(quotients))
 
 class _Node:
+    """Base class for Python graph nodes and opcode instances."""
     __slots__ = ('rate', 'num_out', 'args', '_index', '_bounds')
 
     def __init__(self, rate, num_out, *args, bounds=None):
@@ -99,21 +118,35 @@ class _Node:
 
     @property
     def bounds(self):
+        """Known `(lo, hi)` interval for this node, or `None` if unknown."""
         return self._bounds
 
     @property
     def is_unipolar(self):
+        """Whether this node is known to stay within the range `(0.0, 1.0)`."""
         return self.bounds == (0.0, 1.0)
 
     @property
     def is_bipolar(self):
+        """Whether this node is known to stay within the range `(-1.0, 1.0)`."""
         return self.bounds == (-1.0, 1.0)
 
     def with_bounds(self, lo, hi):
+        """Attach explicit bounds to a node and return the same node.
+
+        This is mainly useful for nodes such as `In.ar(...)` whose range is not
+        known automatically but should participate in later `range(...)` or
+        `linlin(...)` mappings.
+        """
         self._bounds = _normalize_bounds(lo, hi)
         return self
 
     def linlin(self, in_lo, in_hi, out_lo, out_hi):
+        """Linearly remap a value from one range into another.
+
+        The result is expressed as ordinary graph math, so it can be combined
+        with other nodes just like any manually-written expression.
+        """
         in_lo = float(in_lo)
         in_hi = float(in_hi)
         out_lo = float(out_lo)
@@ -127,6 +160,7 @@ class _Node:
         return mapped
 
     def range(self, out_lo, out_hi):
+        """Remap a node from its known bounds into a new output range."""
         if self.bounds is None:
             raise ValueError("range requires known source bounds")
         return self.linlin(*self.bounds, out_lo, out_hi)
@@ -153,6 +187,12 @@ class _Node:
 
 
 class Const(_Node):
+    """Constant scalar embedded in a graph.
+
+    Python numbers are converted to `Const` nodes automatically, so this class
+    is mostly useful when inspecting or debugging the graph builder.
+    """
+
     def __init__(self, value):
         value = float(value)
         try:
@@ -169,6 +209,13 @@ class Const(_Node):
 
 
 class Control(_Node):
+    """Named control input created from a `@DAG` function parameter.
+
+    Controls are synthesized automatically from the decorated function's
+    default-valued parameters; users normally do not instantiate this class
+    directly.
+    """
+
     __slots__ = ('name', 'kind')
 
     def __init__(self, name, *values, kind=ControlKind.VALUE):
@@ -184,6 +231,12 @@ class Control(_Node):
 
 
 class _GraphArgs(_Node):
+    """Node base class that normalizes Python values into graph arguments.
+
+    It also implements the Python-side sequence expansion used by opcodes such
+    as `SinOsc`, `Pan`, and `Out`.
+    """
+
     def __new__(cls, *args, **kwargs):
         """Build one node, or a tuple of nodes for list/tuple/range inputs.
 
@@ -216,6 +269,8 @@ class _GraphArgs(_Node):
 
 
 class _BinOp(_GraphArgs):
+    """Base class for binary arithmetic opcode nodes."""
+
     _bounds_op = None
 
     def __init__(self, left, right):
@@ -225,62 +280,157 @@ class _BinOp(_GraphArgs):
         super().__init__(fastest_rate(left, right), 1, left, right, bounds=bounds)
 
 class Add(_BinOp):
+    """Addition node, usually created by `left + right`."""
+
     _bounds_op = staticmethod(_add_bounds)
 
 
 class Div(_BinOp):
+    """Division node, usually created by `left / right`."""
+
     _bounds_op = staticmethod(_div_bounds)
 
 
 class Mul(_BinOp):
+    """Multiplication node, usually created by `left * right`."""
+
     _bounds_op = staticmethod(_mul_bounds)
 
 
 class Sub(_BinOp):
+    """Subtraction node, usually created by `left - right`."""
+
     _bounds_op = staticmethod(_sub_bounds)
 
 
 class _CmpOp(_GraphArgs):
+    """Base class for comparison opcode nodes."""
+
     def __init__(self, left, right):
         left = _convert(left)
         right = _convert(right)
         super().__init__(fastest_rate(left, right), 1, left, right, bounds=(-1.0, 1.0))
 
 
-class LT(_CmpOp): pass
-class LE(_CmpOp): pass
-class GT(_CmpOp): pass
-class GE(_CmpOp): pass
-class EQ(_CmpOp): pass
-class NE(_CmpOp): pass
+class LT(_CmpOp):
+    """Less-than comparison node, usually created by `left < right`."""
+
+
+class LE(_CmpOp):
+    """Less-than-or-equal comparison node, usually created by `left <= right`."""
+
+
+class GT(_CmpOp):
+    """Greater-than comparison node, usually created by `left > right`."""
+
+
+class GE(_CmpOp):
+    """Greater-than-or-equal node, usually created by `left >= right`."""
+
+
+class EQ(_CmpOp):
+    """Equality comparison node.
+
+    Python `==` is intentionally left as normal object equality, so graph
+    equality tests are spelled explicitly as `EQ(left, right)`.
+    """
+
+
+class NE(_CmpOp):
+    """Inequality comparison node.
+
+    Python `!=` is intentionally left as normal object inequality, so graph
+    inequality tests are spelled explicitly as `NE(left, right)`.
+    """
 
 
 class SinOsc(_GraphArgs):
+    """Audio-rate sine oscillator.
+
+    Create instances with `SinOsc.ar(freq, phase=0)`. As with other graph
+    constructors, passing a `list`, `tuple`, or `range` performs Python-side
+    multi-channel expansion and returns a tuple of oscillators.
+
+    Example:
+
+        >>> osc = SinOsc.ar(440)
+        >>> voices = SinOsc.ar((220, 330, 440), phase=(0.0, 0.5))
+    """
+
     @classmethod
     def ar(cls, freq, phase=0):
+        """Build an audio-rate sine oscillator node."""
         return cls(Rate.AUDIO, 1, freq, phase, bounds=(-1.0, 1.0))
 
 
 class ADSR(_GraphArgs):
+    """Attack/decay/sustain/release envelope generator.
+
+    `gate` starts the envelope and later releases it when driven back to zero.
+    The result is known to be unipolar, so its bounds are seeded to
+    `(0.0, 1.0)`.
+
+    Example:
+
+        >>> env = ADSR.ar(1, 0.01, 0.2, 0.5, 0.4)
+    """
+
     @classmethod
     def ar(cls, gate, attack, decay, sustain, release, done_action=0):
+        """Build an audio-rate ADSR envelope node."""
         return cls(Rate.AUDIO, 1, gate, attack, decay, sustain, release, done_action, bounds=(0.0, 1.0))
 
 
 class In(_GraphArgs):
+    """Audio-rate input bus reader.
+
+    Inputs do not have inferred bounds by default. Use `with_bounds(...)` when
+    you want later interval-based helpers such as `range(...)` to reason about
+    the expected signal range.
+
+    Example:
+
+        >>> cutoff_cv = In.ar(0).with_bounds(0.0, 1.0)
+        >>> cutoff = cutoff_cv.range(200.0, 4000.0)
+    """
+
     @classmethod
     def ar(cls, index=0):
+        """Build an audio-rate input reader for the given bus index."""
         return cls(Rate.AUDIO, 1, index)
 
 
 class Out(_GraphArgs):
+    """Audio-rate output bus writer.
+
+    `Out.ar(index, signal)` routes `signal` to the target output bus. If `index`
+    is a sequence, standard Python-side graph expansion returns a tuple of
+    writers.
+
+    Example:
+
+        >>> Out.ar(0, Pan(SinOsc.ar(440) * 0.1))
+    """
+
     @classmethod
     def ar(cls, index, signal):
+        """Build an audio-rate output writer node."""
         signal = _convert(signal)
         return cls(Rate.AUDIO, signal.num_out, index, signal, bounds=signal.bounds)
 
 
 class Pan(_GraphArgs):
+    """Stereo panner.
+
+    `Pan(signal, pan=0)` converts a mono signal into a 2-channel signal.
+    Sequence inputs participate in the same Python-side expansion rules as other
+    graph constructors.
+
+    Example:
+
+        >>> stereo = Pan(SinOsc.ar(220), pan=(-0.5, 0.5))
+    """
+
     def __init__(self, signal, pan=0):
         signal = _convert(signal)
         super().__init__(signal.rate, 2, signal, pan, bounds=signal.bounds)
@@ -291,6 +441,24 @@ def _convert(x):
 
 
 class DAG:
+    """Capture a graph-building function as a serializable synth definition.
+
+    `@DAG` executes the decorated function once with synthetic `Control` nodes
+    standing in for its default-valued parameters. Every graph node allocated
+    during that call is recorded and can later be serialized with `bytes(...)`.
+
+    Every parameter must have a default value. Annotating a parameter as
+    `Trigger` produces a trigger control instead of a regular value control.
+
+    Example:
+
+        >>> @DAG
+        ... def beep(freq=440, amp=0.1):
+        ...     Out.ar(0, Pan(SinOsc.ar(freq) * amp))
+        ...
+        >>> payload = bytes(beep)
+    """
+
     _constants: list[float] = []
     _controls: list[float] = []
     _controlNames: list[tuple[str, int, ControlKind]] = []
