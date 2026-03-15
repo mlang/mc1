@@ -164,15 +164,11 @@ public:
     auto t_int = gcc.get_type(GCC_JIT_TYPE_INT);
     auto tau = new_float(static_cast<float>(2.0 * std::numbers::pi_v<double>));
 
-    auto wrapped_hi = gcc.new_cast(
-      gcc.new_comparison(GCC_JIT_COMPARISON_GE, phase, tau), t_int
-    );
+    auto wrapped_hi = gcc.new_cast(phase >= tau, t_int);
     auto wrapped_hi_f = gcc.new_cast(wrapped_hi, type<float>());
     auto out = phase - (tau * wrapped_hi_f);
 
-    auto wrapped_lo = gcc.new_cast(
-      gcc.new_comparison(GCC_JIT_COMPARISON_LT, out, gcc.zero(type<float>())), t_int
-    );
+    auto wrapped_lo = gcc.new_cast(out < gcc.zero(type<float>()), t_int);
     auto wrapped_lo_f = gcc.new_cast(wrapped_lo, type<float>());
     return out + (tau * wrapped_lo_f);
   }
@@ -783,10 +779,7 @@ class ADSR final : public GraphArgs
 
       auto non_negative = [&](gccjit::rvalue value) -> gccjit::rvalue
       {
-        auto is_negative = ctx.gcc.new_cast(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LT, value, zero_f),
-          t_int
-        );
+        auto is_negative = ctx.gcc.new_cast(value < zero_f, t_int);
         auto is_negative_f = ctx.gcc.new_cast(is_negative, t_float);
         return value * (one_f - is_negative_f);
       };
@@ -794,20 +787,14 @@ class ADSR final : public GraphArgs
       auto clamp_unit = [&](gccjit::rvalue value) -> gccjit::rvalue
       {
         auto clamped_low = non_negative(value);
-        auto is_high = ctx.gcc.new_cast(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_GT, clamped_low, one_f),
-          t_int
-        );
+        auto is_high = ctx.gcc.new_cast(clamped_low > one_f, t_int);
         auto is_high_f = ctx.gcc.new_cast(is_high, t_float);
         return clamped_low + ((one_f - clamped_low) * is_high_f);
       };
 
       auto set_action_if_done = [&](gccjit::block block, gccjit::rvalue done_value)
       {
-        auto done_is_one = ctx.gcc.new_cast(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, done_value, one_f),
-          t_int
-        );
+        auto done_is_one = ctx.gcc.new_cast(done_value == one_f, t_int);
         auto done_is_one_u32 = ctx.gcc.new_cast(done_is_one, t_u32);
         block.add_assignment(lv_done_action_accum, ctx.gcc.new_binary_op(
           GCC_JIT_BINARY_OP_BITWISE_OR,
@@ -830,10 +817,7 @@ class ADSR final : public GraphArgs
         auto sustain = clamp_unit(sample_arg(3, p_sustain, lv_i));
         auto release = non_negative(sample_arg(4, p_release, lv_i));
         auto done_value = sample_arg(5, p_done_value, lv_i);
-        auto gate_on = ctx.gcc.new_cast(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_GT, gate, zero_f),
-          t_int
-        );
+        auto gate_on = ctx.gcc.new_cast(gate > zero_f, t_int);
 
         auto gate_on_check = k.new_block("adsr_gate_on_check");
         auto gate_rise_apply = k.new_block("adsr_gate_rise_apply");
@@ -870,63 +854,43 @@ class ADSR final : public GraphArgs
         auto stage_idle_apply = k.new_block("adsr_stage_idle_apply");
         auto sample_done = k.new_block("adsr_sample_done");
 
-        body.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, gate_on, zero_i),
-          gate_on_check,
-          gate_fall_check
-        );
+        body.end_with_conditional(gate_on != zero_i, gate_on_check, gate_fall_check);
 
-        gate_on_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_last_gate, zero_i),
-          gate_rise_apply,
-          after_gate
+        gate_on_check.end_with_conditional(lv_last_gate == zero_i,
+          gate_rise_apply, after_gate
         );
         gate_rise_apply.add_assignment(lv_stage, c_stage_attack);
         gate_rise_apply.end_with_jump(after_gate);
 
-        gate_fall_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, lv_last_gate, zero_i),
-          gate_stage_check,
-          after_gate
+        gate_fall_check.end_with_conditional(lv_last_gate != zero_i,
+          gate_stage_check, after_gate
         );
-        gate_stage_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, lv_stage, c_stage_idle),
-          gate_fall_apply,
-          after_gate
+        gate_stage_check.end_with_conditional(lv_stage != c_stage_idle,
+          gate_fall_apply, after_gate
         );
         gate_fall_apply.add_assignment(lv_stage, c_stage_release);
         gate_fall_apply.add_assignment(lv_release_start, lv_level);
         gate_fall_apply.end_with_jump(after_gate);
 
-        after_gate.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_attack),
-          attack_zero_time_check,
-          after_attack_zero
+        after_gate.end_with_conditional(lv_stage == c_stage_attack,
+          attack_zero_time_check, after_attack_zero
         );
-        attack_zero_time_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, attack, zero_f),
-          attack_zero_apply,
-          after_attack_zero
+        attack_zero_time_check.end_with_conditional(attack <= zero_f,
+          attack_zero_apply, after_attack_zero
         );
         attack_zero_apply.add_assignment(lv_level, one_f);
         attack_zero_apply.add_assignment(lv_stage, c_stage_decay);
         attack_zero_apply.end_with_jump(after_attack_zero);
 
-        after_attack_zero.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_decay),
-          decay_zero_time_check,
-          after_decay_zero
+        after_attack_zero.end_with_conditional(lv_stage == c_stage_decay,
+          decay_zero_time_check, after_decay_zero
         );
-        decay_zero_time_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, decay, zero_f),
-          decay_zero_apply,
-          after_decay_zero
+        decay_zero_time_check.end_with_conditional(decay <= zero_f,
+          decay_zero_apply, after_decay_zero
         );
         decay_zero_apply.add_assignment(lv_level, sustain);
-        decay_zero_apply.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, gate_on, zero_i),
-          decay_zero_sustain_apply,
-          decay_zero_release_apply
+        decay_zero_apply.end_with_conditional(gate_on != zero_i,
+          decay_zero_sustain_apply, decay_zero_release_apply
         );
         decay_zero_sustain_apply.add_assignment(lv_stage, c_stage_sustain);
         decay_zero_sustain_apply.end_with_jump(after_decay_zero);
@@ -934,69 +898,50 @@ class ADSR final : public GraphArgs
         decay_zero_release_apply.add_assignment(lv_release_start, lv_level);
         decay_zero_release_apply.end_with_jump(after_decay_zero);
 
-        after_decay_zero.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_sustain),
-          sustain_gate_check,
-          after_sustain_release
+        after_decay_zero.end_with_conditional(lv_stage == c_stage_sustain,
+          sustain_gate_check, after_sustain_release
         );
-        sustain_gate_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, gate_on, zero_i),
-          sustain_release_apply,
-          after_sustain_release
+        sustain_gate_check.end_with_conditional(gate_on == zero_i,
+          sustain_release_apply, after_sustain_release
         );
         sustain_release_apply.add_assignment(lv_stage, c_stage_release);
         sustain_release_apply.add_assignment(lv_release_start, lv_level);
         sustain_release_apply.end_with_jump(after_sustain_release);
 
-        after_sustain_release.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_release),
-          release_zero_time_check,
-          after_release_zero
+        after_sustain_release.end_with_conditional(lv_stage == c_stage_release,
+          release_zero_time_check, after_release_zero
         );
-        release_zero_time_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, release, zero_f),
-          release_zero_apply,
-          after_release_zero
+        release_zero_time_check.end_with_conditional(release <= zero_f,
+          release_zero_apply, after_release_zero
         );
         release_zero_apply.add_assignment(lv_level, zero_f);
         release_zero_apply.add_assignment(lv_stage, c_stage_idle);
         set_action_if_done(release_zero_apply, done_value);
         release_zero_apply.end_with_jump(after_release_zero);
 
-        after_release_zero.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_attack),
-          stage_attack_apply,
-          stage_decay_check
+        after_release_zero.end_with_conditional(lv_stage == c_stage_attack,
+          stage_attack_apply, stage_decay_check
         );
         stage_attack_apply.add_assignment(lv_level, lv_level + (one_f / (attack * sample_rate)));
-        stage_attack_apply.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_GE, lv_level, one_f),
-          stage_attack_finish,
-          sample_done
+        stage_attack_apply.end_with_conditional(lv_level >= one_f,
+          stage_attack_finish, sample_done
         );
         stage_attack_finish.add_assignment(lv_level, one_f);
         stage_attack_finish.add_assignment(lv_stage, c_stage_decay);
         stage_attack_finish.end_with_jump(sample_done);
 
-        stage_decay_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_decay),
-          stage_decay_apply,
-          stage_sustain_check
+        stage_decay_check.end_with_conditional(lv_stage == c_stage_decay,
+          stage_decay_apply, stage_sustain_check
         );
-        stage_decay_apply.add_assignment(
-          lv_level,
+        stage_decay_apply.add_assignment(lv_level,
           lv_level - ((one_f - sustain) / (decay * sample_rate))
         );
-        stage_decay_apply.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, lv_level, sustain),
-          stage_decay_finish,
-          sample_done
+        stage_decay_apply.end_with_conditional(lv_level <= sustain,
+          stage_decay_finish, sample_done
         );
         stage_decay_finish.add_assignment(lv_level, sustain);
-        stage_decay_finish.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_NE, gate_on, zero_i),
-          stage_decay_finish_sustain,
-          stage_decay_finish_release
+        stage_decay_finish.end_with_conditional(gate_on != zero_i,
+          stage_decay_finish_sustain, stage_decay_finish_release
         );
         stage_decay_finish_sustain.add_assignment(lv_stage, c_stage_sustain);
         stage_decay_finish_sustain.end_with_jump(sample_done);
@@ -1004,27 +949,20 @@ class ADSR final : public GraphArgs
         stage_decay_finish_release.add_assignment(lv_release_start, lv_level);
         stage_decay_finish_release.end_with_jump(sample_done);
 
-        stage_sustain_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_sustain),
-          stage_sustain_apply,
-          stage_release_check
+        stage_sustain_check.end_with_conditional(lv_stage == c_stage_sustain,
+          stage_sustain_apply, stage_release_check
         );
         stage_sustain_apply.add_assignment(lv_level, sustain);
         stage_sustain_apply.end_with_jump(sample_done);
 
-        stage_release_check.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_EQ, lv_stage, c_stage_release),
-          stage_release_apply,
-          stage_idle_apply
+        stage_release_check.end_with_conditional(lv_stage == c_stage_release,
+          stage_release_apply, stage_idle_apply
         );
-        stage_release_apply.add_assignment(
-          lv_level,
+        stage_release_apply.add_assignment( lv_level,
           lv_level - (lv_release_start / (release * sample_rate))
         );
-        stage_release_apply.end_with_conditional(
-          ctx.gcc.new_comparison(GCC_JIT_COMPARISON_LE, lv_level, zero_f),
-          stage_release_finish,
-          sample_done
+        stage_release_apply.end_with_conditional(lv_level <= zero_f,
+          stage_release_finish, sample_done
         );
         stage_release_finish.add_assignment(lv_level, zero_f);
         stage_release_finish.add_assignment(lv_stage, c_stage_idle);
