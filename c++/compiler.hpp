@@ -7,8 +7,10 @@
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <libgccjit++.h>
 #include <optional>
+#include <ranges>
 #include <span>
 #include <stdexcept>
 #include <unordered_map>
@@ -19,6 +21,25 @@
 #include <vector>
 
 namespace mc1 {
+
+struct transparent_string_hash {
+  using is_transparent = void;
+
+  size_t operator()(std::string_view value) const noexcept
+  {
+    return std::hash<std::string_view>{}(value);
+  }
+
+  size_t operator()(const std::string& value) const noexcept
+  {
+    return operator()(std::string_view{value});
+  }
+
+  size_t operator()(const char* value) const noexcept
+  {
+    return operator()(std::string_view{value});
+  }
+};
 
 class Result
 {
@@ -49,6 +70,13 @@ public:
       control_kind kind{control_kind::value};
     };
 
+    using controls_by_name_map = std::unordered_map<
+      std::string,
+      ControlSlot,
+      transparent_string_hash,
+      std::equal_to<>
+    >;
+
   private:
     std::shared_ptr<gcc_jit_result> owner_;
     init_fn_t init_{};
@@ -56,7 +84,7 @@ public:
     size_t state_size_{};
     std::vector<float> default_controls_;
     std::vector<ControlDesc> control_descs_;
-    std::unordered_map<std::string, ControlSlot> controls_by_name_;
+    controls_by_name_map controls_by_name_;
 
   public:
     CompiledSynth(
@@ -66,7 +94,7 @@ public:
       size_t state_size,
       std::vector<float> default_controls,
       std::vector<ControlDesc> control_descs,
-      std::unordered_map<std::string, ControlSlot> controls_by_name
+      controls_by_name_map controls_by_name
     )
     : owner_{std::move(owner)}
     , init_{init}
@@ -83,13 +111,14 @@ public:
     CompiledSynth& operator=(CompiledSynth&&) noexcept = default;
 
     bool has_control(std::string_view name) const
-    { return controls_by_name_.contains(std::string(name)); }
+    { return controls_by_name_.contains(name); }
 
     std::optional<ControlSlot> control_slot(std::string_view name) const
     {
-      auto it = controls_by_name_.find(std::string(name));
-      if (it == controls_by_name_.end()) return std::nullopt;
-      return it->second;
+      if (auto it = controls_by_name_.find(name); it != controls_by_name_.end()) {
+        return it->second;
+      }
+      return std::nullopt;
     }
 
     const std::vector<ControlDesc>& control_descs() const
@@ -184,7 +213,7 @@ public:
 
 private:
   std::shared_ptr<gcc_jit_result> r_;
-  std::unordered_map<std::string, CompiledSynth> compiled_synths_by_name_;
+  std::unordered_map<std::string, CompiledSynth, transparent_string_hash, std::equal_to<>> compiled_synths_by_name_;
 
 public:
   Result(gcc_jit_result *r, std::vector<SynthDescriptor> synths)
@@ -200,7 +229,7 @@ public:
       auto state_size_ptr = gcc_jit_result_get_global(r_.get(), state_size_name.c_str());
       auto state_size = state_size_ptr ? *reinterpret_cast<size_t const*>(state_size_ptr) : 0;
 
-      auto controls_by_name = std::unordered_map<std::string, CompiledSynth::ControlSlot>{};
+      auto controls_by_name = CompiledSynth::controls_by_name_map{};
       for (auto const &control : synth.control_descs) {
         controls_by_name.insert_or_assign(
           control.name,
@@ -235,11 +264,10 @@ public:
 
   CompiledSynth operator[](std::string_view name) const
   {
-    auto it = compiled_synths_by_name_.find(std::string(name));
-    if (it == compiled_synths_by_name_.end()) {
-      throw std::runtime_error("Synth not found");
+    if (auto it = compiled_synths_by_name_.find(name); it != compiled_synths_by_name_.end()) {
+      return it->second;
     }
-    return it->second;
+    throw std::runtime_error("Synth not found");
   }
 };
 
@@ -251,15 +279,12 @@ inline Result::Module Result::CompiledSynth::instantiate() const
     process_,
     state_size_,
     default_controls_,
-    [&]() {
-      auto trigger_control_indices = std::vector<size_t>{};
-      for (auto const& control : control_descs_) {
-        if (control.kind == control_kind::trigger) {
-          trigger_control_indices.push_back(control.index);
-        }
-      }
-      return trigger_control_indices;
-    }(),
+    control_descs_
+      | std::views::filter([](const ControlDesc& control) {
+          return control.kind == control_kind::trigger;
+        })
+      | std::views::transform(&ControlDesc::index)
+      | std::ranges::to<std::vector>(),
   };
 }
 

@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <algorithm>
+#include <expected>
 #include <initializer_list>
 #include <memory>
 #include <optional>
@@ -44,23 +45,6 @@ struct StateTypeBase
   virtual ~StateTypeBase() = default;
 };
 
-template<class> inline constexpr enum gcc_jit_types jit_type_v;
-template<> inline constexpr enum gcc_jit_types jit_type_v<void>   = GCC_JIT_TYPE_VOID;
-template<> inline constexpr enum gcc_jit_types jit_type_v<int>    = GCC_JIT_TYPE_INT;
-template<> inline constexpr enum gcc_jit_types jit_type_v<float>  = GCC_JIT_TYPE_FLOAT;
-template<> inline constexpr enum gcc_jit_types jit_type_v<size_t> = GCC_JIT_TYPE_SIZE_T;
-template<> inline constexpr enum gcc_jit_types jit_type_v<uint32_t> = GCC_JIT_TYPE_UNSIGNED_INT;
-
-gccjit::rvalue new_sizeof(gccjit::type type)
-{
-  auto context = type.get_context();
-  auto rv = gccjit::rvalue{
-    gcc_jit_context_new_sizeof(context.get_inner_context(), type.get_inner_type())
-  };
-  // sizeof(type) is of type int for some reason
-  return context.new_cast(rv, context.get_type(GCC_JIT_TYPE_SIZE_T));
-}
-
 struct Context
 {
   gccjit::context gcc;
@@ -76,7 +60,7 @@ struct Context
   Context(unsigned int sample_rate, size_t block_size, DAG const& graph)
   : gcc{gccjit::context::acquire()}
   , sample_rate{sample_rate}, block_size{block_size}, graph{graph}
-  , sinf{gccjit::make_tabled_function(gcc, "sinf_lookup", std::numbers::pi_v<float> * 2.0f, 256, std::sinf)}
+  , sinf{mlang::gccjit::make_tabled_function(gcc, "sinf_lookup", std::numbers::pi_v<float> * 2.0f, 256, std::sinf)}
   , kernelCache{}, stateCache{}
   {}
 
@@ -88,58 +72,12 @@ struct Context
   // Fancy helpers
   template<class T> gccjit::type type()
   {
-    using NoPtr = std::remove_pointer_t<T>;
-    using Base = std::remove_const_t<NoPtr>;
-
-    gccjit::type t = gcc.get_type(jit_type_v<Base>);
-
-    if constexpr (std::is_const_v<NoPtr>) t = t.get_const();
-    if constexpr (std::is_pointer_v<T>) t = t.get_pointer();
-
-    return t;
+    return mlang::gccjit::get_type<T>(gcc);
   }
 
   template<class T> gccjit::type type(int n)
   { return gcc.new_array_type(type<T>(), n); }
 
-  template<class Sig>
-  gccjit::function import_function(const char* name)
-  {
-    using traits = fn_traits<Sig>;
-    return import_function<Sig>(name, std::make_index_sequence<traits::nargs>{});
-  }
-
-private:
-  template<class> struct fn_traits;
-
-  template<class R, class... Args>
-  struct fn_traits<R(Args...)>
-  {
-    using return_t = R;
-    using args_t = std::tuple<Args...>;
-    static constexpr std::size_t nargs = sizeof...(Args);
-  };
-
-  template<class R, class... Args>
-  struct fn_traits<R(*)(Args...)> : fn_traits<R(Args...)> {};
-
-  template<class Sig, std::size_t... I>
-  gccjit::function import_function(const char* name, std::index_sequence<I...>)
-  {
-    using traits = fn_traits<Sig>;
-    using R = typename traits::return_t;
-    using Tup = typename traits::args_t;
-
-    auto params = std::vector{
-      gcc.new_param(type<std::tuple_element_t<I, Tup>>(), std::format("a{}", I))...
-    };
-
-    return gcc.new_function(GCC_JIT_FUNCTION_IMPORTED,
-      type<R>(), name, params, 0
-    );
-  }
-
-public:
   template<class T, class MakeFn>
   T& get_or_make_state(std::string const& key, MakeFn &&make_fn)
   {
@@ -224,12 +162,12 @@ public:
 
   gccjit::rvalue aligned_planar_channel_ptr(gccjit::rvalue buffer, size_t channel)
   {
-    return gccjit::assume_aligned(planar_channel_ptr(buffer, channel), int(audio_buffer_alignment));
+    return mlang::gccjit::assume_aligned(planar_channel_ptr(buffer, channel), int(audio_buffer_alignment));
   }
 
   gccjit::rvalue aligned_audio_bus_base_ptr(gccjit::rvalue abus)
   {
-    return gccjit::assume_aligned(abus, int(audio_buffer_alignment));
+    return mlang::gccjit::assume_aligned(abus, int(audio_buffer_alignment));
   }
 
   gccjit::rvalue audio_bus_ptr(gccjit::rvalue abus, gccjit::rvalue bus_index, size_t channel = 0)
@@ -1209,22 +1147,66 @@ class Registry
 {
   using nongraph_args_t = std::vector<size_t>;
   using graph_args_t = std::vector<CodegenNode*>;
-  using make_nongraph_fn = std::unique_ptr<CodegenNode>(Context &,std::string,std::string,size_t,size_t,nongraph_args_t);
-  using make_graph_fn = std::unique_ptr<CodegenNode>(Context &,std::string,std::string,size_t,size_t,graph_args_t);
+  using factory_args_t = std::variant<nongraph_args_t, graph_args_t>;
+  using make_fn = std::unique_ptr<CodegenNode>(*)(
+    Context &,
+    std::string,
+    std::string,
+    size_t,
+    size_t,
+    factory_args_t
+  );
 
-  std::unordered_map<std::string, std::variant<make_nongraph_fn*, make_graph_fn*>> maker;
+  struct factory_entry {
+    bool takes_nongraph_args;
+    make_fn make;
+  };
 
-  template<class T> static std::unique_ptr<CodegenNode> make_nongraph(
+  std::unordered_map<std::string, factory_entry, transparent_string_hash, std::equal_to<>> maker;
+
+  template<class T> static std::unique_ptr<CodegenNode> make_node(
     Context &ctx, std::string name, std::string sig, size_t vertex_index, size_t num_out,
-    nongraph_args_t args
+    factory_args_t args
   )
-  { return std::make_unique<T>(ctx, name, sig, vertex_index, num_out, std::move(args)); }
+  {
+    if constexpr (SpecialIndices<T>) {
+      return std::make_unique<T>(
+        ctx,
+        std::move(name),
+        std::move(sig),
+        vertex_index,
+        num_out,
+        std::get<nongraph_args_t>(std::move(args))
+      );
+    } else {
+      return std::make_unique<T>(
+        ctx,
+        std::move(name),
+        std::move(sig),
+        vertex_index,
+        num_out,
+        std::get<graph_args_t>(std::move(args))
+      );
+    }
+  }
 
-  template<class T> static std::unique_ptr<CodegenNode> make_graph(
-    Context &ctx, std::string name, std::string sig, size_t vertex_index, size_t num_out,
-    graph_args_t args
-  )
-  { return std::make_unique<T>(ctx, name, sig, vertex_index, num_out, std::move(args)); }
+  std::expected<const factory_entry *, std::string_view>
+  lookup(std::string_view name) const
+  {
+    if (auto it = maker.find(name); it != maker.end()) {
+      return std::addressof(it->second);
+    }
+    return std::unexpected(name);
+  }
+
+  const factory_entry& require(std::string_view name) const
+  {
+    auto entry = lookup(name);
+    if (!entry) {
+      throw std::runtime_error(std::format("Opcode '{}' not found", entry.error()));
+    }
+    return **entry;
+  }
 
 public:
   Registry()
@@ -1252,87 +1234,48 @@ public:
     nodes.reserve(g.ops.size());
 
     for (auto const &[i, vertex]: g.ops | std::views::enumerate) {
-      auto sig = compute_signature(g, i);
+      auto const& entry = require(vertex.name);
+      auto sig = compute_signature(g, i, entry.takes_nongraph_args);
 
-      if (is_nongraph_args(vertex.name)) {
-        nodes.push_back(create(ctx, vertex.name, sig, i, vertex.num_out, vertex.args));
-        continue;
-      }
+      auto args = entry.takes_nongraph_args
+        ? factory_args_t{vertex.args}
+        : factory_args_t{
+            vertex.args
+              | std::views::transform([&](size_t arg) {
+                  assert(arg < i);
+                  return nodes[arg].get();
+                })
+              | std::ranges::to<graph_args_t>()
+          };
 
-      std::vector<CodegenNode*> args;
-      for (auto arg : vertex.args) {
-        assert(arg < i);
-        args.push_back(nodes[arg].get());
-      }
-
-      nodes.push_back(create(ctx, vertex.name, sig, i, vertex.num_out, std::move(args)));
+      nodes.push_back(entry.make(ctx, vertex.name, std::move(sig), i, vertex.num_out, std::move(args)));
     }
 
     return nodes;
   }
 
-  bool is_nongraph_args(std::string const& name) const
-  {
-    auto it = maker.find(name);
-    if (it == maker.end())
-      throw std::runtime_error(std::format("Opcode '{}' not found", name));
-    return std::holds_alternative<make_nongraph_fn*>(it->second);
-  }
-
-  std::string compute_signature(const DAG &g, size_t i) const
+  std::string compute_signature(const DAG &g, size_t i, bool takes_nongraph_args) const
   {
     auto const &v = g.ops.at(i);
 
-    size_t n_in = is_nongraph_args(v.name) ? 0 : v.args.size();
-
-    std::string sig;
-    sig.reserve(n_in + 1);
-
-    for (size_t k = 0; k < n_in; k++) {
-      size_t arg_i = v.args.at(k);
-      sig.push_back(g.ops.at(arg_i).rate);
-    }
+    auto sig = v.args
+      | std::views::take(takes_nongraph_args ? 0 : v.args.size())
+      | std::views::transform([&](size_t arg_i) { return g.ops.at(arg_i).rate; })
+      | std::ranges::to<std::string>();
 
     sig.push_back(v.rate);
     return sig;
   }
 
-  std::unique_ptr<CodegenNode> create(
-    Context &ctx, std::string name, std::string sig, size_t vertex_index, size_t num_out,
-    nongraph_args_t args
-  ) const
-  {
-    auto iter = maker.find(name);
-    if (iter == maker.end()) throw std::runtime_error("Not found");
-
-    auto *fn = std::get<make_nongraph_fn *>(iter->second);
-    return fn(ctx, std::move(name), std::move(sig), vertex_index, num_out, std::move(args));
-  }
-
-  std::unique_ptr<CodegenNode> create(
-    Context &ctx, std::string name, std::string sig, size_t vertex_index, size_t num_out,
-    graph_args_t args
-  ) const
-  {
-    auto iter = maker.find(name);
-    if (iter == maker.end()) throw std::runtime_error("Not found");
-
-    auto *fn = std::get<make_graph_fn *>(iter->second);
-    return fn(ctx, std::move(name), std::move(sig), vertex_index, num_out, std::move(args));
-  }
-
-  template<SpecialIndices T> void emplace(std::string name)
-  {
-    auto iter = maker.find(name);
-    if (iter != maker.end()) throw std::runtime_error("name already used");
-    maker.emplace(std::move(name), &make_nongraph<T>);
-  }
-
   template<class T> void emplace(std::string name)
   {
-    auto iter = maker.find(name);
-    if (iter != maker.end()) throw std::runtime_error("name already used");
-    maker.emplace(std::move(name), &make_graph<T>);
+    if (maker.contains(name)) {
+      throw std::runtime_error("name already used");
+    }
+    maker.emplace(std::move(name), factory_entry{
+      .takes_nongraph_args = SpecialIndices<T>,
+      .make = &make_node<T>,
+    });
   }
 };
 
@@ -1412,7 +1355,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
   if (!state_struct) {
     state_size.set_initializer_rvalue(ctx.zero<size_t>());
   } else {
-    state_size.set_initializer_rvalue(new_sizeof(*state_struct));
+    state_size.set_initializer_rvalue(mlang::gccjit::new_sizeof(*state_struct));
   }
 
   auto control_descs = std::vector<Result::ControlDesc>{};

@@ -12,7 +12,6 @@
 - `uv run pytest -q`: run the full Python test suite.
 - `uv run pytest -q test/dsp_test.py`: run a focused test module during iteration.
 - `uv run python -m mc1`: start the interactive MiniCollider REPL.
-- `uv run python -m build` (optional): build wheel/sdist via scikit-build-core.
 
 ## Coding Style & Naming Conventions
 - Python: 4-space indentation, PEP 8 naming (`snake_case` for functions/modules, `CapWords` for classes), and explicit assertions in tests.

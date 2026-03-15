@@ -19,6 +19,18 @@ namespace mc1 {
 
 namespace {
 
+DAG parse_dag_or_throw(pybind11::bytes bytes_object)
+{
+  auto bytes = std::as_bytes(std::span(std::string_view(bytes_object)));
+  auto dag = DAG::parse(bytes);
+  if (!dag) {
+    throw pybind11::value_error(
+      std::string("invalid DAG bytes: ") + std::string(mlang::to_string(dag.error()))
+    );
+  }
+  return std::move(*dag);
+}
+
 uint32_t validate_positive_arg(long value, const char* name)
 {
   if (value <= 0) throw pybind11::value_error(std::string(name) + " must be > 0");
@@ -144,17 +156,13 @@ pybind11::list compiled_controls(
     long sample_rate = 44100,
     long block_size = 32)
 {
-  auto bytes = std::as_bytes(std::span(std::string_view(b)));
-  auto dag = DAG::parse(bytes);
-  if (!dag) {
-    throw pybind11::value_error("invalid DAG bytes");
-  }
+  auto dag = parse_dag_or_throw(b);
 
   auto result = compile(
-      *dag,
+      dag,
       validate_positive_arg(sample_rate, "sample_rate"),
       static_cast<size_t>(validate_positive_arg(block_size, "block_size")));
-  auto compiled_synth = result[dag->name];
+  auto compiled_synth = result[dag.name];
 
   pybind11::list descriptors;
   for (auto const& control : compiled_synth.control_descs()) {
@@ -175,19 +183,15 @@ pybind11::dict render_control_blocks(
     long block_size = 32,
     long output_channels = 2)
 {
-  auto bytes = std::as_bytes(std::span(std::string_view(b)));
-  auto dag = DAG::parse(bytes);
-  if (!dag) {
-    throw pybind11::value_error("invalid DAG bytes");
-  }
+  auto dag = parse_dag_or_throw(b);
 
   auto validated_block_size = static_cast<size_t>(validate_positive_arg(block_size, "block_size"));
   auto validated_output_channels = static_cast<size_t>(validate_positive_arg(output_channels, "output_channels"));
   auto result = compile(
-      *dag,
+      dag,
       validate_positive_arg(sample_rate, "sample_rate"),
       validated_block_size);
-  auto compiled_synth = result[dag->name];
+  auto compiled_synth = result[dag.name];
   auto module = compiled_synth.instantiate();
 
   aligned_float_buffer abus(validated_output_channels * validated_block_size);
@@ -219,20 +223,16 @@ pybind11::list render_blocks(
     long block_size = 32,
     long output_channels = 2)
 {
-  auto bytes = std::as_bytes(std::span(std::string_view(b)));
-  auto dag = DAG::parse(bytes);
-  if (!dag) {
-    throw pybind11::value_error("invalid DAG bytes");
-  }
+  auto dag = parse_dag_or_throw(b);
 
   auto validated_blocks = static_cast<size_t>(validate_positive_arg(blocks, "blocks"));
   auto validated_block_size = static_cast<size_t>(validate_positive_arg(block_size, "block_size"));
   auto validated_output_channels = static_cast<size_t>(validate_positive_arg(output_channels, "output_channels"));
   auto result = compile(
-      *dag,
+      dag,
       validate_positive_arg(sample_rate, "sample_rate"),
       validated_block_size);
-  auto compiled_synth = result[dag->name];
+  auto compiled_synth = result[dag.name];
   auto module = compiled_synth.instantiate();
 
   aligned_float_buffer abus(validated_output_channels * validated_block_size);
@@ -267,23 +267,19 @@ pybind11::list runtime_module_ids_per_block(
     long block_size = 32,
     long output_channels = 2)
 {
-  auto bytes = std::as_bytes(std::span(std::string_view(b)));
-  auto dag = DAG::parse(bytes);
-  if (!dag) {
-    throw pybind11::value_error("invalid DAG bytes");
-  }
+  auto dag = parse_dag_or_throw(b);
 
   auto validated_sample_rate = validate_positive_arg(sample_rate, "sample_rate");
   auto validated_block_size = static_cast<size_t>(validate_positive_arg(block_size, "block_size"));
   auto validated_output_channels = validate_positive_arg(output_channels, "output_channels");
-  auto result = compile(*dag, validated_sample_rate, validated_block_size);
-  auto compiled_synth = result[dag->name];
+  auto result = compile(dag, validated_sample_rate, validated_block_size);
+  auto compiled_synth = result[dag.name];
 
   runtime rt(validated_sample_rate, validated_block_size, 0, validated_output_channels);
 
   auto instance = std::make_unique<module_instance>(module_instance{
     .module_id = 1,
-    .synth_name = dag->name,
+    .synth_name = dag.name,
     .compiled_synth = compiled_synth,
     .module = compiled_synth.instantiate(),
   });

@@ -92,12 +92,9 @@ std::vector<uint32_t> runtime::module_ids()
 {
   drain_commands();
 
-  std::vector<uint32_t> ids;
-  ids.reserve(modules_.size());
-  for (auto* module : modules_) {
-    ids.push_back(module->module_id);
-  }
-  return ids;
+  return modules_
+    | std::views::transform([](module_instance* module) { return module->module_id; })
+    | std::ranges::to<std::vector>();
 }
 
 module_instance* runtime::find_module(uint32_t module_id) noexcept

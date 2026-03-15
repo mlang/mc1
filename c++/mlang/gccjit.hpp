@@ -1,16 +1,26 @@
 #pragma once
 
+#include <algorithm>
+#include <cassert>
+#include <cstddef>
+#include <iterator>
 #include <memory>
+#include <optional>
+#include <ranges>
+#include <string>
+#include <type_traits>
+#include <utility>
+#include <vector>
+
 #include <libgccjit++.h>
 
-#include <cassert>
 #include "views.hpp"
 
-namespace gccjit {
+namespace mlang::gccjit {
 
-rvalue assume_aligned(rvalue ptr, int alignment)
+inline ::gccjit::rvalue assume_aligned(::gccjit::rvalue ptr, int alignment)
 {
-  context gcc = ptr.get_context();
+  ::gccjit::context gcc = ptr.get_context();
   return gcc.new_cast(
     gcc.get_builtin_function("__builtin_assume_aligned")(
       gcc.new_cast(ptr, gcc.get_type(GCC_JIT_TYPE_VOID).get_pointer()),
@@ -20,64 +30,93 @@ rvalue assume_aligned(rvalue ptr, int alignment)
   );
 }
 
-type new_function_ptr_type (
-  type return_type, std::vector<type> &args, int is_variadic = 0,
-  location loc = location()
+inline ::gccjit::type new_function_ptr_type(
+  ::gccjit::type return_type,
+  std::vector<::gccjit::type> &args,
+  int is_variadic = 0,
+  ::gccjit::location loc = ::gccjit::location()
 )
 {
-  context gcc = return_type.get_context();
+  ::gccjit::context gcc = return_type.get_context();
   return gcc_jit_context_new_function_ptr_type(
-    gcc.get_inner_context (),
-    loc.get_inner_location (),
-    return_type.get_inner_type (),
-    args.size (), reinterpret_cast<gcc_jit_type **> (args.data()),
+    gcc.get_inner_context(),
+    loc.get_inner_location(),
+    return_type.get_inner_type(),
+    args.size(), reinterpret_cast<gcc_jit_type **>(args.data()),
     is_variadic
   );
 }
 
-rvalue new_call_through_ptr (
-  rvalue fn_ptr, std::vector<rvalue> &args, location loc = location()
+inline ::gccjit::rvalue new_call_through_ptr(
+  ::gccjit::rvalue fn_ptr,
+  std::vector<::gccjit::rvalue> &args,
+  ::gccjit::location loc = ::gccjit::location()
 )
 {
-  context gcc = fn_ptr.get_context();
+  ::gccjit::context gcc = fn_ptr.get_context();
   return gcc_jit_context_new_call_through_ptr(
-    gcc.get_inner_context (),
-    loc.get_inner_location (),
-    fn_ptr.get_inner_rvalue (),
-    args.size(), reinterpret_cast<gcc_jit_rvalue **> (args.data())
+    gcc.get_inner_context(),
+    loc.get_inner_location(),
+    fn_ptr.get_inner_rvalue(),
+    args.size(), reinterpret_cast<gcc_jit_rvalue **>(args.data())
   );
 }
 
 template<typename T>
-inline constexpr std::optional<gcc_jit_types> type_v = std::nullopt;
-#define TYPE_V(type, TYPE) template<>         \
+inline constexpr std::optional<gcc_jit_types> builtin_type_v = std::nullopt;
+
+#define BUILTIN_TYPE(type, TYPE) template<>   \
 inline constexpr std::optional<gcc_jit_types> \
-type_v<type> = GCC_JIT_TYPE_##TYPE;
+builtin_type_v<type> = GCC_JIT_TYPE_##TYPE;
 
-TYPE_V(void, VOID)
-TYPE_V(void *, VOID_PTR)
-TYPE_V(bool, BOOL)
-TYPE_V(short, SHORT)
-TYPE_V(unsigned short, UNSIGNED_SHORT)
-TYPE_V(int, INT)
-TYPE_V(unsigned int, UNSIGNED_INT)
-TYPE_V(float, FLOAT)
-TYPE_V(double, DOUBLE)
-TYPE_V(long double, LONG_DOUBLE)
-TYPE_V(const char *, CONST_CHAR_PTR)
-TYPE_V(size_t, SIZE_T)
+BUILTIN_TYPE(void, VOID)
+BUILTIN_TYPE(void *, VOID_PTR)
+BUILTIN_TYPE(bool, BOOL)
+BUILTIN_TYPE(char, CHAR)
+BUILTIN_TYPE(short, SHORT)
+BUILTIN_TYPE(unsigned short, UNSIGNED_SHORT)
+BUILTIN_TYPE(int, INT)
+BUILTIN_TYPE(unsigned int, UNSIGNED_INT)
+BUILTIN_TYPE(float, FLOAT)
+BUILTIN_TYPE(double, DOUBLE)
+BUILTIN_TYPE(long double, LONG_DOUBLE)
+BUILTIN_TYPE(const char *, CONST_CHAR_PTR)
+BUILTIN_TYPE(size_t, SIZE_T)
 
-#undef TYPE_V
+#undef BUILTIN_TYPE
 
 template<typename T>
-type get_type(context gcc)
+::gccjit::type get_type(::gccjit::context gcc)
 {
-  static_assert(type_v<T>, "No type defined");
-  return gcc.get_type(type_v<T>.value());
+  if constexpr (builtin_type_v<T>.has_value()) {
+    return gcc.get_type(*builtin_type_v<T>);
+  } else {
+    using no_ptr_t = std::remove_pointer_t<T>;
+    using base_t = std::remove_const_t<no_ptr_t>;
+
+    static_assert(!std::is_same_v<T, base_t>, "No type defined");
+
+    auto type = get_type<base_t>(gcc);
+    if constexpr (std::is_const_v<no_ptr_t>) type = type.get_const();
+    if constexpr (std::is_pointer_v<T>) type = type.get_pointer();
+    return type;
+  }
 }
 
-std::shared_ptr<gcc_jit_result> compile_shared(context gcc)
-{ return { gcc.compile(), &gcc_jit_result_release }; }
+inline ::gccjit::rvalue new_sizeof(::gccjit::type type)
+{
+  auto context = type.get_context();
+  auto rv = ::gccjit::rvalue{
+    gcc_jit_context_new_sizeof(context.get_inner_context(), type.get_inner_type())
+  };
+  // libgccjit reports sizeof as int; normalize it to size_t for callers.
+  return context.new_cast(rv, get_type<size_t>(context));
+}
+
+inline std::shared_ptr<gcc_jit_result> compile_shared(::gccjit::context gcc)
+{
+  return {gcc.compile(), &gcc_jit_result_release};
+}
 
 template<typename Signature>
 std::shared_ptr<Signature>
@@ -86,19 +125,19 @@ get_code(std::shared_ptr<gcc_jit_result> result, const char *name)
   auto const ptr = reinterpret_cast<Signature *>(
     gcc_jit_result_get_code(result.get(), name)
   );
-  return { std::move(result), ptr };
+  return {std::move(result), ptr};
 }
 
 template<typename T>
-function
-make_tabled_function(context gcc, std::string name, T period, size_t n, T(*f)(T))
+::gccjit::function
+make_tabled_function(::gccjit::context gcc, std::string name, T period, size_t n, T(*f)(T))
 {
   auto fp_type = get_type<T>(gcc);
   assert(n > 0);
   auto array_type = gcc.new_array_type(fp_type.get_const(), n + 1);
   auto table = gcc.new_global(GCC_JIT_GLOBAL_INTERNAL, array_type, name + "__table");
   { // Initialize the table
-    std::vector<gccjit::rvalue> init;
+    std::vector<::gccjit::rvalue> init;
     init.reserve(n + 1);
     std::ranges::copy
     ( mlang::views::sampled_interval(period, n)
@@ -129,7 +168,7 @@ make_tabled_function(context gcc, std::string name, T period, size_t n, T(*f)(T)
   block.add_assignment_op(x, GCC_JIT_BINARY_OP_MULT,
     gcc.new_rvalue(fp_type, static_cast<T>(n) / period)
   );
-  block.add_assignment(i, gcc.new_cast(x, i.get_type())); 
+  block.add_assignment(i, gcc.new_cast(x, i.get_type()));
   block.add_assignment(a, table_a[i]);
   block.add_assignment(b, table_b[i]);
   block.end_with_return(

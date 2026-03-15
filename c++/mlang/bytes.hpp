@@ -3,52 +3,81 @@
 #pragma once
 
 #include <cstring>
-#include <optional>
+#include <expected>
 #include <span>
 #include <string>
+#include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace mlang {
+
+enum class parse_error {
+  truncated,
+  invalid_data,
+};
+
+inline constexpr std::string_view to_string(parse_error error) noexcept
+{
+  switch (error) {
+  case parse_error::truncated:
+    return "truncated";
+  case parse_error::invalid_data:
+    return "invalid data";
+  }
+  return "unknown";
+}
 
 template<typename T>
 concept TriviallyCopyable = std::is_trivially_copyable_v<T>;
 
 template<TriviallyCopyable T>
-std::optional<T> get_value(std::span<const std::byte> &span)
+std::expected<std::remove_const_t<T>, parse_error>
+get_value(std::span<const std::byte> &span)
 {
-  if (sizeof(T) > span.size()) return std::nullopt;
+  if (sizeof(T) > span.size()) {
+    return std::unexpected(parse_error::truncated);
+  }
 
-  std::optional<std::remove_const_t<T>> result{std::in_place};
-  std::memcpy(std::addressof(result.value()), span.data(), sizeof(T));
+  auto result = std::remove_const_t<T>{};
+  std::memcpy(std::addressof(result), span.data(), sizeof(T));
   span = span.subspan(sizeof(T));
 
   return result;
 }
 
 template<TriviallyCopyable T>
-std::optional<std::vector<T>> get_values(std::span<const std::byte> &span, size_t n)
+std::expected<std::vector<std::remove_const_t<T>>, parse_error>
+get_values(std::span<const std::byte> &span, size_t n)
 {
   const auto size = sizeof(T) * n;
-  if (size > span.size()) return std::nullopt;
+  if (size > span.size()) {
+    return std::unexpected(parse_error::truncated);
+  }
 
-  std::optional<std::vector<std::remove_const_t<T>>> result(std::in_place, n);
-  std::memcpy(result->data(), span.data(), size);
+  auto result = std::vector<std::remove_const_t<T>>(n);
+  std::memcpy(result.data(), span.data(), size);
   span = span.subspan(size);
 
   return result;
 }
 
-inline std::optional<std::string>
+inline std::expected<std::string, parse_error>
 get_pstring(std::span<const std::byte> &span)
 {
-  auto const size = get_value<const unsigned char>(span);
-  if (!size || size.value() > span.size()) return std::nullopt;
+  auto size = get_value<unsigned char>(span);
+  if (!size) {
+    return std::unexpected(size.error());
+  }
+  if (*size > span.size()) {
+    return std::unexpected(parse_error::truncated);
+  }
 
-  std::optional<std::string> result(std::in_place,
-    std::string::size_type(size.value()), std::string::value_type(0)
+  auto result = std::string(
+    std::string::size_type(*size), std::string::value_type(0)
   );
-  std::memcpy(result->data(), span.data(), size.value());
-  span = span.subspan(size.value());
+  std::memcpy(result.data(), span.data(), *size);
+  span = span.subspan(*size);
 
   return result;
 }

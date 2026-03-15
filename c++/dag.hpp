@@ -1,9 +1,10 @@
 #pragma once
 
+#include "mlang/bytes.hpp"
+
 #include <iostream>
 #include <cstdint>
 #include <memory>
-#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -33,11 +34,11 @@ struct DAG final {
     size_t num_out;
     std::vector<size_t> args;
 
-    static std::optional<op> parse(std::span<const std::byte>&);
+    static std::expected<op, mlang::parse_error> parse(std::span<const std::byte>&);
   };
   std::vector<op> ops;
 
-  static std::optional<DAG> parse(std::span<const std::byte>&);
+  static std::expected<DAG, mlang::parse_error> parse(std::span<const std::byte>&);
 };
 
 std::ostream& operator<<(std::ostream&, const DAG&);

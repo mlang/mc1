@@ -8,74 +8,152 @@ using mlang::get_value;
 using mlang::get_values;
 using mlang::get_pstring;
 
-std::optional<DAG::op> DAG::op::parse(std::span<const std::byte> &bytes)
+namespace {
+
+std::expected<control_kind, mlang::parse_error>
+parse_control_kind(std::span<const std::byte> &bytes)
 {
-  if (auto name = get_pstring(bytes)) {
-    if (auto rate = get_value<char>(bytes)) {
-      if (auto num_out = get_value<size_t>(bytes)) {
-        if (auto nargs = get_value<size_t>(bytes)) {
-          if (auto args = get_values<size_t>(bytes, nargs.value())) {
-            return op{
-              std::move(name.value()),
-              rate.value(), num_out.value(), std::move(args.value())
-            };
-          }
-        }
-      }
-    }
+  auto kind = get_value<uint8_t>(bytes);
+  if (!kind) {
+    return std::unexpected(kind.error());
   }
-  return std::nullopt;
+
+  switch (*kind) {
+  case static_cast<uint8_t>(control_kind::value):
+    return control_kind::value;
+  case static_cast<uint8_t>(control_kind::trigger):
+    return control_kind::trigger;
+  default:
+    return std::unexpected(mlang::parse_error::invalid_data);
+  }
 }
 
-std::optional<DAG> DAG::parse(std::span<const std::byte> &bytes)
+template<class T, class Parser>
+std::expected<std::vector<T>, mlang::parse_error>
+parse_n(std::span<const std::byte> &bytes, size_t count, Parser &&parser)
 {
-  if (auto name = get_pstring(bytes)) {
-    if (auto n = get_value<const size_t>(bytes)) {
-      if (auto consts = get_values<float>(bytes, n.value())) {
-        if (auto nctrlvals = get_value<const size_t>(bytes)) {
-          if (auto ctrlvals = get_values<float>(bytes, nctrlvals.value())) {
-            if (auto nctrlnames = get_value<const size_t>(bytes)) {
-              std::vector<DAG::ControlName> controlNames;
-              controlNames.reserve(nctrlnames.value());
-              for (int i = 0; i != nctrlnames.value(); i++) {
-                auto controlName = get_pstring(bytes);
-                if (!controlName) return std::nullopt;
-                auto controlIndex = get_value<const size_t>(bytes);
-                if (!controlIndex) return std::nullopt;
-                auto controlKind = get_value<const uint8_t>(bytes);
-                if (!controlKind) return std::nullopt;
-
-                controlNames.push_back({
-                  std::move(controlName.value()),
-                  controlIndex.value(),
-                  static_cast<control_kind>(controlKind.value())
-                });
-              }
-
-              if (auto nops = get_value<const size_t>(bytes)) {
-                std::vector<op> ops;
-                ops.reserve(nops.value());
-                for (int i = 0; i != nops.value(); i++) {
-                  auto op = op::parse(bytes);
-                  if (!op) return std::nullopt;
-                  ops.emplace_back(std::move(op.value()));
-                }
-
-                return DAG{
-                  std::move(name.value()),
-                  std::move(consts.value()),
-                  std::move(ctrlvals.value()),
-                  std::move(controlNames),
-                  std::move(ops)
-                };
-              }
-            }
-          }
-        }
-      }
+  auto values = std::vector<T>{};
+  values.reserve(count);
+  for (size_t i = 0; i < count; ++i) {
+    auto value = parser(bytes);
+    if (!value) {
+      return std::unexpected(value.error());
     }
+    values.push_back(std::move(*value));
   }
-  return std::nullopt;
+  return values;
+}
+
+} // namespace
+
+std::expected<DAG::op, mlang::parse_error> DAG::op::parse(std::span<const std::byte> &bytes)
+{
+  auto name = get_pstring(bytes);
+  if (!name) {
+    return std::unexpected(name.error());
+  }
+
+  auto rate = get_value<char>(bytes);
+  if (!rate) {
+    return std::unexpected(rate.error());
+  }
+
+  auto num_out = get_value<size_t>(bytes);
+  if (!num_out) {
+    return std::unexpected(num_out.error());
+  }
+
+  auto nargs = get_value<size_t>(bytes);
+  if (!nargs) {
+    return std::unexpected(nargs.error());
+  }
+
+  auto args = get_values<size_t>(bytes, *nargs);
+  if (!args) {
+    return std::unexpected(args.error());
+  }
+
+  return op{
+    std::move(*name),
+    *rate,
+    *num_out,
+    std::move(*args),
+  };
+}
+
+std::expected<DAG, mlang::parse_error> DAG::parse(std::span<const std::byte> &bytes)
+{
+  auto name = get_pstring(bytes);
+  if (!name) {
+    return std::unexpected(name.error());
+  }
+
+  auto nconsts = get_value<size_t>(bytes);
+  if (!nconsts) {
+    return std::unexpected(nconsts.error());
+  }
+  auto consts = get_values<float>(bytes, *nconsts);
+  if (!consts) {
+    return std::unexpected(consts.error());
+  }
+
+  auto nctrlvals = get_value<size_t>(bytes);
+  if (!nctrlvals) {
+    return std::unexpected(nctrlvals.error());
+  }
+  auto ctrlvals = get_values<float>(bytes, *nctrlvals);
+  if (!ctrlvals) {
+    return std::unexpected(ctrlvals.error());
+  }
+
+  auto nctrlnames = get_value<size_t>(bytes);
+  if (!nctrlnames) {
+    return std::unexpected(nctrlnames.error());
+  }
+  auto control_names = parse_n<ControlName>(bytes, *nctrlnames,
+    [](std::span<const std::byte> &bytes) -> std::expected<ControlName, mlang::parse_error>
+    {
+      auto control_name = get_pstring(bytes);
+      if (!control_name) {
+        return std::unexpected(control_name.error());
+      }
+
+      auto control_index = get_value<size_t>(bytes);
+      if (!control_index) {
+        return std::unexpected(control_index.error());
+      }
+
+      auto control_kind = parse_control_kind(bytes);
+      if (!control_kind) {
+        return std::unexpected(control_kind.error());
+      }
+
+      return ControlName{
+        std::move(*control_name),
+        *control_index,
+        *control_kind,
+      };
+    });
+  if (!control_names) {
+    return std::unexpected(control_names.error());
+  }
+
+  auto nops = get_value<size_t>(bytes);
+  if (!nops) {
+    return std::unexpected(nops.error());
+  }
+  auto ops = parse_n<op>(bytes, *nops, &op::parse);
+  if (!ops) {
+    return std::unexpected(ops.error());
+  }
+
+  return DAG{
+    std::move(*name),
+    std::move(*consts),
+    std::move(*ctrlvals),
+    std::move(*control_names),
+    std::move(*ops),
+  };
 }
 
 std::ostream& operator<<(std::ostream& os, const DAG& d)

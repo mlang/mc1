@@ -25,6 +25,18 @@ namespace mc1 {
 
 namespace {
 
+DAG parse_dag_or_throw(pybind11::bytes bytes_object)
+{
+  auto bytes = std::as_bytes(std::span(std::string_view(bytes_object)));
+  auto dag = DAG::parse(bytes);
+  if (!dag) {
+    throw pybind11::value_error(
+      std::string("invalid DAG bytes: ") + std::string(mlang::to_string(dag.error()))
+    );
+  }
+  return std::move(*dag);
+}
+
 uint32_t validate_positive_arg(long value, const char* name)
 {
   if (value <= 0) throw pybind11::value_error(std::string(name) + " must be > 0");
@@ -47,13 +59,12 @@ uint32_t validate_non_negative_arg(long value, const char* name)
 
 double perft(pybind11::bytes b)
 {
-  auto bytes = std::as_bytes(std::span(std::string_view(b)));
-  auto dag = DAG::parse(bytes);
+  auto dag = parse_dag_or_throw(b);
   constexpr unsigned int SR = 44100;
   constexpr size_t BS = 32;
 
-  auto r = compile(*dag, SR, BS);
-  auto compiled_synth = r[dag->name];
+  auto r = compile(dag, SR, BS);
+  auto compiled_synth = r[dag.name];
   auto module = compiled_synth.instantiate();
 
   // Two-channel audiobus: channel-major layout [ch0 block][ch1 block]
@@ -279,16 +290,12 @@ public:
   {
     reap_retired_modules();
 
-    auto bytes = std::as_bytes(std::span(std::string_view(b)));
-    auto dag = DAG::parse(bytes);
-    if (!dag) {
-      throw pybind11::value_error("invalid DAG bytes");
-    }
+    auto dag = parse_dag_or_throw(b);
 
     try {
-      auto result = compile(*dag, sample_rate_, block_size_);
-      auto compiled_synth = result[dag->name];
-      compiled_synths_by_name_.insert_or_assign(dag->name, std::move(compiled_synth));
+      auto result = compile(dag, sample_rate_, block_size_);
+      auto compiled_synth = result[dag.name];
+      compiled_synths_by_name_.insert_or_assign(dag.name, std::move(compiled_synth));
     } catch (const pybind11::error_already_set&) {
       throw;
     } catch (const std::exception& ex) {
