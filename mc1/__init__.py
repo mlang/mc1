@@ -48,17 +48,10 @@ __all__ = (
     "Pan",
     "SinOsc",
     "Trigger",
-    "compile",
     "default",
     "drone",
     "perft",
 )
-
-def compile(func):
-    dag = DAG(func)
-    dsp.compile(bytes(dag))
-    return dag
-
 
 def default(
     freq=440,
