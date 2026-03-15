@@ -654,6 +654,96 @@ public:
   }
 };
 
+class CmpOp final : public GraphArgs
+{
+  enum gcc_jit_comparison op_kind;
+  std::optional<gccjit::function> kernel;
+
+  static enum gcc_jit_comparison kind_from_name(std::string const& opcode_name)
+  {
+    if (opcode_name == "LT") return GCC_JIT_COMPARISON_LT;
+    if (opcode_name == "LE") return GCC_JIT_COMPARISON_LE;
+    if (opcode_name == "GT") return GCC_JIT_COMPARISON_GT;
+    if (opcode_name == "GE") return GCC_JIT_COMPARISON_GE;
+    if (opcode_name == "EQ") return GCC_JIT_COMPARISON_EQ;
+    if (opcode_name == "NE") return GCC_JIT_COMPARISON_NE;
+    throw std::runtime_error("unknown cmp opcode: " + opcode_name);
+  }
+
+  static bool is_sig_supported(std::string const& s)
+  {
+    return s == "aaa" || s == "aba" || s == "baa" || s == "bbb";
+  }
+
+  gccjit::rvalue comparison_value(gccjit::rvalue lhs, gccjit::rvalue rhs) const
+  {
+    auto compared = ctx.gcc.new_comparison(op_kind, lhs, rhs);
+    return ctx.new_float(-1.0f) + (ctx.new_float(2.0f) * ctx.float_from_bool(compared));
+  }
+
+  std::optional<gccjit::function> make_kernel() const override
+  {
+    if (sig == "bbb") return std::nullopt;
+
+    gccjit::param p_r = ctx.gcc.new_param(ctx.restrict_float_ptr_type(), "r");
+    gccjit::param p_a = args[0]->new_param("a");
+    gccjit::param p_b = args[1]->new_param("b");
+
+    auto kernel = new_kernel({p_r, p_a, p_b});
+    {
+      auto entry = kernel.new_block("entry");
+      ctx.loop(kernel, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i) {
+        auto lv_r_i = p_r[lv_i];
+        auto ra = sample_arg(0, p_a, lv_i);
+        auto rb = sample_arg(1, p_b, lv_i);
+
+        body.add_assignment(lv_r_i, comparison_value(ra, rb));
+        body.end_with_jump(cont);
+      }).end_with_return();
+    }
+
+    return kernel;
+  }
+
+public:
+  CmpOp(
+    Context &ctx, std::string name, std::string sig, size_t vertex_index, size_t num_out,
+    std::vector<CodegenNode*> args
+  )
+  : GraphArgs{ctx, std::move(name), std::move(sig), vertex_index, num_out, std::move(args)}
+  , op_kind{kind_from_name(this->name)}
+  , kernel{get_or_make_kernel()}
+  {
+    assert(output_count() == 1);
+    assert(this->args.size() == 2);
+    assert(this->args[0]->output_count() == 1);
+    assert(this->args[1]->output_count() == 1);
+  }
+
+  void emit_proc(
+    gccjit::function f,
+    gccjit::block b,
+    std::optional<gccjit::lvalue>,
+    std::optional<gccjit::lvalue>
+  ) override
+  {
+    assert(args.size() == 2);
+    assert(sig.size() == 3);
+    assert(is_sig_supported(sig));
+
+    if (sig == "bbb") {
+      assert(rate() == 'b');
+      rvalue = new_proc_local(f, b, comparison_value(args[0]->get_rvalue(), args[1]->get_rvalue()));
+      return;
+    }
+
+    assert(rate() == 'a');
+    assert(kernel);
+
+    rvalue = new_proc_local(f, b, *kernel);
+  }
+};
+
 class SinOsc final : public GraphArgs
 {
   struct StateType final : StateTypeBase
@@ -1223,6 +1313,12 @@ public:
     emplace<BinOp>("Add");
     emplace<BinOp>("Sub");
     emplace<BinOp>("Div");
+    emplace<CmpOp>("LT");
+    emplace<CmpOp>("LE");
+    emplace<CmpOp>("GT");
+    emplace<CmpOp>("GE");
+    emplace<CmpOp>("EQ");
+    emplace<CmpOp>("NE");
 
     emplace<Pan>("Pan");
   }

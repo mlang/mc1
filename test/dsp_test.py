@@ -136,6 +136,16 @@ def _adsr_env(gate=0, attack=0.25, decay=0.25, sustain=0.25, release=0.25, done_
     Out.ar(0, ADSR.ar(gate, attack, decay, sustain, release, done_action))
 
 
+@DAG
+def _block_comparison(level=0.0, threshold=0.5):
+    Out.ar(0, (SinOsc.ar(0) * 0) + (level > threshold))
+
+
+@DAG
+def _audio_comparison(freq=1.0):
+    Out.ar(0, SinOsc.ar(freq) < -0.5)
+
+
 def test_dsp_append_accepts_multi_width_control_sequence():
     dsp = DSP()
     dsp.compile(bytes(_multi_control))
@@ -428,6 +438,34 @@ def test_adsr_zero_times_and_done_action_fire_immediately():
     assert rendered["blocks"][0] == pytest.approx([0.4])
     assert rendered["blocks"][1] == pytest.approx([0.0])
     assert rendered["done_actions"] == [0, 1]
+
+
+def test_block_rate_comparison_renders_bipolar_mask():
+    rendered = mc1._test._render_control_blocks(
+        bytes(_block_comparison),
+        [
+            {"level": 0.25, "threshold": 0.5},
+            {"level": 0.75, "threshold": 0.5},
+        ],
+        sample_rate=8,
+        block_size=4,
+        output_channels=1,
+    )
+
+    assert rendered["blocks"][0] == pytest.approx([-1.0, -1.0, -1.0, -1.0])
+    assert rendered["blocks"][1] == pytest.approx([1.0, 1.0, 1.0, 1.0])
+
+
+def test_audio_rate_comparison_renders_bipolar_mask():
+    rendered = mc1._test._render_blocks(
+        bytes(_audio_comparison),
+        blocks=1,
+        sample_rate=8,
+        block_size=8,
+        output_channels=1,
+    )
+
+    assert rendered[0] == pytest.approx([-1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0])
 
 
 def test_adsr_done_action_removes_module_from_runtime():

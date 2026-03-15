@@ -45,6 +45,10 @@ class _Node:
     def __rmul__(self, other): return Mul(other, self)
     def __sub__(self, other):  return Sub(self, other)
     def __rsub__(self, other): return Sub(other, self)
+    def __lt__(self, other):  return LT(self, other)
+    def __le__(self, other):  return LE(self, other)
+    def __gt__(self, other):  return GT(self, other)
+    def __ge__(self, other):  return GE(self, other)
 
     def __bytes__(self):
         buf = io.BytesIO()
@@ -137,6 +141,21 @@ class Add(_BinOp): pass
 class Div(_BinOp): pass
 class Mul(_BinOp): pass
 class Sub(_BinOp): pass
+
+
+class _CmpOp(_GraphArgs):
+    def __init__(self, left, right):
+        left = _convert(left)
+        right = _convert(right)
+        super().__init__(fastest_rate(left, right), 1, left, right)
+
+
+class LT(_CmpOp): pass
+class LE(_CmpOp): pass
+class GT(_CmpOp): pass
+class GE(_CmpOp): pass
+class EQ(_CmpOp): pass
+class NE(_CmpOp): pass
 
 
 class SinOsc(_GraphArgs):

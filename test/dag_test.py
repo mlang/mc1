@@ -6,7 +6,7 @@ import operator
 import pytest
 
 from mc1 import DAG, Out, Pan, SinOsc
-from mc1.dag import Add, Mul, Rate
+from mc1.dag import Add, EQ, GE, GT, LE, LT, Mul, NE, Rate
 
 
 @pytest.fixture(autouse=True)
@@ -87,3 +87,43 @@ def test_reduce_can_fold_graph_nodes_with_operators():
 
     assert isinstance(folded, Mul)
     assert folded.rate is Rate.AUDIO
+
+
+def test_ordering_comparisons_build_graph_nodes():
+    signal = SinOsc.ar(220)
+
+    lt = signal < 0.25
+    le = signal <= 0.25
+    gt = signal > 0.25
+    ge = signal >= 0.25
+
+    assert isinstance(lt, LT)
+    assert isinstance(le, LE)
+    assert isinstance(gt, GT)
+    assert isinstance(ge, GE)
+    assert lt.rate is Rate.AUDIO
+    assert le.rate is Rate.AUDIO
+    assert gt.rate is Rate.AUDIO
+    assert ge.rate is Rate.AUDIO
+
+
+def test_internal_equality_comparison_nodes_preserve_fastest_rate():
+    signal = SinOsc.ar(220)
+
+    eq = EQ(signal, 0.0)
+    ne = NE(0.0, signal)
+
+    assert isinstance(eq, EQ)
+    assert isinstance(ne, NE)
+    assert eq.rate is Rate.AUDIO
+    assert ne.rate is Rate.AUDIO
+
+
+def test_python_equality_remains_identity_based_boolean():
+    signal = SinOsc.ar(220)
+    other = SinOsc.ar(220)
+
+    assert (signal == signal) is True
+    assert (signal == other) is False
+    assert (signal != signal) is False
+    assert (signal != other) is True
