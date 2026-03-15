@@ -51,6 +51,12 @@ def test_compile_adsr_uses_jit_kernel():
     assert "mc1_adsr_process" not in actual
 
 
+def test_compile_marks_abus_base_pointer_aligned():
+    actual = compile(default)
+
+    assert "__builtin_assume_aligned (abus, 64)" in actual
+
+
 if __name__ == "__main__":
     print("Regenerating golden output...")
     actual = compile(default)

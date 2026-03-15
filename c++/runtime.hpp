@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio_buffer.hpp"
 #include "compiler.hpp"
 #include "rt_command.hpp"
 #include "rt_queue.hpp"
@@ -59,7 +60,7 @@ private:
   size_t block_size_;
   uint32_t input_channels_;
   uint32_t output_channels_;
-  std::vector<float> abus_;
+  aligned_float_buffer abus_;
   rt_command_queue commands_;
   rt_retire_queue retired_modules_;
   boost::container::static_vector<module_instance*, max_modules> modules_{};

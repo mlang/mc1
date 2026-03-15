@@ -38,7 +38,7 @@ runtime::runtime(
 : block_size_{block_size}
 , input_channels_{input_channels}
 , output_channels_{output_channels}
-, abus_(static_cast<size_t>(input_channels + output_channels) * block_size, 0.0f)
+, abus_(static_cast<size_t>(input_channels + output_channels) * block_size)
 , audio_device_{std::make_unique<audio_device>(
       input_channels_,
       output_channels_,
@@ -174,7 +174,8 @@ void runtime::render_block(float* output, const float* input, size_t frame_offse
   const size_t input_channels = static_cast<size_t>(input_channels_);
   const size_t output_channels = static_cast<size_t>(output_channels_);
 
-  std::fill(abus_.begin(), abus_.end(), 0.0f);
+  assert(is_aligned(abus_.data(), audio_buffer_alignment));
+  abus_.fill(0.0f);
 
   if (input != nullptr) {
     for (size_t frame = 0; frame < block_size_; ++frame) {

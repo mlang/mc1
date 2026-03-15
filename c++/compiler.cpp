@@ -1,5 +1,7 @@
 #include "compiler.hpp"
 
+#include "audio_buffer.hpp"
+
 #include <numbers>
 
 #include "mlang/gccjit.hpp"
@@ -220,9 +222,25 @@ public:
     return planar_sample(buffer, zero<size_t>(), channel).get_address();
   }
 
-  gccjit::rvalue audio_bus_ptr(gccjit::param abus, gccjit::rvalue bus_index, size_t channel = 0)
+  gccjit::rvalue aligned_planar_channel_ptr(gccjit::rvalue buffer, size_t channel)
   {
-    return planar_sample(abus, bus_index * block_size_value(), channel).get_address();
+    return gccjit::assume_aligned(planar_channel_ptr(buffer, channel), int(audio_buffer_alignment));
+  }
+
+  gccjit::rvalue aligned_audio_bus_base_ptr(gccjit::rvalue abus)
+  {
+    return gccjit::assume_aligned(abus, int(audio_buffer_alignment));
+  }
+
+  gccjit::rvalue audio_bus_ptr(gccjit::rvalue abus, gccjit::rvalue bus_index, size_t channel = 0)
+  {
+    auto aligned_abus = aligned_audio_bus_base_ptr(abus);
+    return planar_sample(aligned_abus, bus_index * block_size_value(), channel).get_address();
+  }
+
+  gccjit::type restrict_float_ptr_type()
+  {
+    return type<float*>().get_restrict();
   }
 
   gccjit::rvalue sample_at(char rate, gccjit::param p_arg, gccjit::lvalue lv_i)
@@ -415,7 +433,7 @@ protected:
   {
     return f.new_local(
       rate() == 'a'
-        ? ctx.type<float>(int(ctx.block_size * output_count()))
+        ? ctx.type<float>(int(ctx.block_size * output_count())).get_aligned(audio_buffer_alignment)
         : ctx.type<float>(),
       std::format("e{}", vertex_index)
     );
@@ -436,7 +454,7 @@ protected:
     call_args.reserve(args.size() + extra_args.size() + (out ? 1 : 0) + (state_ptr ? 1 : 0));
 
     if (state_ptr) call_args.push_back(*state_ptr);
-    if (out) call_args.push_back(ctx.planar_channel_ptr(*out, 0));
+    if (out) call_args.push_back(ctx.aligned_planar_channel_ptr(*out, 0));
     for (auto *op : args) call_args.push_back(op->get_rvalue());
     for (auto arg : extra_args) call_args.push_back(arg);
 
@@ -468,7 +486,7 @@ protected:
     if (rate() == 'a') {
       b.add_eval(std::visit(maybe_call, v));
 
-      return ctx.planar_channel_ptr(var, 0);
+      return ctx.aligned_planar_channel_ptr(var, 0);
     }
 
     // assign scalar rvalue
@@ -634,7 +652,7 @@ class BinOp final : public GraphArgs
     if (sig == "bbb") return std::nullopt;
 
     // void f(float *r, <a>, <b>) where <a>/<b> are float or float* depending
-    gccjit::param p_r = ctx.gcc.new_param(ctx.type<float *>(), "r");
+    gccjit::param p_r = ctx.gcc.new_param(ctx.restrict_float_ptr_type(), "r");
     gccjit::param p_a = args[0]->new_param("a");
     gccjit::param p_b = args[1]->new_param("b");
 
@@ -728,7 +746,7 @@ class SinOsc final : public GraphArgs
     if (!is_sig_supported(sig)) return std::nullopt;
 
     auto t_state_ptr = ST.st.get_pointer();
-    auto t_float_ptr = ctx.type<float*>();
+    auto t_float_ptr = ctx.restrict_float_ptr_type();
 
     // void SinOsc_<sig>(State *st, float *out, <freq>, <phase>)
     auto p_st = ctx.gcc.new_param(t_state_ptr, "st");
@@ -856,7 +874,7 @@ class ADSR final : public GraphArgs
 
     auto t_state_ptr = ST.st.get_pointer();
     auto t_float = ctx.type<float>();
-    auto t_float_ptr = ctx.type<float*>();
+    auto t_float_ptr = ctx.restrict_float_ptr_type();
     auto t_int = ctx.type<int>();
     auto t_u32 = ctx.type<uint32_t>();
 
@@ -868,7 +886,7 @@ class ADSR final : public GraphArgs
     auto p_sustain = args[3]->new_param("sustain");
     auto p_release = args[4]->new_param("release");
     auto p_done_value = args[5]->new_param("done_action");
-    auto p_done_action_accum = ctx.gcc.new_param(ctx.type<uint32_t*>(), "done_action_accum");
+    auto p_done_action_accum = ctx.gcc.new_param(ctx.type<uint32_t*>().get_restrict(), "done_action_accum");
 
     auto k = new_kernel(
       {p_st, p_out, p_gate, p_attack, p_decay, p_sustain, p_release, p_done_value, p_done_action_accum}
@@ -1127,7 +1145,7 @@ class Pan final : public GraphArgs
     if (!is_sig_supported(sig)) return std::nullopt;
 
     // void Pan_<sig>(float *out, const float *in, <pan>)
-    auto p_out = ctx.gcc.new_param(ctx.type<float *>(), "out");
+    auto p_out = ctx.gcc.new_param(ctx.restrict_float_ptr_type(), "out");
     auto p_in  = args[0]->new_param("in");
     auto p_pan = args[1]->new_param("pan");
 
@@ -1354,7 +1372,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
   };
 
   auto init_args = std::vector{
-    ctx.gcc.new_param(t_void_ptr, "state"),
+    ctx.gcc.new_param(t_void_ptr.get_restrict(), "state"),
   };
   auto init = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
     t_void, ctx.graph_symbol("init"), init_args, 0
@@ -1370,9 +1388,9 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
 
   // uint32_t process(void *state, const float *controls, float *abus)
   auto process_args = std::vector{
-    ctx.gcc.new_param(t_void_ptr, "state"),
-    ctx.gcc.new_param(ctx.type<const float*>(), "controls"),
-    ctx.gcc.new_param(ctx.type<float*>(), "abus"),
+    ctx.gcc.new_param(t_void_ptr.get_restrict(), "state"),
+    ctx.gcc.new_param(ctx.type<const float*>().get_restrict(), "controls"),
+    ctx.gcc.new_param(ctx.type<float*>().get_restrict(), "abus"),
   };
   auto process = ctx.gcc.new_function(GCC_JIT_FUNCTION_EXPORTED,
     t_u32, ctx.graph_symbol("process"), process_args, 0

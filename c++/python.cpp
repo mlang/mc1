@@ -13,6 +13,7 @@
 #include <utility>
 #include <vector>
 
+#include "audio_buffer.hpp"
 #include "compiler.hpp"
 #include "dag.hpp"
 #include "runtime.hpp"
@@ -56,9 +57,10 @@ double perft(pybind11::bytes b)
   auto module = compiled_synth.instantiate();
 
   // Two-channel audiobus: channel-major layout [ch0 block][ch1 block]
-  std::vector<float> abus(2 * BS, 0.0f);
+  aligned_float_buffer abus(2 * BS);
 
   for (int iter = 0; iter < 10; ++iter) {
+    abus.fill(0.0f);
     module.process(abus.data());
 
     std::println("process call {}", iter);
@@ -75,6 +77,7 @@ double perft(pybind11::bytes b)
 
   auto t0 = std::chrono::steady_clock::now();
   for (size_t i = 0; i < nblocks; ++i) {
+    abus.fill(0.0f);
     module.process(abus.data());
   }
   auto t1 = std::chrono::steady_clock::now();

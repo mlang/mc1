@@ -7,6 +7,7 @@
 #include <string_view>
 #include <vector>
 
+#include "audio_buffer.hpp"
 #include "compiler.hpp"
 #include "dag.hpp"
 #include "runtime.hpp"
@@ -189,12 +190,12 @@ pybind11::dict render_control_blocks(
   auto compiled_synth = result[dag->name];
   auto module = compiled_synth.instantiate();
 
-  std::vector<float> abus(validated_output_channels * validated_block_size, 0.0f);
+  aligned_float_buffer abus(validated_output_channels * validated_block_size);
   pybind11::list rendered_blocks;
   pybind11::list done_actions;
   for (auto step : control_steps) {
     apply_controls(compiled_synth, module, step);
-    std::fill(abus.begin(), abus.end(), 0.0f);
+    abus.fill(0.0f);
     auto done_action = module.process(abus.data());
 
     pybind11::list rendered_block;
@@ -234,10 +235,10 @@ pybind11::list render_blocks(
   auto compiled_synth = result[dag->name];
   auto module = compiled_synth.instantiate();
 
-  std::vector<float> abus(validated_output_channels * validated_block_size, 0.0f);
+  aligned_float_buffer abus(validated_output_channels * validated_block_size);
   pybind11::list rendered_blocks;
   for (size_t i = 0; i < validated_blocks; ++i) {
-    std::fill(abus.begin(), abus.end(), 0.0f);
+    abus.fill(0.0f);
     module.process(abus.data());
 
     pybind11::list rendered_block;
@@ -247,6 +248,16 @@ pybind11::list render_blocks(
     rendered_blocks.append(std::move(rendered_block));
   }
   return rendered_blocks;
+}
+
+std::uintptr_t aligned_abus_modulo(
+    long block_size = 32,
+    long channels = 2)
+{
+  auto validated_block_size = static_cast<size_t>(validate_positive_arg(block_size, "block_size"));
+  auto validated_channels = static_cast<size_t>(validate_positive_arg(channels, "channels"));
+  aligned_float_buffer abus(validated_channels * validated_block_size);
+  return reinterpret_cast<std::uintptr_t>(abus.data()) % audio_buffer_alignment;
 }
 
 pybind11::list runtime_module_ids_per_block(
@@ -342,4 +353,7 @@ PYBIND11_MODULE(_test, m, py::mod_gil_not_used())
       py::arg("sample_rate") = 44100,
       py::arg("block_size") = 32,
       py::arg("output_channels") = 2);
+  m.def("_aligned_abus_modulo", &aligned_abus_modulo,
+      py::arg("block_size") = 32,
+      py::arg("channels") = 2);
 }

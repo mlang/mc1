@@ -1,7 +1,7 @@
 __attribute__((always_inline))
 float sinf_lookup (float x)
 {
-  float D.284;
+  float D.288;
   float b;
   float a;
   size_t i;
@@ -18,12 +18,12 @@ float sinf_lookup (float x)
   _5 = (float) i;
   _6 = x - _5;
   _7 = b - a;
-  D.284 = fmaf (_6, _7, a);
-  return D.284;
+  D.288 = fmaf (_6, _7, a);
+  return D.288;
 }
 
 
-void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack, float decay, float sustain, float release, float done_action, unsigned int * done_action_accum)
+void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, float attack, float decay, float sustain, float release, float done_action, unsigned int * restrict done_action_accum)
 {
   bool iftmp.0;
   float iftmp.1;
@@ -70,13 +70,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   cond:
   if (i <= 31) goto body; else goto done;
   body:
-  if (gate > 0.0) goto <D.286>; else goto <D.287>;
-  <D.286>:
+  if (gate > 0.0) goto <D.290>; else goto <D.291>;
+  <D.290>:
   iftmp.0 = 1;
-  goto <D.288>;
-  <D.287>:
+  goto <D.292>;
+  <D.291>:
   iftmp.0 = 0;
-  <D.288>:
+  <D.292>:
   if (iftmp.0 != 0) goto adsr_gate_on_check; else goto adsr_gate_fall_check;
   cont:
   i = i + 1;
@@ -103,13 +103,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_gate:
   if (stage == 1) goto adsr_attack_zero_time_check; else goto adsr_after_attack_zero;
   adsr_attack_zero_time_check:
-  if (attack < 0.0) goto <D.290>; else goto <D.291>;
-  <D.290>:
+  if (attack < 0.0) goto <D.294>; else goto <D.295>;
+  <D.294>:
   iftmp.1 = 1.0e+0;
-  goto <D.292>;
-  <D.291>:
+  goto <D.296>;
+  <D.295>:
   iftmp.1 = 0.0;
-  <D.292>:
+  <D.296>:
   _1 = 1.0e+0 - iftmp.1;
   _2 = attack * _1;
   if (_2 <= 0.0) goto adsr_attack_zero_apply; else goto adsr_after_attack_zero;
@@ -120,61 +120,61 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_attack_zero:
   if (stage == 2) goto adsr_decay_zero_time_check; else goto adsr_after_decay_zero;
   adsr_decay_zero_time_check:
-  if (decay < 0.0) goto <D.294>; else goto <D.295>;
-  <D.294>:
+  if (decay < 0.0) goto <D.298>; else goto <D.299>;
+  <D.298>:
   iftmp.2 = 1.0e+0;
-  goto <D.296>;
-  <D.295>:
+  goto <D.300>;
+  <D.299>:
   iftmp.2 = 0.0;
-  <D.296>:
+  <D.300>:
   _3 = 1.0e+0 - iftmp.2;
   _4 = decay * _3;
   if (_4 <= 0.0) goto adsr_decay_zero_apply; else goto adsr_after_decay_zero;
   adsr_decay_zero_apply:
-  if (sustain < 0.0) goto <D.298>; else goto <D.299>;
-  <D.298>:
-  iftmp.3 = 1.0e+0;
-  goto <D.300>;
-  <D.299>:
-  iftmp.3 = 0.0;
-  <D.300>:
-  _5 = 1.0e+0 - iftmp.3;
-  _6 = sustain * _5;
   if (sustain < 0.0) goto <D.302>; else goto <D.303>;
   <D.302>:
-  iftmp.4 = 1.0e+0;
+  iftmp.3 = 1.0e+0;
   goto <D.304>;
   <D.303>:
-  iftmp.4 = 0.0;
+  iftmp.3 = 0.0;
   <D.304>:
+  _5 = 1.0e+0 - iftmp.3;
+  _6 = sustain * _5;
+  if (sustain < 0.0) goto <D.306>; else goto <D.307>;
+  <D.306>:
+  iftmp.4 = 1.0e+0;
+  goto <D.308>;
+  <D.307>:
+  iftmp.4 = 0.0;
+  <D.308>:
   _7 = 1.0e+0 - iftmp.4;
   _8 = sustain * _7;
   _9 = 1.0e+0 - _8;
-  if (sustain < 0.0) goto <D.307>; else goto <D.308>;
-  <D.307>:
+  if (sustain < 0.0) goto <D.311>; else goto <D.312>;
+  <D.311>:
   iftmp.6 = 1.0e+0;
-  goto <D.309>;
-  <D.308>:
+  goto <D.313>;
+  <D.312>:
   iftmp.6 = 0.0;
-  <D.309>:
+  <D.313>:
   _10 = 1.0e+0 - iftmp.6;
   _11 = sustain * _10;
-  if (_11 > 1.0e+0) goto <D.310>; else goto <D.311>;
-  <D.310>:
-  iftmp.5 = 1.0e+0;
-  goto <D.312>;
-  <D.311>:
-  iftmp.5 = 0.0;
-  <D.312>:
-  _12 = iftmp.5 * _9;
-  level = _6 + _12;
-  if (gate > 0.0) goto <D.314>; else goto <D.315>;
+  if (_11 > 1.0e+0) goto <D.314>; else goto <D.315>;
   <D.314>:
-  iftmp.7 = 1;
+  iftmp.5 = 1.0e+0;
   goto <D.316>;
   <D.315>:
-  iftmp.7 = 0;
+  iftmp.5 = 0.0;
   <D.316>:
+  _12 = iftmp.5 * _9;
+  level = _6 + _12;
+  if (gate > 0.0) goto <D.318>; else goto <D.319>;
+  <D.318>:
+  iftmp.7 = 1;
+  goto <D.320>;
+  <D.319>:
+  iftmp.7 = 0;
+  <D.320>:
   if (iftmp.7 != 0) goto adsr_decay_zero_sustain_apply; else goto adsr_decay_zero_release_apply;
   adsr_decay_zero_sustain_apply:
   stage = 3;
@@ -198,13 +198,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_sustain_release:
   if (stage == 4) goto adsr_release_zero_time_check; else goto adsr_after_release_zero;
   adsr_release_zero_time_check:
-  if (release < 0.0) goto <D.318>; else goto <D.319>;
-  <D.318>:
+  if (release < 0.0) goto <D.322>; else goto <D.323>;
+  <D.322>:
   iftmp.8 = 1.0e+0;
-  goto <D.320>;
-  <D.319>:
+  goto <D.324>;
+  <D.323>:
   iftmp.8 = 0.0;
-  <D.320>:
+  <D.324>:
   _17 = 1.0e+0 - iftmp.8;
   _18 = release * _17;
   if (_18 <= 0.0) goto adsr_release_zero_apply; else goto adsr_after_release_zero;
@@ -220,13 +220,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_after_release_zero:
   if (stage == 1) goto adsr_stage_attack_apply; else goto adsr_stage_decay_check;
   adsr_stage_attack_apply:
-  if (attack < 0.0) goto <D.322>; else goto <D.323>;
-  <D.322>:
+  if (attack < 0.0) goto <D.326>; else goto <D.327>;
+  <D.326>:
   iftmp.9 = 1.0e+0;
-  goto <D.324>;
-  <D.323>:
+  goto <D.328>;
+  <D.327>:
   iftmp.9 = 0.0;
-  <D.324>:
+  <D.328>:
   _23 = 1.0e+0 - iftmp.9;
   _24 = attack * _23;
   _25 = _24 * 4.41e+4;
@@ -240,139 +240,139 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_stage_decay_check:
   if (stage == 2) goto adsr_stage_decay_apply; else goto adsr_stage_sustain_check;
   adsr_stage_decay_apply:
-  if (sustain < 0.0) goto <D.326>; else goto <D.327>;
-  <D.326>:
-  iftmp.10 = 1.0e+0;
-  goto <D.328>;
-  <D.327>:
-  iftmp.10 = 0.0;
-  <D.328>:
-  _27 = 1.0e+0 - iftmp.10;
-  _28 = sustain * _27;
   if (sustain < 0.0) goto <D.330>; else goto <D.331>;
   <D.330>:
-  iftmp.11 = 1.0e+0;
+  iftmp.10 = 1.0e+0;
   goto <D.332>;
   <D.331>:
-  iftmp.11 = 0.0;
+  iftmp.10 = 0.0;
   <D.332>:
+  _27 = 1.0e+0 - iftmp.10;
+  _28 = sustain * _27;
+  if (sustain < 0.0) goto <D.334>; else goto <D.335>;
+  <D.334>:
+  iftmp.11 = 1.0e+0;
+  goto <D.336>;
+  <D.335>:
+  iftmp.11 = 0.0;
+  <D.336>:
   _29 = 1.0e+0 - iftmp.11;
   _30 = sustain * _29;
   _31 = 1.0e+0 - _30;
-  if (sustain < 0.0) goto <D.335>; else goto <D.336>;
-  <D.335>:
+  if (sustain < 0.0) goto <D.339>; else goto <D.340>;
+  <D.339>:
   iftmp.13 = 1.0e+0;
-  goto <D.337>;
-  <D.336>:
+  goto <D.341>;
+  <D.340>:
   iftmp.13 = 0.0;
-  <D.337>:
+  <D.341>:
   _32 = 1.0e+0 - iftmp.13;
   _33 = sustain * _32;
-  if (_33 > 1.0e+0) goto <D.338>; else goto <D.339>;
-  <D.338>:
+  if (_33 > 1.0e+0) goto <D.342>; else goto <D.343>;
+  <D.342>:
   iftmp.12 = 1.0e+0;
-  goto <D.340>;
-  <D.339>:
+  goto <D.344>;
+  <D.343>:
   iftmp.12 = 0.0;
-  <D.340>:
+  <D.344>:
   _34 = iftmp.12 * _31;
   _35 = _28 + _34;
   _36 = 1.0e+0 - _35;
-  if (decay < 0.0) goto <D.342>; else goto <D.343>;
-  <D.342>:
+  if (decay < 0.0) goto <D.346>; else goto <D.347>;
+  <D.346>:
   iftmp.14 = 1.0e+0;
-  goto <D.344>;
-  <D.343>:
+  goto <D.348>;
+  <D.347>:
   iftmp.14 = 0.0;
-  <D.344>:
+  <D.348>:
   _37 = 1.0e+0 - iftmp.14;
   _38 = decay * _37;
   _39 = _38 * 4.41e+4;
   _40 = _36 / _39;
   level = level - _40;
-  if (sustain < 0.0) goto <D.346>; else goto <D.347>;
-  <D.346>:
-  iftmp.15 = 1.0e+0;
-  goto <D.348>;
-  <D.347>:
-  iftmp.15 = 0.0;
-  <D.348>:
-  _41 = 1.0e+0 - iftmp.15;
-  _42 = sustain * _41;
   if (sustain < 0.0) goto <D.350>; else goto <D.351>;
   <D.350>:
-  iftmp.16 = 1.0e+0;
+  iftmp.15 = 1.0e+0;
   goto <D.352>;
   <D.351>:
-  iftmp.16 = 0.0;
+  iftmp.15 = 0.0;
   <D.352>:
+  _41 = 1.0e+0 - iftmp.15;
+  _42 = sustain * _41;
+  if (sustain < 0.0) goto <D.354>; else goto <D.355>;
+  <D.354>:
+  iftmp.16 = 1.0e+0;
+  goto <D.356>;
+  <D.355>:
+  iftmp.16 = 0.0;
+  <D.356>:
   _43 = 1.0e+0 - iftmp.16;
   _44 = sustain * _43;
   _45 = 1.0e+0 - _44;
-  if (sustain < 0.0) goto <D.355>; else goto <D.356>;
-  <D.355>:
+  if (sustain < 0.0) goto <D.359>; else goto <D.360>;
+  <D.359>:
   iftmp.18 = 1.0e+0;
-  goto <D.357>;
-  <D.356>:
+  goto <D.361>;
+  <D.360>:
   iftmp.18 = 0.0;
-  <D.357>:
+  <D.361>:
   _46 = 1.0e+0 - iftmp.18;
   _47 = sustain * _46;
-  if (_47 > 1.0e+0) goto <D.358>; else goto <D.359>;
-  <D.358>:
+  if (_47 > 1.0e+0) goto <D.362>; else goto <D.363>;
+  <D.362>:
   iftmp.17 = 1.0e+0;
-  goto <D.360>;
-  <D.359>:
+  goto <D.364>;
+  <D.363>:
   iftmp.17 = 0.0;
-  <D.360>:
+  <D.364>:
   _48 = iftmp.17 * _45;
   _49 = _42 + _48;
   if (level <= _49) goto adsr_stage_decay_finish; else goto adsr_sample_done;
   adsr_stage_decay_finish:
-  if (sustain < 0.0) goto <D.362>; else goto <D.363>;
-  <D.362>:
-  iftmp.19 = 1.0e+0;
-  goto <D.364>;
-  <D.363>:
-  iftmp.19 = 0.0;
-  <D.364>:
-  _50 = 1.0e+0 - iftmp.19;
-  _51 = sustain * _50;
   if (sustain < 0.0) goto <D.366>; else goto <D.367>;
   <D.366>:
-  iftmp.20 = 1.0e+0;
+  iftmp.19 = 1.0e+0;
   goto <D.368>;
   <D.367>:
-  iftmp.20 = 0.0;
+  iftmp.19 = 0.0;
   <D.368>:
+  _50 = 1.0e+0 - iftmp.19;
+  _51 = sustain * _50;
+  if (sustain < 0.0) goto <D.370>; else goto <D.371>;
+  <D.370>:
+  iftmp.20 = 1.0e+0;
+  goto <D.372>;
+  <D.371>:
+  iftmp.20 = 0.0;
+  <D.372>:
   _52 = 1.0e+0 - iftmp.20;
   _53 = sustain * _52;
   _54 = 1.0e+0 - _53;
-  if (sustain < 0.0) goto <D.371>; else goto <D.372>;
-  <D.371>:
+  if (sustain < 0.0) goto <D.375>; else goto <D.376>;
+  <D.375>:
   iftmp.22 = 1.0e+0;
-  goto <D.373>;
-  <D.372>:
+  goto <D.377>;
+  <D.376>:
   iftmp.22 = 0.0;
-  <D.373>:
+  <D.377>:
   _55 = 1.0e+0 - iftmp.22;
   _56 = sustain * _55;
-  if (_56 > 1.0e+0) goto <D.374>; else goto <D.375>;
-  <D.374>:
-  iftmp.21 = 1.0e+0;
-  goto <D.376>;
-  <D.375>:
-  iftmp.21 = 0.0;
-  <D.376>:
-  _57 = iftmp.21 * _54;
-  level = _51 + _57;
-  if (gate > 0.0) goto <D.378>; else goto <D.379>;
+  if (_56 > 1.0e+0) goto <D.378>; else goto <D.379>;
   <D.378>:
-  iftmp.23 = 1;
+  iftmp.21 = 1.0e+0;
   goto <D.380>;
   <D.379>:
-  iftmp.23 = 0;
+  iftmp.21 = 0.0;
   <D.380>:
+  _57 = iftmp.21 * _54;
+  level = _51 + _57;
+  if (gate > 0.0) goto <D.382>; else goto <D.383>;
+  <D.382>:
+  iftmp.23 = 1;
+  goto <D.384>;
+  <D.383>:
+  iftmp.23 = 0;
+  <D.384>:
   if (iftmp.23 != 0) goto adsr_stage_decay_finish_sustain; else goto adsr_stage_decay_finish_release;
   adsr_stage_decay_finish_sustain:
   stage = 3;
@@ -384,54 +384,54 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
   adsr_stage_sustain_check:
   if (stage == 3) goto adsr_stage_sustain_apply; else goto adsr_stage_release_check;
   adsr_stage_sustain_apply:
-  if (sustain < 0.0) goto <D.382>; else goto <D.383>;
-  <D.382>:
-  iftmp.24 = 1.0e+0;
-  goto <D.384>;
-  <D.383>:
-  iftmp.24 = 0.0;
-  <D.384>:
-  _58 = 1.0e+0 - iftmp.24;
-  _59 = sustain * _58;
   if (sustain < 0.0) goto <D.386>; else goto <D.387>;
   <D.386>:
-  iftmp.25 = 1.0e+0;
+  iftmp.24 = 1.0e+0;
   goto <D.388>;
   <D.387>:
-  iftmp.25 = 0.0;
+  iftmp.24 = 0.0;
   <D.388>:
+  _58 = 1.0e+0 - iftmp.24;
+  _59 = sustain * _58;
+  if (sustain < 0.0) goto <D.390>; else goto <D.391>;
+  <D.390>:
+  iftmp.25 = 1.0e+0;
+  goto <D.392>;
+  <D.391>:
+  iftmp.25 = 0.0;
+  <D.392>:
   _60 = 1.0e+0 - iftmp.25;
   _61 = sustain * _60;
   _62 = 1.0e+0 - _61;
-  if (sustain < 0.0) goto <D.391>; else goto <D.392>;
-  <D.391>:
+  if (sustain < 0.0) goto <D.395>; else goto <D.396>;
+  <D.395>:
   iftmp.27 = 1.0e+0;
-  goto <D.393>;
-  <D.392>:
+  goto <D.397>;
+  <D.396>:
   iftmp.27 = 0.0;
-  <D.393>:
+  <D.397>:
   _63 = 1.0e+0 - iftmp.27;
   _64 = sustain * _63;
-  if (_64 > 1.0e+0) goto <D.394>; else goto <D.395>;
-  <D.394>:
+  if (_64 > 1.0e+0) goto <D.398>; else goto <D.399>;
+  <D.398>:
   iftmp.26 = 1.0e+0;
-  goto <D.396>;
-  <D.395>:
+  goto <D.400>;
+  <D.399>:
   iftmp.26 = 0.0;
-  <D.396>:
+  <D.400>:
   _65 = iftmp.26 * _62;
   level = _59 + _65;
   goto adsr_sample_done;
   adsr_stage_release_check:
   if (stage == 4) goto adsr_stage_release_apply; else goto adsr_stage_idle_apply;
   adsr_stage_release_apply:
-  if (release < 0.0) goto <D.398>; else goto <D.399>;
-  <D.398>:
+  if (release < 0.0) goto <D.402>; else goto <D.403>;
+  <D.402>:
   iftmp.28 = 1.0e+0;
-  goto <D.400>;
-  <D.399>:
+  goto <D.404>;
+  <D.403>:
   iftmp.28 = 0.0;
-  <D.400>:
+  <D.404>:
   _66 = 1.0e+0 - iftmp.28;
   _67 = release * _66;
   _68 = _67 * 4.41e+4;
@@ -460,7 +460,7 @@ void ADSR_bbbbbba (struct adsr_state * st, float * out, float gate, float attack
 }
 
 
-void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
+void SinOsc_bba (struct sinosc_state * st, float * restrict out, float freq, float phase)
 {
   float iftmp.29;
   float iftmp.30;
@@ -480,33 +480,33 @@ void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
   body:
   _1 = phase + phase;
   _2 = phase + phase;
-  if (_2 >= 6.283185482025146484375e+0) goto <D.402>; else goto <D.403>;
-  <D.402>:
+  if (_2 >= 6.283185482025146484375e+0) goto <D.406>; else goto <D.407>;
+  <D.406>:
   iftmp.29 = 1.0e+0;
-  goto <D.404>;
-  <D.403>:
+  goto <D.408>;
+  <D.407>:
   iftmp.29 = 0.0;
-  <D.404>:
+  <D.408>:
   _3 = iftmp.29 * 6.283185482025146484375e+0;
   _4 = _1 - _3;
   _5 = phase + phase;
   _6 = phase + phase;
-  if (_6 >= 6.283185482025146484375e+0) goto <D.407>; else goto <D.408>;
-  <D.407>:
+  if (_6 >= 6.283185482025146484375e+0) goto <D.411>; else goto <D.412>;
+  <D.411>:
   iftmp.31 = 1.0e+0;
-  goto <D.409>;
-  <D.408>:
+  goto <D.413>;
+  <D.412>:
   iftmp.31 = 0.0;
-  <D.409>:
+  <D.413>:
   _7 = iftmp.31 * 6.283185482025146484375e+0;
   _8 = _5 - _7;
-  if (_8 < 0.0) goto <D.410>; else goto <D.411>;
-  <D.410>:
+  if (_8 < 0.0) goto <D.414>; else goto <D.415>;
+  <D.414>:
   iftmp.30 = 1.0e+0;
-  goto <D.412>;
-  <D.411>:
+  goto <D.416>;
+  <D.415>:
   iftmp.30 = 0.0;
-  <D.412>:
+  <D.416>:
   _9 = iftmp.30 * 6.283185482025146484375e+0;
   _10 = _4 + _9;
   _11 = i * 4;
@@ -517,35 +517,35 @@ void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
   _15 = phase + _14;
   _16 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _17 = phase + _16;
-  if (_17 >= 6.283185482025146484375e+0) goto <D.414>; else goto <D.415>;
-  <D.414>:
+  if (_17 >= 6.283185482025146484375e+0) goto <D.418>; else goto <D.419>;
+  <D.418>:
   iftmp.32 = 1.0e+0;
-  goto <D.416>;
-  <D.415>:
+  goto <D.420>;
+  <D.419>:
   iftmp.32 = 0.0;
-  <D.416>:
+  <D.420>:
   _18 = iftmp.32 * 6.283185482025146484375e+0;
   _19 = _15 - _18;
   _20 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _21 = phase + _20;
   _22 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _23 = phase + _22;
-  if (_23 >= 6.283185482025146484375e+0) goto <D.419>; else goto <D.420>;
-  <D.419>:
+  if (_23 >= 6.283185482025146484375e+0) goto <D.423>; else goto <D.424>;
+  <D.423>:
   iftmp.34 = 1.0e+0;
-  goto <D.421>;
-  <D.420>:
+  goto <D.425>;
+  <D.424>:
   iftmp.34 = 0.0;
-  <D.421>:
+  <D.425>:
   _24 = iftmp.34 * 6.283185482025146484375e+0;
   _25 = _21 - _24;
-  if (_25 < 0.0) goto <D.422>; else goto <D.423>;
-  <D.422>:
+  if (_25 < 0.0) goto <D.426>; else goto <D.427>;
+  <D.426>:
   iftmp.33 = 1.0e+0;
-  goto <D.424>;
-  <D.423>:
+  goto <D.428>;
+  <D.427>:
   iftmp.33 = 0.0;
-  <D.424>:
+  <D.428>:
   _26 = iftmp.33 * 6.283185482025146484375e+0;
   phase = _19 + _26;
   goto cont;
@@ -558,7 +558,7 @@ void SinOsc_bba (struct sinosc_state * st, float * out, float freq, float phase)
 }
 
 
-void Mul_baa (float * r, float a, const float * b)
+void Mul_baa (float * restrict r, float a, const float * b)
 {
   size_t i;
 
@@ -584,7 +584,7 @@ void Mul_baa (float * r, float a, const float * b)
 }
 
 
-void Mul_aaa (float * r, const float * a, const float * b)
+void Mul_aaa (float * restrict r, const float * a, const float * b)
 {
   size_t i;
 
@@ -613,7 +613,7 @@ void Mul_aaa (float * r, const float * a, const float * b)
 }
 
 
-void Add_baa (float * r, float a, const float * b)
+void Add_baa (float * restrict r, float a, const float * b)
 {
   size_t i;
 
@@ -639,7 +639,7 @@ void Add_baa (float * r, float a, const float * b)
 }
 
 
-void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, float phase)
+void SinOsc_aba (struct sinosc_state * st, float * restrict out, const float * freq, float phase)
 {
   float iftmp.35;
   float iftmp.36;
@@ -659,33 +659,33 @@ void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, floa
   body:
   _1 = phase + phase;
   _2 = phase + phase;
-  if (_2 >= 6.283185482025146484375e+0) goto <D.426>; else goto <D.427>;
-  <D.426>:
+  if (_2 >= 6.283185482025146484375e+0) goto <D.430>; else goto <D.431>;
+  <D.430>:
   iftmp.35 = 1.0e+0;
-  goto <D.428>;
-  <D.427>:
+  goto <D.432>;
+  <D.431>:
   iftmp.35 = 0.0;
-  <D.428>:
+  <D.432>:
   _3 = iftmp.35 * 6.283185482025146484375e+0;
   _4 = _1 - _3;
   _5 = phase + phase;
   _6 = phase + phase;
-  if (_6 >= 6.283185482025146484375e+0) goto <D.431>; else goto <D.432>;
-  <D.431>:
+  if (_6 >= 6.283185482025146484375e+0) goto <D.435>; else goto <D.436>;
+  <D.435>:
   iftmp.37 = 1.0e+0;
-  goto <D.433>;
-  <D.432>:
+  goto <D.437>;
+  <D.436>:
   iftmp.37 = 0.0;
-  <D.433>:
+  <D.437>:
   _7 = iftmp.37 * 6.283185482025146484375e+0;
   _8 = _5 - _7;
-  if (_8 < 0.0) goto <D.434>; else goto <D.435>;
-  <D.434>:
+  if (_8 < 0.0) goto <D.438>; else goto <D.439>;
+  <D.438>:
   iftmp.36 = 1.0e+0;
-  goto <D.436>;
-  <D.435>:
+  goto <D.440>;
+  <D.439>:
   iftmp.36 = 0.0;
-  <D.436>:
+  <D.440>:
   _9 = iftmp.36 * 6.283185482025146484375e+0;
   _10 = _4 + _9;
   _11 = i * 4;
@@ -702,13 +702,13 @@ void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, floa
   _21 = *_20;
   _22 = _21 * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _23 = phase + _22;
-  if (_23 >= 6.283185482025146484375e+0) goto <D.438>; else goto <D.439>;
-  <D.438>:
+  if (_23 >= 6.283185482025146484375e+0) goto <D.442>; else goto <D.443>;
+  <D.442>:
   iftmp.38 = 1.0e+0;
-  goto <D.440>;
-  <D.439>:
+  goto <D.444>;
+  <D.443>:
   iftmp.38 = 0.0;
-  <D.440>:
+  <D.444>:
   _24 = iftmp.38 * 6.283185482025146484375e+0;
   _25 = _18 - _24;
   _26 = i * 4;
@@ -721,22 +721,22 @@ void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, floa
   _33 = *_32;
   _34 = _33 * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _35 = phase + _34;
-  if (_35 >= 6.283185482025146484375e+0) goto <D.443>; else goto <D.444>;
-  <D.443>:
+  if (_35 >= 6.283185482025146484375e+0) goto <D.447>; else goto <D.448>;
+  <D.447>:
   iftmp.40 = 1.0e+0;
-  goto <D.445>;
-  <D.444>:
+  goto <D.449>;
+  <D.448>:
   iftmp.40 = 0.0;
-  <D.445>:
+  <D.449>:
   _36 = iftmp.40 * 6.283185482025146484375e+0;
   _37 = _30 - _36;
-  if (_37 < 0.0) goto <D.446>; else goto <D.447>;
-  <D.446>:
+  if (_37 < 0.0) goto <D.450>; else goto <D.451>;
+  <D.450>:
   iftmp.39 = 1.0e+0;
-  goto <D.448>;
-  <D.447>:
+  goto <D.452>;
+  <D.451>:
   iftmp.39 = 0.0;
-  <D.448>:
+  <D.452>:
   _38 = iftmp.39 * 6.283185482025146484375e+0;
   phase = _25 + _38;
   goto cont;
@@ -749,7 +749,7 @@ void SinOsc_aba (struct sinosc_state * st, float * out, const float * freq, floa
 }
 
 
-void Mul_aba (float * r, const float * a, float b)
+void Mul_aba (float * restrict r, const float * a, float b)
 {
   size_t i;
 
@@ -775,7 +775,7 @@ void Mul_aba (float * r, const float * a, float b)
 }
 
 
-void Pan_aba (float * out, const float * in, float pan)
+void Pan_aba (float * restrict out, const float * in, float pan)
 {
   size_t i;
 
@@ -838,7 +838,7 @@ void Out_baa (float * dst, const float * a)
 }
 
 
-void default_init (void * state)
+void default_init (void * restrict state)
 {
   entry:
   MEM[(struct default_state *)state].s15.level = 0.0;
@@ -855,9 +855,9 @@ void default_init (void * state)
 }
 
 
-unsigned int default_process (void * state, const float * controls, float * abus)
+unsigned int default_process (void * restrict state, const float * restrict controls, float * restrict abus)
 {
-  unsigned int D.449;
+  unsigned int D.453;
   float e31[64];
   float e29[32];
   float e28[32];
@@ -878,61 +878,84 @@ unsigned int default_process (void * state, const float * controls, float * abus
       entry:
       done_action = 0;
       _1 = &MEM[(struct default_state *)state].s15;
-      _2 = controls + 20;
-      _3 = *_2;
-      _4 = controls + 24;
-      _5 = *_4;
-      _6 = controls + 28;
-      _7 = *_6;
-      _8 = controls + 32;
-      _9 = *_8;
-      _10 = controls + 36;
-      _11 = *_10;
-      _12 = controls + 56;
-      _13 = *_12;
-      ADSR_bbbbbba (_1, &e15[0], _3, _5, _7, _9, _11, _13, &done_action);
-      _14 = &MEM[(struct default_state *)state].s17;
-      _15 = controls + 20;
-      _16 = *_15;
-      _17 = controls + 40;
+      _2 = __builtin_assume_aligned (&e15[0], 64);
+      _3 = controls + 20;
+      _4 = *_3;
+      _5 = controls + 24;
+      _6 = *_5;
+      _7 = controls + 28;
+      _8 = *_7;
+      _9 = controls + 32;
+      _10 = *_9;
+      _11 = controls + 36;
+      _12 = *_11;
+      _13 = controls + 56;
+      _14 = *_13;
+      ADSR_bbbbbba (_1, _2, _4, _6, _8, _10, _12, _14, &done_action);
+      _15 = &MEM[(struct default_state *)state].s17;
+      _16 = __builtin_assume_aligned (&e17[0], 64);
+      _17 = controls + 20;
       _18 = *_17;
-      _19 = controls + 44;
+      _19 = controls + 40;
       _20 = *_19;
-      _21 = controls + 48;
+      _21 = controls + 44;
       _22 = *_21;
-      _23 = controls + 52;
+      _23 = controls + 48;
       _24 = *_23;
-      ADSR_bbbbbba (_14, &e17[0], _16, _18, _20, _22, _24, 0.0, &done_action);
-      _25 = *controls;
-      _26 = controls + 16;
-      _27 = *_26;
-      e18 = _25 * _27;
-      _28 = &MEM[(struct default_state *)state].s20;
-      SinOsc_bba (_28, &e20[0], e18, 0.0);
-      _29 = *controls;
-      _30 = controls + 8;
-      _31 = *_30;
-      e21 = _29 * _31;
-      Mul_baa (&e22[0], e21, &e17[0]);
-      Mul_aaa (&e23[0], &e20[0], &e22[0]);
+      _25 = controls + 52;
+      _26 = *_25;
+      ADSR_bbbbbba (_15, _16, _18, _20, _22, _24, _26, 0.0, &done_action);
+      _27 = *controls;
+      _28 = controls + 16;
+      _29 = *_28;
+      e18 = _27 * _29;
+      _30 = &MEM[(struct default_state *)state].s20;
+      _31 = __builtin_assume_aligned (&e20[0], 64);
+      SinOsc_bba (_30, _31, e18, 0.0);
       _32 = *controls;
-      _33 = controls + 12;
+      _33 = controls + 8;
       _34 = *_33;
-      e24 = _32 * _34;
-      Add_baa (&e25[0], e24, &e23[0]);
-      _35 = &MEM[(struct default_state *)state].s27;
-      SinOsc_aba (_35, &e27[0], &e25[0], 0.0);
-      _36 = controls + 4;
-      _37 = *_36;
-      Mul_aba (&e28[0], &e27[0], _37);
-      Mul_aaa (&e29[0], &e28[0], &e15[0]);
-      Pan_aba (&e31[0], &e29[0], 0.0);
-      Out_baa (abus, &e31[0]);
-      _38 = abus + 128;
-      _39 = &e31[0] + 128;
-      Out_baa (_38, _39);
-      D.449 = done_action;
-      return D.449;
+      e21 = _32 * _34;
+      _35 = __builtin_assume_aligned (&e22[0], 64);
+      _36 = __builtin_assume_aligned (&e17[0], 64);
+      Mul_baa (_35, e21, _36);
+      _37 = __builtin_assume_aligned (&e23[0], 64);
+      _38 = __builtin_assume_aligned (&e20[0], 64);
+      _39 = __builtin_assume_aligned (&e22[0], 64);
+      Mul_aaa (_37, _38, _39);
+      _40 = *controls;
+      _41 = controls + 12;
+      _42 = *_41;
+      e24 = _40 * _42;
+      _43 = __builtin_assume_aligned (&e25[0], 64);
+      _44 = __builtin_assume_aligned (&e23[0], 64);
+      Add_baa (_43, e24, _44);
+      _45 = &MEM[(struct default_state *)state].s27;
+      _46 = __builtin_assume_aligned (&e27[0], 64);
+      _47 = __builtin_assume_aligned (&e25[0], 64);
+      SinOsc_aba (_45, _46, _47, 0.0);
+      _48 = __builtin_assume_aligned (&e28[0], 64);
+      _49 = __builtin_assume_aligned (&e27[0], 64);
+      _50 = controls + 4;
+      _51 = *_50;
+      Mul_aba (_48, _49, _51);
+      _52 = __builtin_assume_aligned (&e29[0], 64);
+      _53 = __builtin_assume_aligned (&e28[0], 64);
+      _54 = __builtin_assume_aligned (&e15[0], 64);
+      Mul_aaa (_52, _53, _54);
+      _55 = __builtin_assume_aligned (&e31[0], 64);
+      _56 = __builtin_assume_aligned (&e29[0], 64);
+      Pan_aba (_55, _56, 0.0);
+      _57 = __builtin_assume_aligned (abus, 64);
+      _58 = __builtin_assume_aligned (&e31[0], 64);
+      Out_baa (_57, _58);
+      _59 = __builtin_assume_aligned (abus, 64);
+      _60 = _59 + 128;
+      _61 = __builtin_assume_aligned (&e31[0], 64);
+      _62 = _61 + 128;
+      Out_baa (_60, _62);
+      D.453 = done_action;
+      return D.453;
     }
   finally
     {
@@ -1263,10 +1286,10 @@ ADSR_bbbbbba:
 	.p2align 2,,3
 .L19:
 	ldr	w4, [x2]
-	orr	w4, w6, w4
-	str	w4, [x2]
 	str	wzr, [x1, x3, lsl 2]
 	add	x3, x3, 1
+	orr	w4, w6, w4
+	str	w4, [x2]
 	mov	w4, 0
 	cmp	x3, 32
 	bne	.L7
@@ -1317,10 +1340,10 @@ ADSR_bbbbbba:
 	.p2align 2,,3
 .L31:
 	ldr	w4, [x2]
-	orr	w6, w6, w4
-	str	w6, [x2]
 	str	wzr, [x1, x3, lsl 2]
 	add	x3, x3, 1
+	orr	w6, w6, w4
+	str	w6, [x2]
 	mov	w4, 0
 	cmp	x3, 32
 	beq	.L151
@@ -1460,42 +1483,44 @@ default_process:
 .LFB11:
 	.cfi_startproc
 .L163:
-	sub	sp, sp, #928
-	.cfi_def_cfa_offset 928
-	mov	x10, x1
-	mov	x11, x2
-	add	x1, sp, 32
-	add	x2, sp, 28
-	mov	x12, x0
+	sub	sp, sp, #992
+	.cfi_def_cfa_offset 992
+	mov	x11, x1
+	add	x8, sp, 111
+	mov	x12, x2
+	and	x8, x8, -64
+	add	x2, sp, 44
 	stp	x29, x30, [sp]
-	.cfi_offset 29, -928
-	.cfi_offset 30, -920
+	.cfi_offset 29, -992
+	.cfi_offset 30, -984
 	mov	x29, sp
-	add	x8, sp, 416
-	ldp	s0, s1, [x10, 20]
-	ldp	s2, s3, [x10, 28]
-	str	wzr, [sp, 28]
-	ldr	s4, [x10, 36]
-	ldr	s5, [x10, 56]
+	add	x1, x8, 768
+	ldr	s4, [x11, 36]
+	mov	x13, x0
+	ldr	s5, [x11, 56]
+	str	d15, [sp, 16]
+	.cfi_offset 79, -976
+	ldp	s0, s1, [x11, 20]
+	ldp	s2, s3, [x11, 28]
+	str	wzr, [sp, 44]
 	bl	ADSR_bbbbbba
 	movi	v5.2s, #0
-	ldp	s1, s2, [x10, 40]
+	ldp	s1, s2, [x11, 40]
 	add	x0, x0, 16
-	ldp	s3, s4, [x10, 48]
-	add	x1, sp, 160
-	ldr	s0, [x10, 20]
+	ldp	s3, s4, [x11, 48]
+	add	x1, x8, 640
 	bl	ADSR_bbbbbba
 	mov	w0, 26002
-	ldr	s25, [x10]
+	ldr	s23, [x11]
 	movk	w0, 0x3915, lsl 16
-	ldr	s29, [x10, 16]
+	ldr	s25, [x11, 16]
 	fmov	s31, w0
-	ldr	s30, [x12, 32]
+	ldr	s30, [x13, 32]
 	adrp	x6, .LANCHOR0
 	mov	w4, 4059
 	mov	w5, 63875
-	fmul	s25, s25, s29
-	add	x3, sp, 288
+	fmul	s25, s23, s25
+	add	x3, x8, 512
 	add	x7, x6, :lo12:.LANCHOR0
 	movk	w4, 0x40c9, lsl 16
 	movk	w5, 0x4222, lsl 16
@@ -1518,7 +1543,7 @@ default_process:
 	fadd	s31, s31, s5
 .L167:
 	fmul	s31, s31, s24
-	fadd	s30, s25, s30
+	fadd	s30, s30, s25
 	fcvtzu	x5, s31
 	fcmpe	s30, s27
 	lsl	x4, x5, 2
@@ -1535,72 +1560,72 @@ default_process:
 	add	x3, x3, 4
 	bmi	.L174
 	fadd	s31, s30, s5
-	cmp	x3, x8
+	cmp	x3, x1
 	beq	.L173
 	fmov	s30, s31
 	b	.L167
 	.p2align 2,,3
 .L174:
 	fadd	s30, s30, s27
-	cmp	x8, x3
+	cmp	x1, x3
 	bne	.L164
 	fmov	s31, s30
 .L173:
-	ldp	q26, q28, [sp, 256]
+	ldp	s28, s30, [x11, 8]
 	mov	w0, 4059
-	ldp	q17, q18, [sp, 160]
+	ldp	q22, q26, [x8, 736]
 	movk	w0, 0x40c9, lsl 16
-	ldp	q19, q20, [sp, 192]
+	fmul	s30, s23, s30
+	fmul	s28, s23, s28
+	ldp	q17, q16, [x8, 640]
 	fmov	s27, w0
-	ldp	q21, q22, [sp, 224]
+	ldp	q18, q19, [x8, 672]
 	mov	w0, 63875
-	ldp	q1, q2, [sp, 288]
+	ldp	q20, q21, [x8, 704]
 	movk	w0, 0x4222, lsl 16
-	ldp	q3, q4, [sp, 320]
+	ldp	q2, q1, [x8, 512]
 	movi	v25.2s, #0
-	ldp	q5, q6, [sp, 352]
+	ldp	q3, q4, [x8, 544]
+	str	s31, [x13, 32]
+	dup	v31.4s, v30.s[0]
+	ldr	s29, [x13, 36]
+	fmul	v17.4s, v17.4s, v28.s[0]
 	fmov	s23, w0
-	ldp	q7, q16, [sp, 384]
-	str	s31, [x12, 32]
-	ldp	s30, s29, [x10, 8]
+	fmul	v18.4s, v18.4s, v28.s[0]
 	mov	w0, 26002
-	ldr	s31, [x10]
+	fmul	v20.4s, v20.4s, v28.s[0]
 	add	x6, x6, :lo12:.LANCHOR0
-	add	x9, sp, 544
+	fmul	v30.4s, v26.4s, v28.s[0]
+	add	x10, x8, 256
+	fmul	v16.4s, v16.4s, v28.s[0]
+	add	x9, x8, 384
+	fmul	v19.4s, v19.4s, v28.s[0]
 	movk	w0, 0x3915, lsl 16
-	mov	x3, 1
+	fmul	v21.4s, v21.4s, v28.s[0]
 	fmov	s24, w0
-	fmul	s30, s31, s30
-	fmul	s31, s31, s29
-	ldr	s29, [x12, 36]
-	dup	v31.4s, v31.s[0]
-	fmul	v18.4s, v18.4s, v30.s[0]
-	fmul	v19.4s, v19.4s, v30.s[0]
-	fmul	v20.4s, v20.4s, v30.s[0]
-	fmul	v21.4s, v21.4s, v30.s[0]
-	fmul	v17.4s, v17.4s, v30.s[0]
-	fmul	v22.4s, v22.4s, v30.s[0]
-	fmul	v26.4s, v26.4s, v30.s[0]
-	fmul	v30.4s, v28.4s, v30.s[0]
+	fmul	v22.4s, v22.4s, v28.s[0]
+	mov	x3, 1
+	mov	v15.16b, v31.16b
 	mov	v28.16b, v31.16b
-	mov	v0.16b, v31.16b
-	fmla	v28.4s, v2.4s, v18.4s
-	mov	v18.16b, v31.16b
-	fmla	v0.4s, v1.4s, v17.4s
-	fmla	v18.4s, v3.4s, v19.4s
-	mov	v19.16b, v31.16b
-	stp	q0, q28, [sp, 416]
-	mov	v28.16b, v31.16b
-	fmla	v19.4s, v4.4s, v20.4s
+	ldp	q0, q5, [x8, 576]
+	mov	v26.16b, v31.16b
+	fmla	v28.4s, v2.4s, v17.4s
+	fmla	v15.4s, v1.4s, v16.4s
+	mov	v17.16b, v31.16b
+	ldp	q6, q7, [x8, 608]
+	fmla	v26.4s, v0.4s, v20.4s
+	stp	q28, q15, [x8, 384]
+	fmla	v17.4s, v3.4s, v18.4s
 	mov	v20.16b, v31.16b
-	fmla	v28.4s, v7.4s, v26.4s
-	stp	q18, q19, [sp, 448]
+	mov	v18.16b, v31.16b
+	mov	v28.16b, v31.16b
+	fmla	v31.4s, v30.4s, v7.4s
 	fmla	v20.4s, v5.4s, v21.4s
-	mov	v21.16b, v31.16b
-	fmla	v31.4s, v30.4s, v16.4s
-	fmla	v21.4s, v6.4s, v22.4s
-	stp	q28, q31, [sp, 512]
-	stp	q20, q21, [sp, 480]
+	fmla	v18.4s, v4.4s, v19.4s
+	fmla	v28.4s, v6.4s, v22.4s
+	stp	q26, q20, [x8, 448]
+	stp	q17, q18, [x8, 416]
+	stp	q28, q31, [x8, 480]
 	.p2align 5,,15
 .L177:
 	fadd	s31, s29, s25
@@ -1611,8 +1636,8 @@ default_process:
 	.p2align 5,,15
 .L187:
 	fmul	s31, s31, s23
-	add	x4, x8, x3, lsl 2
-	add	x7, x9, x3, lsl 2
+	add	x4, x9, x3, lsl 2
+	add	x7, x10, x3, lsl 2
 	ldr	s30, [x4, -4]
 	fcvtzu	x5, s31
 	fmadd	s30, s30, s24, s29
@@ -1644,7 +1669,7 @@ default_process:
 	fsub	s30, s30, s27
 	add	x3, x3, 4
 	fadd	s31, s30, s5
-	cmp	x3, x8
+	cmp	x3, x1
 	beq	.L173
 	fcmpe	s31, s27
 	fmov	s30, s31
@@ -1657,17 +1682,17 @@ default_process:
 	bne	.L177
 	fmov	s31, s29
 .L185:
-	ldp	q16, q7, [sp, 32]
-	add	x1, x11, 128
-	ldp	q17, q18, [sp, 64]
-	ldp	q19, q20, [sp, 96]
-	ldp	q21, q22, [sp, 128]
-	ldp	q24, q26, [sp, 544]
-	ldp	q25, q28, [sp, 576]
-	ldp	q27, q30, [sp, 608]
-	str	s31, [x12, 36]
-	ldp	q29, q31, [sp, 640]
-	ldr	s23, [x10, 4]
+	ldp	q24, q26, [x8, 256]
+	str	s31, [x13, 36]
+	ldp	q25, q28, [x8, 288]
+	add	x1, x12, 128
+	ldp	q27, q30, [x8, 320]
+	ldp	q29, q31, [x8, 352]
+	ldr	s23, [x11, 4]
+	ldp	q21, q7, [x8, 768]
+	ldp	q16, q17, [x8, 800]
+	ldp	q18, q19, [x8, 832]
+	ldp	q20, q22, [x8, 864]
 	fmul	v26.4s, v26.4s, v23.s[0]
 	fmul	v24.4s, v24.4s, v23.s[0]
 	fmul	v25.4s, v25.4s, v23.s[0]
@@ -1678,36 +1703,47 @@ default_process:
 	fmul	v31.4s, v31.4s, v23.s[0]
 	fmul	v26.4s, v26.4s, v7.4s
 	fmov	v23.4s, 5.0e-1
-	fmul	v24.4s, v24.4s, v16.4s
-	fmul	v25.4s, v25.4s, v17.4s
-	fmul	v28.4s, v28.4s, v18.4s
-	fmul	v27.4s, v27.4s, v19.4s
-	fmul	v30.4s, v30.4s, v20.4s
-	fmul	v29.4s, v29.4s, v21.4s
+	fmul	v25.4s, v25.4s, v16.4s
+	fmul	v28.4s, v28.4s, v17.4s
+	fmul	v27.4s, v27.4s, v18.4s
+	fmul	v30.4s, v30.4s, v19.4s
+	fmul	v29.4s, v29.4s, v20.4s
+	fmul	v24.4s, v24.4s, v21.4s
 	fmul	v31.4s, v31.4s, v22.4s
 	fmul	v26.4s, v26.4s, v23.4s
-	fmul	v24.4s, v24.4s, v23.4s
 	fmul	v25.4s, v25.4s, v23.4s
 	fmul	v28.4s, v28.4s, v23.4s
 	fmul	v27.4s, v27.4s, v23.4s
 	fmul	v30.4s, v30.4s, v23.4s
-	stp	q24, q26, [x11]
 	fmul	v29.4s, v29.4s, v23.4s
-	stp	q25, q28, [x11, 32]
+	fmul	v24.4s, v24.4s, v23.4s
+	stp	q25, q28, [x8, 32]
 	fmul	v31.4s, v31.4s, v23.4s
-	stp	q27, q30, [x11, 64]
-	str	q24, [x11, 128]
-	stp	q29, q31, [x11, 96]
+	stp	q27, q30, [x8, 64]
+	stp	q24, q26, [x8]
+	stp	q29, q31, [x8, 96]
+	stp	q24, q26, [x8, 128]
+	stp	q25, q28, [x8, 160]
+	stp	q27, q30, [x8, 192]
+	ldr	w0, [sp, 44]
+	str	q29, [x8, 224]
+	stp	q24, q26, [x12]
+	stp	q25, q28, [x12, 32]
+	stp	q27, q30, [x12, 64]
+	stp	q29, q31, [x12, 96]
+	str	q24, [x12, 128]
 	stp	q26, q25, [x1, 16]
 	stp	q28, q27, [x1, 48]
 	stp	q30, q29, [x1, 80]
-	ldr	w0, [sp, 28]
-	str	q31, [x11, 240]
+	str	q31, [x12, 240]
+	ldr	d15, [sp, 16]
+	str	q31, [x8, 240]
 	ldp	x29, x30, [sp]
-	add	sp, sp, 928
+	add	sp, sp, 992
 	.cfi_remember_state
 	.cfi_restore 29
 	.cfi_restore 30
+	.cfi_restore 79
 	.cfi_def_cfa_offset 0
 	ret
 	.p2align 2,,3

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio_buffer.hpp"
 #include "dag.hpp"
 
 #include <algorithm>
@@ -160,6 +161,7 @@ public:
     uint32_t process(float *abus)
     {
       assert(process_ != nullptr);
+      assert(is_aligned(abus, audio_buffer_alignment));
       last_done_action_ = process_(state_.data(), controls_.data(), abus);
       if (last_done_action_ != 0 && pending_done_action_ == 0) {
         pending_done_action_ = last_done_action_;

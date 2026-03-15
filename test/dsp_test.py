@@ -21,6 +21,11 @@ def test_dsp_keyword_args():
     assert dsp.output_channels == 2
 
 
+def test_aligned_abus_storage_is_64_byte_aligned():
+    assert mc1._test._aligned_abus_modulo(block_size=1, channels=2) == 0
+    assert mc1._test._aligned_abus_modulo(block_size=64, channels=2) == 0
+
+
 def test_dsp_positional_args():
     dsp = DSP(96000, 128, 2, 4)
     assert dsp.sample_rate == 96000
