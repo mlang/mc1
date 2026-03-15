@@ -5,7 +5,7 @@ import operator
 
 import pytest
 
-from mc1 import DAG, Out, Pan, SinOsc
+from mc1 import ADSR, DAG, In, Out, Pan, SinOsc
 from mc1.dag import Add, EQ, GE, GT, LE, LT, Mul, NE, Rate
 
 
@@ -87,6 +87,73 @@ def test_reduce_can_fold_graph_nodes_with_operators():
 
     assert isinstance(folded, Mul)
     assert folded.rate is Rate.AUDIO
+
+
+def test_seeded_bounds_cover_known_signal_shapes():
+    osc = SinOsc.ar(220)
+    env = ADSR.ar(1, 0.01, 0.2, 0.5, 0.4)
+    gt = osc > 0.25
+
+    assert osc.bounds == (-1.0, 1.0)
+    assert osc.is_bipolar is True
+    assert osc.is_unipolar is False
+    assert env.bounds == (0.0, 1.0)
+    assert env.is_unipolar is True
+    assert env.is_bipolar is False
+    assert gt.bounds == (-1.0, 1.0)
+
+
+def test_arithmetic_bounds_are_inferred_with_interval_math():
+    modulator = SinOsc.ar(2) * 0.25 + 0.75
+
+    assert modulator.bounds == (0.5, 1.0)
+    assert modulator.rate is Rate.AUDIO
+
+
+def test_pan_and_out_forward_signal_bounds():
+    signal = ADSR.ar(1, 0.01, 0.2, 0.5, 0.4)
+    stereo = Pan(signal, pan=0.25)
+    out = Out.ar(0, stereo)
+
+    assert stereo.bounds == (0.0, 1.0)
+    assert out.bounds == (0.0, 1.0)
+
+
+def test_range_remaps_bipolar_signal_to_requested_bounds():
+    signal = SinOsc.ar(220)
+    remapped = signal.range(-0.5, 0.5)
+
+    assert isinstance(remapped, Add)
+    assert remapped.bounds == (-0.5, 0.5)
+
+
+def test_range_supports_inverted_output_ranges():
+    env = ADSR.ar(1, 0.01, 0.2, 0.5, 0.4)
+    remapped = env.range(1.0, 0.0)
+
+    assert remapped.bounds == (0.0, 1.0)
+
+
+def test_range_requires_known_source_bounds():
+    signal = In.ar(0)
+
+    with pytest.raises(ValueError, match="known source bounds"):
+        signal.range(-1.0, 1.0)
+
+
+def test_range_rejects_zero_width_source_ranges():
+    constant = SinOsc.ar(220).with_bounds(0.5, 0.5)
+
+    with pytest.raises(ValueError, match="non-zero source range"):
+        constant.range(0.0, 1.0)
+
+
+def test_with_bounds_enables_range_for_unknown_inputs():
+    signal = In.ar(0).with_bounds(0.0, 1.0)
+    cutoff = signal.range(200.0, 4000.0)
+
+    assert signal.bounds == (0.0, 1.0)
+    assert cutoff.bounds == (200.0, 4000.0)
 
 
 def test_ordering_comparisons_build_graph_nodes():

@@ -29,13 +29,60 @@ def fastest_rate(*args):
             return Rate.AUDIO
     return Rate.BLOCK
 
-class _Node:
-    __slots__ = ('rate', 'num_out', 'args', '_index')
 
-    def __init__(self, rate, num_out, *args):
+def _normalize_bounds(lo, hi):
+    lo = float(lo)
+    hi = float(hi)
+    if lo > hi:
+        raise ValueError("bounds require lo <= hi")
+    return (lo, hi)
+
+
+def _add_bounds(left, right):
+    if left is None or right is None:
+        return None
+    return (left[0] + right[0], left[1] + right[1])
+
+
+def _sub_bounds(left, right):
+    if left is None or right is None:
+        return None
+    return (left[0] - right[1], left[1] - right[0])
+
+
+def _mul_bounds(left, right):
+    if left is None or right is None:
+        return None
+    products = (
+        left[0] * right[0],
+        left[0] * right[1],
+        left[1] * right[0],
+        left[1] * right[1],
+    )
+    return (min(products), max(products))
+
+
+def _div_bounds(left, right):
+    if left is None or right is None:
+        return None
+    if right[0] <= 0 <= right[1]:
+        return None
+    quotients = (
+        left[0] / right[0],
+        left[0] / right[1],
+        left[1] / right[0],
+        left[1] / right[1],
+    )
+    return (min(quotients), max(quotients))
+
+class _Node:
+    __slots__ = ('rate', 'num_out', 'args', '_index', '_bounds')
+
+    def __init__(self, rate, num_out, *args, bounds=None):
         self.rate = rate
         self.num_out = num_out
         self.args = args
+        self._bounds = bounds
         self._index = len(DAG._operations)
         DAG._operations.append(self)
 
@@ -49,6 +96,40 @@ class _Node:
     def __le__(self, other):  return LE(self, other)
     def __gt__(self, other):  return GT(self, other)
     def __ge__(self, other):  return GE(self, other)
+
+    @property
+    def bounds(self):
+        return self._bounds
+
+    @property
+    def is_unipolar(self):
+        return self.bounds == (0.0, 1.0)
+
+    @property
+    def is_bipolar(self):
+        return self.bounds == (-1.0, 1.0)
+
+    def with_bounds(self, lo, hi):
+        self._bounds = _normalize_bounds(lo, hi)
+        return self
+
+    def linlin(self, in_lo, in_hi, out_lo, out_hi):
+        in_lo = float(in_lo)
+        in_hi = float(in_hi)
+        out_lo = float(out_lo)
+        out_hi = float(out_hi)
+        if in_lo == in_hi:
+            raise ValueError("linlin requires a non-zero source range")
+
+        scale = (out_hi - out_lo) / (in_hi - in_lo)
+        mapped = (self - in_lo) * scale + out_lo
+        mapped._bounds = (min(out_lo, out_hi), max(out_lo, out_hi))
+        return mapped
+
+    def range(self, out_lo, out_hi):
+        if self.bounds is None:
+            raise ValueError("range requires known source bounds")
+        return self.linlin(*self.bounds, out_lo, out_hi)
 
     def __bytes__(self):
         buf = io.BytesIO()
@@ -79,7 +160,7 @@ class Const(_Node):
         except ValueError:
             cindex = len(DAG._constants)
             DAG._constants.append(value)
-        super().__init__(Rate.BLOCK, 1, cindex)
+        super().__init__(Rate.BLOCK, 1, cindex, bounds=(value, value))
 
     def __float__(self) -> float: return DAG._constants[self.args[0]]
 
@@ -109,45 +190,61 @@ class _GraphArgs(_Node):
         Scalars are broadcast, and shorter sequences wrap to the longest input.
         """
         sequence_types = (list, range, tuple)
+        nonexpanding_kwargs = {'bounds'}
         lengths = [len(arg) for arg in args if isinstance(arg, sequence_types)]
         lengths.extend(len(v)
-            for v in kwargs.values() if isinstance(v, sequence_types)
+            for k, v in kwargs.items()
+            if k not in nonexpanding_kwargs and isinstance(v, sequence_types)
         )
         if not lengths:
             return super().__new__(cls)
 
-        def item(arg, index: int):
+        def item(arg, index: int, expand=True):
+            if not expand:
+                return arg
             return arg[index % len(arg)] if isinstance(arg, sequence_types) else arg
 
         return tuple(
             cls(
                 *(item(arg, index) for arg in args),
-                **{k: item(v, index) for k, v in kwargs.items()}
+                **{k: item(v, index, k not in nonexpanding_kwargs) for k, v in kwargs.items()}
             ) for index in range(max(lengths))
         )
 
-    def __init__(self, rate, num_out, *args):
-        super().__init__(rate, num_out, *map(_convert, args))
+    def __init__(self, rate, num_out, *args, bounds=None):
+        super().__init__(rate, num_out, *map(_convert, args), bounds=bounds)
 
 
 class _BinOp(_GraphArgs):
+    _bounds_op = None
+
     def __init__(self, left, right):
         left = _convert(left)
         right = _convert(right)
-        super().__init__(fastest_rate(left, right), 1, left, right)
+        bounds = self._bounds_op(left.bounds, right.bounds)
+        super().__init__(fastest_rate(left, right), 1, left, right, bounds=bounds)
+
+class Add(_BinOp):
+    _bounds_op = staticmethod(_add_bounds)
 
 
-class Add(_BinOp): pass
-class Div(_BinOp): pass
-class Mul(_BinOp): pass
-class Sub(_BinOp): pass
+class Div(_BinOp):
+    _bounds_op = staticmethod(_div_bounds)
+
+
+class Mul(_BinOp):
+    _bounds_op = staticmethod(_mul_bounds)
+
+
+class Sub(_BinOp):
+    _bounds_op = staticmethod(_sub_bounds)
 
 
 class _CmpOp(_GraphArgs):
     def __init__(self, left, right):
         left = _convert(left)
         right = _convert(right)
-        super().__init__(fastest_rate(left, right), 1, left, right)
+        super().__init__(fastest_rate(left, right), 1, left, right, bounds=(-1.0, 1.0))
 
 
 class LT(_CmpOp): pass
@@ -161,13 +258,13 @@ class NE(_CmpOp): pass
 class SinOsc(_GraphArgs):
     @classmethod
     def ar(cls, freq, phase=0):
-        return cls(Rate.AUDIO, 1, freq, phase)
+        return cls(Rate.AUDIO, 1, freq, phase, bounds=(-1.0, 1.0))
 
 
 class ADSR(_GraphArgs):
     @classmethod
     def ar(cls, gate, attack, decay, sustain, release, done_action=0):
-        return cls(Rate.AUDIO, 1, gate, attack, decay, sustain, release, done_action)
+        return cls(Rate.AUDIO, 1, gate, attack, decay, sustain, release, done_action, bounds=(0.0, 1.0))
 
 
 class In(_GraphArgs):
@@ -180,13 +277,13 @@ class Out(_GraphArgs):
     @classmethod
     def ar(cls, index, signal):
         signal = _convert(signal)
-        return cls(Rate.AUDIO, signal.num_out, index, signal)
+        return cls(Rate.AUDIO, signal.num_out, index, signal, bounds=signal.bounds)
 
 
 class Pan(_GraphArgs):
     def __init__(self, signal, pan=0):
         signal = _convert(signal)
-        super().__init__(signal.rate, 2, signal, pan)
+        super().__init__(signal.rate, 2, signal, pan, bounds=signal.bounds)
 
 
 def _convert(x):
