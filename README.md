@@ -40,6 +40,16 @@ uv run python -m mc1
 
 `uv run python -m mc1` starts the current MiniCollider REPL. The first build of the native modules happens as part of the normal Python package build flow.
 
+## Demo
+
+Run the bundled two-voice default-synth melody example with:
+
+```bash
+uv run python -m mc1 examples/default_melody.py
+```
+
+The script keeps the score in MIDI note numbers, uses small helpers like `midi2cps`, and schedules two concurrent voice generators through the package's default FM synth.
+
 ## Repository Layout
 
 - `mc1/`: Python API surface, DAG helpers, graph construction, and the REPL entry point.

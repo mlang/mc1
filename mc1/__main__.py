@@ -9,7 +9,7 @@ dsp = None
 
 
 def compile(func):
-    dag = DAG(func)
+    dag = DAG(func) if not isinstance(func, DAG) else func
     if dsp is None:
         raise RuntimeError("DSP is not initialized")
     dsp.compile(bytes(dag))
