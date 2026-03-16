@@ -403,9 +403,9 @@ class In(_GraphArgs):
 class Out(_GraphArgs):
     """Audio-rate output bus writer.
 
-    `Out.ar(index, signal)` routes `signal` to the target output bus. If `index`
-    is a sequence, standard Python-side graph expansion returns a tuple of
-    writers.
+    `Out.ar(index, signal)` mixes `signal` into the target output bus. If
+    `index` is a sequence, standard Python-side graph expansion returns a tuple
+    of writers.
 
     Example:
 

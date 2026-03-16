@@ -525,7 +525,7 @@ class Out final : public GraphArgs
     {
       auto entry = kernel.new_block("entry");
       ctx.loop(kernel, entry, [&](gccjit::block body, gccjit::block cont, gccjit::lvalue lv_i) {
-        body.add_assignment(p_dst[lv_i], p_a[lv_i]);
+        body.add_assignment_op(p_dst[lv_i], GCC_JIT_BINARY_OP_PLUS, p_a[lv_i]);
         body.end_with_jump(cont);
       }).end_with_return();
     }

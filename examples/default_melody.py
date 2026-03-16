@@ -171,17 +171,22 @@ def release_tail(*parts):
 
 
 def main(dsp_instance=None, sleep=time.sleep):
+    if dsp_instance is None:
+        dsp_instance = globals().get("dsp")
+    if dsp_instance is None:
+        raise RuntimeError("pass dsp_instance explicitly or run via: python -m mc1 examples/default_melody.py")
+
     generators = [
-        voice(LEAD, bpm=BPM, dsp_instance=dsp, voice_controls=LEAD_CONTROLS),
-        voice(BASS, bpm=BPM, dsp_instance=dsp, voice_controls=BASS_CONTROLS),
+        voice(LEAD, bpm=BPM, dsp_instance=dsp_instance, voice_controls=LEAD_CONTROLS),
+        voice(BASS, bpm=BPM, dsp_instance=dsp_instance, voice_controls=BASS_CONTROLS),
     ]
 
-    dsp.start()
+    dsp_instance.start()
     try:
         play(generators, sleep=sleep)
         sleep(release_tail((LEAD, LEAD_CONTROLS), (BASS, BASS_CONTROLS)))
     finally:
-        dsp.stop()
+        dsp_instance.stop()
 
 
 if __name__ == "__main__":

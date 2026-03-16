@@ -318,6 +318,68 @@ pybind11::list runtime_module_ids_per_block(
   return blocks_module_ids;
 }
 
+pybind11::list runtime_render_blocks(
+    pybind11::bytes b,
+    long module_count,
+    long blocks,
+    long sample_rate = 44100,
+    long block_size = 32,
+    long output_channels = 2)
+{
+  auto dag = parse_dag_or_throw(b);
+
+  auto validated_module_count = static_cast<size_t>(validate_positive_arg(module_count, "module_count"));
+  auto validated_blocks = static_cast<size_t>(validate_positive_arg(blocks, "blocks"));
+  auto validated_sample_rate = validate_positive_arg(sample_rate, "sample_rate");
+  auto validated_block_size = static_cast<size_t>(validate_positive_arg(block_size, "block_size"));
+  auto validated_output_channels = validate_positive_arg(output_channels, "output_channels");
+  auto result = compile(dag, validated_sample_rate, validated_block_size);
+  auto compiled_synth = result[dag.name];
+
+  runtime rt(validated_sample_rate, validated_block_size, 0, validated_output_channels);
+  std::vector<std::unique_ptr<module_instance>> instances;
+  instances.reserve(validated_module_count);
+
+  for (size_t index = 0; index < validated_module_count; ++index) {
+    auto instance = std::make_unique<module_instance>(module_instance{
+      .module_id = static_cast<uint32_t>(index + 1),
+      .synth_name = dag.name,
+      .compiled_synth = compiled_synth,
+      .module = compiled_synth.instantiate(),
+    });
+    auto* instance_ptr = instance.get();
+    instances.push_back(std::move(instance));
+
+    rt_command start{
+      .sample_offset = 0,
+      .payload = rt_payload{start_module{
+        .module_id = instance_ptr->module_id,
+        .module = instance_ptr,
+        .insert_mode = module_insert_mode::append,
+        .anchor_module_id = 0,
+      }},
+    };
+    if (!rt.try_enqueue(start)) {
+      throw pybind11::value_error("rt command queue overflow");
+    }
+  }
+
+  std::vector<float> output(static_cast<size_t>(validated_output_channels) * validated_block_size, 0.0f);
+  pybind11::list rendered_blocks;
+  for (size_t block_index = 0; block_index < validated_blocks; ++block_index) {
+    std::fill(output.begin(), output.end(), 0.0f);
+    rt.process(output.data(), nullptr, static_cast<uint32_t>(validated_block_size));
+
+    pybind11::list rendered_block;
+    for (float sample : output) {
+      rendered_block.append(sample);
+    }
+    rendered_blocks.append(std::move(rendered_block));
+  }
+
+  return rendered_blocks;
+}
+
 } // namespace mc1
 
 namespace py = pybind11;
@@ -346,6 +408,13 @@ PYBIND11_MODULE(_test, m, py::mod_gil_not_used())
   m.def("_runtime_module_ids_per_block", &runtime_module_ids_per_block,
       py::arg("dag_bytes"),
       py::arg("control_steps"),
+      py::arg("sample_rate") = 44100,
+      py::arg("block_size") = 32,
+      py::arg("output_channels") = 2);
+  m.def("_runtime_render_blocks", &runtime_render_blocks,
+      py::arg("dag_bytes"),
+      py::arg("module_count"),
+      py::arg("blocks"),
       py::arg("sample_rate") = 44100,
       py::arg("block_size") = 32,
       py::arg("output_channels") = 2);

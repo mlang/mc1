@@ -146,6 +146,18 @@ def _audio_comparison(freq=1.0):
     Out.ar(0, SinOsc.ar(freq) < -0.5)
 
 
+@DAG
+def _double_out_constant():
+    zero = SinOsc.ar(0) * 0
+    Out.ar(0, zero + 0.25)
+    Out.ar(0, zero + 0.5)
+
+
+@DAG
+def _constant_quarter():
+    Out.ar(0, (SinOsc.ar(0) * 0) + 0.25)
+
+
 def test_dsp_append_accepts_multi_width_control_sequence():
     dsp = DSP()
     dsp.compile(bytes(_multi_control))
@@ -466,6 +478,31 @@ def test_audio_rate_comparison_renders_bipolar_mask():
     )
 
     assert rendered[0] == pytest.approx([-1.0, -1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0])
+
+
+def test_multiple_out_nodes_mix_on_same_bus():
+    rendered = mc1._test._render_blocks(
+        bytes(_double_out_constant),
+        blocks=1,
+        sample_rate=8,
+        block_size=4,
+        output_channels=1,
+    )
+
+    assert rendered[0] == pytest.approx([0.75, 0.75, 0.75, 0.75])
+
+
+def test_runtime_mixes_multiple_modules_on_same_bus():
+    rendered = mc1._test._runtime_render_blocks(
+        bytes(_constant_quarter),
+        module_count=2,
+        blocks=1,
+        sample_rate=8,
+        block_size=4,
+        output_channels=1,
+    )
+
+    assert rendered[0] == pytest.approx([0.5, 0.5, 0.5, 0.5])
 
 
 def test_adsr_done_action_removes_module_from_runtime():
