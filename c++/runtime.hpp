@@ -3,9 +3,9 @@
 #include "audio_buffer.hpp"
 #include "compiler.hpp"
 #include "rt_command.hpp"
-#include "rt_queue.hpp"
 
 #include <boost/container/static_vector.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
 
 #include <cstdint>
 #include <memory>
@@ -14,6 +14,9 @@
 #include <vector>
 
 namespace mc1 {
+
+template<typename T, size_t Capacity>
+using fixed_spsc_queue = boost::lockfree::spsc_queue<T, boost::lockfree::capacity<Capacity>>;
 
 class audio_device;
 
@@ -30,9 +33,6 @@ struct retire_token final {
 
 static_assert(std::is_trivially_copyable_v<retire_token>);
 static_assert(std::is_trivially_destructible_v<retire_token>);
-
-using rt_command_queue = fixed_spsc_queue<rt_command, 1024>;
-using rt_retire_queue = fixed_spsc_queue<retire_token, 1024>;
 
 class runtime final
 {
@@ -55,15 +55,13 @@ public:
   void process(float* output, const float* input, uint32_t frame_count);
 
 private:
-  static constexpr size_t max_modules = 1024;
-
   size_t block_size_;
   uint32_t input_channels_;
   uint32_t output_channels_;
   aligned_float_buffer abus_;
-  rt_command_queue commands_;
-  rt_retire_queue retired_modules_;
-  boost::container::static_vector<module_instance*, max_modules> modules_{};
+  fixed_spsc_queue<rt_command, 1024> commands_;
+  fixed_spsc_queue<retire_token, 1024> retired_modules_;
+  boost::container::static_vector<module_instance*, 1024> modules_{};
   std::unique_ptr<audio_device> audio_device_;
 
   bool retire_module(module_instance* module) noexcept;

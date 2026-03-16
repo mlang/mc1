@@ -1,7 +1,7 @@
 __attribute__((always_inline))
 float sinf_lookup (float x)
 {
-  float D.288;
+  float D.287;
   float b;
   float a;
   size_t i;
@@ -15,11 +15,11 @@ float sinf_lookup (float x)
   _3 = i * 4;
   _4 = &sinf_lookup__table[1] + _3;
   b = *_4;
-  _5 = (float) i;
-  _6 = x - _5;
-  _7 = b - a;
-  D.288 = fmaf (_6, _7, a);
-  return D.288;
+  _5 = b - a;
+  _6 = (float) i;
+  _7 = x - _6;
+  D.287 = fmaf (_7, _5, a);
+  return D.287;
 }
 
 
@@ -70,13 +70,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, flo
   cond:
   if (i <= 31) goto body; else goto done;
   body:
-  if (gate > 0.0) goto <D.290>; else goto <D.291>;
-  <D.290>:
+  if (gate > 0.0) goto <D.289>; else goto <D.290>;
+  <D.289>:
   iftmp.0 = 1;
-  goto <D.292>;
-  <D.291>:
+  goto <D.291>;
+  <D.290>:
   iftmp.0 = 0;
-  <D.292>:
+  <D.291>:
   if (iftmp.0 != 0) goto adsr_gate_on_check; else goto adsr_gate_fall_check;
   cont:
   i = i + 1;
@@ -103,13 +103,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, flo
   adsr_after_gate:
   if (stage == 1) goto adsr_attack_zero_time_check; else goto adsr_after_attack_zero;
   adsr_attack_zero_time_check:
-  if (attack < 0.0) goto <D.294>; else goto <D.295>;
-  <D.294>:
+  if (attack < 0.0) goto <D.293>; else goto <D.294>;
+  <D.293>:
   iftmp.1 = 1.0e+0;
-  goto <D.296>;
-  <D.295>:
+  goto <D.295>;
+  <D.294>:
   iftmp.1 = 0.0;
-  <D.296>:
+  <D.295>:
   _1 = 1.0e+0 - iftmp.1;
   _2 = attack * _1;
   if (_2 <= 0.0) goto adsr_attack_zero_apply; else goto adsr_after_attack_zero;
@@ -120,61 +120,61 @@ void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, flo
   adsr_after_attack_zero:
   if (stage == 2) goto adsr_decay_zero_time_check; else goto adsr_after_decay_zero;
   adsr_decay_zero_time_check:
-  if (decay < 0.0) goto <D.298>; else goto <D.299>;
-  <D.298>:
+  if (decay < 0.0) goto <D.297>; else goto <D.298>;
+  <D.297>:
   iftmp.2 = 1.0e+0;
-  goto <D.300>;
-  <D.299>:
+  goto <D.299>;
+  <D.298>:
   iftmp.2 = 0.0;
-  <D.300>:
+  <D.299>:
   _3 = 1.0e+0 - iftmp.2;
   _4 = decay * _3;
   if (_4 <= 0.0) goto adsr_decay_zero_apply; else goto adsr_after_decay_zero;
   adsr_decay_zero_apply:
-  if (sustain < 0.0) goto <D.302>; else goto <D.303>;
-  <D.302>:
+  if (sustain < 0.0) goto <D.301>; else goto <D.302>;
+  <D.301>:
   iftmp.3 = 1.0e+0;
-  goto <D.304>;
-  <D.303>:
+  goto <D.303>;
+  <D.302>:
   iftmp.3 = 0.0;
-  <D.304>:
+  <D.303>:
   _5 = 1.0e+0 - iftmp.3;
   _6 = sustain * _5;
-  if (sustain < 0.0) goto <D.306>; else goto <D.307>;
-  <D.306>:
+  if (sustain < 0.0) goto <D.305>; else goto <D.306>;
+  <D.305>:
   iftmp.4 = 1.0e+0;
-  goto <D.308>;
-  <D.307>:
+  goto <D.307>;
+  <D.306>:
   iftmp.4 = 0.0;
-  <D.308>:
+  <D.307>:
   _7 = 1.0e+0 - iftmp.4;
   _8 = sustain * _7;
   _9 = 1.0e+0 - _8;
-  if (sustain < 0.0) goto <D.311>; else goto <D.312>;
-  <D.311>:
+  if (sustain < 0.0) goto <D.310>; else goto <D.311>;
+  <D.310>:
   iftmp.6 = 1.0e+0;
-  goto <D.313>;
-  <D.312>:
+  goto <D.312>;
+  <D.311>:
   iftmp.6 = 0.0;
-  <D.313>:
+  <D.312>:
   _10 = 1.0e+0 - iftmp.6;
   _11 = sustain * _10;
-  if (_11 > 1.0e+0) goto <D.314>; else goto <D.315>;
-  <D.314>:
+  if (_11 > 1.0e+0) goto <D.313>; else goto <D.314>;
+  <D.313>:
   iftmp.5 = 1.0e+0;
-  goto <D.316>;
-  <D.315>:
+  goto <D.315>;
+  <D.314>:
   iftmp.5 = 0.0;
-  <D.316>:
+  <D.315>:
   _12 = iftmp.5 * _9;
   level = _6 + _12;
-  if (gate > 0.0) goto <D.318>; else goto <D.319>;
-  <D.318>:
+  if (gate > 0.0) goto <D.317>; else goto <D.318>;
+  <D.317>:
   iftmp.7 = 1;
-  goto <D.320>;
-  <D.319>:
+  goto <D.319>;
+  <D.318>:
   iftmp.7 = 0;
-  <D.320>:
+  <D.319>:
   if (iftmp.7 != 0) goto adsr_decay_zero_sustain_apply; else goto adsr_decay_zero_release_apply;
   adsr_decay_zero_sustain_apply:
   stage = 3;
@@ -198,13 +198,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, flo
   adsr_after_sustain_release:
   if (stage == 4) goto adsr_release_zero_time_check; else goto adsr_after_release_zero;
   adsr_release_zero_time_check:
-  if (release < 0.0) goto <D.322>; else goto <D.323>;
-  <D.322>:
+  if (release < 0.0) goto <D.321>; else goto <D.322>;
+  <D.321>:
   iftmp.8 = 1.0e+0;
-  goto <D.324>;
-  <D.323>:
+  goto <D.323>;
+  <D.322>:
   iftmp.8 = 0.0;
-  <D.324>:
+  <D.323>:
   _17 = 1.0e+0 - iftmp.8;
   _18 = release * _17;
   if (_18 <= 0.0) goto adsr_release_zero_apply; else goto adsr_after_release_zero;
@@ -220,13 +220,13 @@ void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, flo
   adsr_after_release_zero:
   if (stage == 1) goto adsr_stage_attack_apply; else goto adsr_stage_decay_check;
   adsr_stage_attack_apply:
-  if (attack < 0.0) goto <D.326>; else goto <D.327>;
-  <D.326>:
+  if (attack < 0.0) goto <D.325>; else goto <D.326>;
+  <D.325>:
   iftmp.9 = 1.0e+0;
-  goto <D.328>;
-  <D.327>:
+  goto <D.327>;
+  <D.326>:
   iftmp.9 = 0.0;
-  <D.328>:
+  <D.327>:
   _23 = 1.0e+0 - iftmp.9;
   _24 = attack * _23;
   _25 = _24 * 4.41e+4;
@@ -240,139 +240,139 @@ void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, flo
   adsr_stage_decay_check:
   if (stage == 2) goto adsr_stage_decay_apply; else goto adsr_stage_sustain_check;
   adsr_stage_decay_apply:
-  if (sustain < 0.0) goto <D.330>; else goto <D.331>;
-  <D.330>:
+  if (sustain < 0.0) goto <D.329>; else goto <D.330>;
+  <D.329>:
   iftmp.10 = 1.0e+0;
-  goto <D.332>;
-  <D.331>:
+  goto <D.331>;
+  <D.330>:
   iftmp.10 = 0.0;
-  <D.332>:
+  <D.331>:
   _27 = 1.0e+0 - iftmp.10;
   _28 = sustain * _27;
-  if (sustain < 0.0) goto <D.334>; else goto <D.335>;
-  <D.334>:
+  if (sustain < 0.0) goto <D.333>; else goto <D.334>;
+  <D.333>:
   iftmp.11 = 1.0e+0;
-  goto <D.336>;
-  <D.335>:
+  goto <D.335>;
+  <D.334>:
   iftmp.11 = 0.0;
-  <D.336>:
+  <D.335>:
   _29 = 1.0e+0 - iftmp.11;
   _30 = sustain * _29;
   _31 = 1.0e+0 - _30;
-  if (sustain < 0.0) goto <D.339>; else goto <D.340>;
-  <D.339>:
+  if (sustain < 0.0) goto <D.338>; else goto <D.339>;
+  <D.338>:
   iftmp.13 = 1.0e+0;
-  goto <D.341>;
-  <D.340>:
+  goto <D.340>;
+  <D.339>:
   iftmp.13 = 0.0;
-  <D.341>:
+  <D.340>:
   _32 = 1.0e+0 - iftmp.13;
   _33 = sustain * _32;
-  if (_33 > 1.0e+0) goto <D.342>; else goto <D.343>;
-  <D.342>:
+  if (_33 > 1.0e+0) goto <D.341>; else goto <D.342>;
+  <D.341>:
   iftmp.12 = 1.0e+0;
-  goto <D.344>;
-  <D.343>:
+  goto <D.343>;
+  <D.342>:
   iftmp.12 = 0.0;
-  <D.344>:
+  <D.343>:
   _34 = iftmp.12 * _31;
   _35 = _28 + _34;
   _36 = 1.0e+0 - _35;
-  if (decay < 0.0) goto <D.346>; else goto <D.347>;
-  <D.346>:
+  if (decay < 0.0) goto <D.345>; else goto <D.346>;
+  <D.345>:
   iftmp.14 = 1.0e+0;
-  goto <D.348>;
-  <D.347>:
+  goto <D.347>;
+  <D.346>:
   iftmp.14 = 0.0;
-  <D.348>:
+  <D.347>:
   _37 = 1.0e+0 - iftmp.14;
   _38 = decay * _37;
   _39 = _38 * 4.41e+4;
   _40 = _36 / _39;
   level = level - _40;
-  if (sustain < 0.0) goto <D.350>; else goto <D.351>;
-  <D.350>:
+  if (sustain < 0.0) goto <D.349>; else goto <D.350>;
+  <D.349>:
   iftmp.15 = 1.0e+0;
-  goto <D.352>;
-  <D.351>:
+  goto <D.351>;
+  <D.350>:
   iftmp.15 = 0.0;
-  <D.352>:
+  <D.351>:
   _41 = 1.0e+0 - iftmp.15;
   _42 = sustain * _41;
-  if (sustain < 0.0) goto <D.354>; else goto <D.355>;
-  <D.354>:
+  if (sustain < 0.0) goto <D.353>; else goto <D.354>;
+  <D.353>:
   iftmp.16 = 1.0e+0;
-  goto <D.356>;
-  <D.355>:
+  goto <D.355>;
+  <D.354>:
   iftmp.16 = 0.0;
-  <D.356>:
+  <D.355>:
   _43 = 1.0e+0 - iftmp.16;
   _44 = sustain * _43;
   _45 = 1.0e+0 - _44;
-  if (sustain < 0.0) goto <D.359>; else goto <D.360>;
-  <D.359>:
+  if (sustain < 0.0) goto <D.358>; else goto <D.359>;
+  <D.358>:
   iftmp.18 = 1.0e+0;
-  goto <D.361>;
-  <D.360>:
+  goto <D.360>;
+  <D.359>:
   iftmp.18 = 0.0;
-  <D.361>:
+  <D.360>:
   _46 = 1.0e+0 - iftmp.18;
   _47 = sustain * _46;
-  if (_47 > 1.0e+0) goto <D.362>; else goto <D.363>;
-  <D.362>:
+  if (_47 > 1.0e+0) goto <D.361>; else goto <D.362>;
+  <D.361>:
   iftmp.17 = 1.0e+0;
-  goto <D.364>;
-  <D.363>:
+  goto <D.363>;
+  <D.362>:
   iftmp.17 = 0.0;
-  <D.364>:
+  <D.363>:
   _48 = iftmp.17 * _45;
   _49 = _42 + _48;
   if (level <= _49) goto adsr_stage_decay_finish; else goto adsr_sample_done;
   adsr_stage_decay_finish:
-  if (sustain < 0.0) goto <D.366>; else goto <D.367>;
-  <D.366>:
+  if (sustain < 0.0) goto <D.365>; else goto <D.366>;
+  <D.365>:
   iftmp.19 = 1.0e+0;
-  goto <D.368>;
-  <D.367>:
+  goto <D.367>;
+  <D.366>:
   iftmp.19 = 0.0;
-  <D.368>:
+  <D.367>:
   _50 = 1.0e+0 - iftmp.19;
   _51 = sustain * _50;
-  if (sustain < 0.0) goto <D.370>; else goto <D.371>;
-  <D.370>:
+  if (sustain < 0.0) goto <D.369>; else goto <D.370>;
+  <D.369>:
   iftmp.20 = 1.0e+0;
-  goto <D.372>;
-  <D.371>:
+  goto <D.371>;
+  <D.370>:
   iftmp.20 = 0.0;
-  <D.372>:
+  <D.371>:
   _52 = 1.0e+0 - iftmp.20;
   _53 = sustain * _52;
   _54 = 1.0e+0 - _53;
-  if (sustain < 0.0) goto <D.375>; else goto <D.376>;
-  <D.375>:
+  if (sustain < 0.0) goto <D.374>; else goto <D.375>;
+  <D.374>:
   iftmp.22 = 1.0e+0;
-  goto <D.377>;
-  <D.376>:
+  goto <D.376>;
+  <D.375>:
   iftmp.22 = 0.0;
-  <D.377>:
+  <D.376>:
   _55 = 1.0e+0 - iftmp.22;
   _56 = sustain * _55;
-  if (_56 > 1.0e+0) goto <D.378>; else goto <D.379>;
-  <D.378>:
+  if (_56 > 1.0e+0) goto <D.377>; else goto <D.378>;
+  <D.377>:
   iftmp.21 = 1.0e+0;
-  goto <D.380>;
-  <D.379>:
+  goto <D.379>;
+  <D.378>:
   iftmp.21 = 0.0;
-  <D.380>:
+  <D.379>:
   _57 = iftmp.21 * _54;
   level = _51 + _57;
-  if (gate > 0.0) goto <D.382>; else goto <D.383>;
-  <D.382>:
+  if (gate > 0.0) goto <D.381>; else goto <D.382>;
+  <D.381>:
   iftmp.23 = 1;
-  goto <D.384>;
-  <D.383>:
+  goto <D.383>;
+  <D.382>:
   iftmp.23 = 0;
-  <D.384>:
+  <D.383>:
   if (iftmp.23 != 0) goto adsr_stage_decay_finish_sustain; else goto adsr_stage_decay_finish_release;
   adsr_stage_decay_finish_sustain:
   stage = 3;
@@ -384,54 +384,54 @@ void ADSR_bbbbbba (struct adsr_state * st, float * restrict out, float gate, flo
   adsr_stage_sustain_check:
   if (stage == 3) goto adsr_stage_sustain_apply; else goto adsr_stage_release_check;
   adsr_stage_sustain_apply:
-  if (sustain < 0.0) goto <D.386>; else goto <D.387>;
-  <D.386>:
+  if (sustain < 0.0) goto <D.385>; else goto <D.386>;
+  <D.385>:
   iftmp.24 = 1.0e+0;
-  goto <D.388>;
-  <D.387>:
+  goto <D.387>;
+  <D.386>:
   iftmp.24 = 0.0;
-  <D.388>:
+  <D.387>:
   _58 = 1.0e+0 - iftmp.24;
   _59 = sustain * _58;
-  if (sustain < 0.0) goto <D.390>; else goto <D.391>;
-  <D.390>:
+  if (sustain < 0.0) goto <D.389>; else goto <D.390>;
+  <D.389>:
   iftmp.25 = 1.0e+0;
-  goto <D.392>;
-  <D.391>:
+  goto <D.391>;
+  <D.390>:
   iftmp.25 = 0.0;
-  <D.392>:
+  <D.391>:
   _60 = 1.0e+0 - iftmp.25;
   _61 = sustain * _60;
   _62 = 1.0e+0 - _61;
-  if (sustain < 0.0) goto <D.395>; else goto <D.396>;
-  <D.395>:
+  if (sustain < 0.0) goto <D.394>; else goto <D.395>;
+  <D.394>:
   iftmp.27 = 1.0e+0;
-  goto <D.397>;
-  <D.396>:
+  goto <D.396>;
+  <D.395>:
   iftmp.27 = 0.0;
-  <D.397>:
+  <D.396>:
   _63 = 1.0e+0 - iftmp.27;
   _64 = sustain * _63;
-  if (_64 > 1.0e+0) goto <D.398>; else goto <D.399>;
-  <D.398>:
+  if (_64 > 1.0e+0) goto <D.397>; else goto <D.398>;
+  <D.397>:
   iftmp.26 = 1.0e+0;
-  goto <D.400>;
-  <D.399>:
+  goto <D.399>;
+  <D.398>:
   iftmp.26 = 0.0;
-  <D.400>:
+  <D.399>:
   _65 = iftmp.26 * _62;
   level = _59 + _65;
   goto adsr_sample_done;
   adsr_stage_release_check:
   if (stage == 4) goto adsr_stage_release_apply; else goto adsr_stage_idle_apply;
   adsr_stage_release_apply:
-  if (release < 0.0) goto <D.402>; else goto <D.403>;
-  <D.402>:
+  if (release < 0.0) goto <D.401>; else goto <D.402>;
+  <D.401>:
   iftmp.28 = 1.0e+0;
-  goto <D.404>;
-  <D.403>:
+  goto <D.403>;
+  <D.402>:
   iftmp.28 = 0.0;
-  <D.404>:
+  <D.403>:
   _66 = 1.0e+0 - iftmp.28;
   _67 = release * _66;
   _68 = _67 * 4.41e+4;
@@ -480,33 +480,33 @@ void SinOsc_bba (struct sinosc_state * st, float * restrict out, float freq, flo
   body:
   _1 = phase + phase;
   _2 = phase + phase;
-  if (_2 >= 6.283185482025146484375e+0) goto <D.406>; else goto <D.407>;
-  <D.406>:
+  if (_2 >= 6.283185482025146484375e+0) goto <D.405>; else goto <D.406>;
+  <D.405>:
   iftmp.29 = 1.0e+0;
-  goto <D.408>;
-  <D.407>:
+  goto <D.407>;
+  <D.406>:
   iftmp.29 = 0.0;
-  <D.408>:
+  <D.407>:
   _3 = iftmp.29 * 6.283185482025146484375e+0;
   _4 = _1 - _3;
   _5 = phase + phase;
   _6 = phase + phase;
-  if (_6 >= 6.283185482025146484375e+0) goto <D.411>; else goto <D.412>;
-  <D.411>:
+  if (_6 >= 6.283185482025146484375e+0) goto <D.410>; else goto <D.411>;
+  <D.410>:
   iftmp.31 = 1.0e+0;
-  goto <D.413>;
-  <D.412>:
+  goto <D.412>;
+  <D.411>:
   iftmp.31 = 0.0;
-  <D.413>:
+  <D.412>:
   _7 = iftmp.31 * 6.283185482025146484375e+0;
   _8 = _5 - _7;
-  if (_8 < 0.0) goto <D.414>; else goto <D.415>;
-  <D.414>:
+  if (_8 < 0.0) goto <D.413>; else goto <D.414>;
+  <D.413>:
   iftmp.30 = 1.0e+0;
-  goto <D.416>;
-  <D.415>:
+  goto <D.415>;
+  <D.414>:
   iftmp.30 = 0.0;
-  <D.416>:
+  <D.415>:
   _9 = iftmp.30 * 6.283185482025146484375e+0;
   _10 = _4 + _9;
   _11 = i * 4;
@@ -517,35 +517,35 @@ void SinOsc_bba (struct sinosc_state * st, float * restrict out, float freq, flo
   _15 = phase + _14;
   _16 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _17 = phase + _16;
-  if (_17 >= 6.283185482025146484375e+0) goto <D.418>; else goto <D.419>;
-  <D.418>:
+  if (_17 >= 6.283185482025146484375e+0) goto <D.417>; else goto <D.418>;
+  <D.417>:
   iftmp.32 = 1.0e+0;
-  goto <D.420>;
-  <D.419>:
+  goto <D.419>;
+  <D.418>:
   iftmp.32 = 0.0;
-  <D.420>:
+  <D.419>:
   _18 = iftmp.32 * 6.283185482025146484375e+0;
   _19 = _15 - _18;
   _20 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _21 = phase + _20;
   _22 = freq * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _23 = phase + _22;
-  if (_23 >= 6.283185482025146484375e+0) goto <D.423>; else goto <D.424>;
-  <D.423>:
+  if (_23 >= 6.283185482025146484375e+0) goto <D.422>; else goto <D.423>;
+  <D.422>:
   iftmp.34 = 1.0e+0;
-  goto <D.425>;
-  <D.424>:
+  goto <D.424>;
+  <D.423>:
   iftmp.34 = 0.0;
-  <D.425>:
+  <D.424>:
   _24 = iftmp.34 * 6.283185482025146484375e+0;
   _25 = _21 - _24;
-  if (_25 < 0.0) goto <D.426>; else goto <D.427>;
-  <D.426>:
+  if (_25 < 0.0) goto <D.425>; else goto <D.426>;
+  <D.425>:
   iftmp.33 = 1.0e+0;
-  goto <D.428>;
-  <D.427>:
+  goto <D.427>;
+  <D.426>:
   iftmp.33 = 0.0;
-  <D.428>:
+  <D.427>:
   _26 = iftmp.33 * 6.283185482025146484375e+0;
   phase = _19 + _26;
   goto cont;
@@ -659,33 +659,33 @@ void SinOsc_aba (struct sinosc_state * st, float * restrict out, const float * f
   body:
   _1 = phase + phase;
   _2 = phase + phase;
-  if (_2 >= 6.283185482025146484375e+0) goto <D.430>; else goto <D.431>;
-  <D.430>:
+  if (_2 >= 6.283185482025146484375e+0) goto <D.429>; else goto <D.430>;
+  <D.429>:
   iftmp.35 = 1.0e+0;
-  goto <D.432>;
-  <D.431>:
+  goto <D.431>;
+  <D.430>:
   iftmp.35 = 0.0;
-  <D.432>:
+  <D.431>:
   _3 = iftmp.35 * 6.283185482025146484375e+0;
   _4 = _1 - _3;
   _5 = phase + phase;
   _6 = phase + phase;
-  if (_6 >= 6.283185482025146484375e+0) goto <D.435>; else goto <D.436>;
-  <D.435>:
+  if (_6 >= 6.283185482025146484375e+0) goto <D.434>; else goto <D.435>;
+  <D.434>:
   iftmp.37 = 1.0e+0;
-  goto <D.437>;
-  <D.436>:
+  goto <D.436>;
+  <D.435>:
   iftmp.37 = 0.0;
-  <D.437>:
+  <D.436>:
   _7 = iftmp.37 * 6.283185482025146484375e+0;
   _8 = _5 - _7;
-  if (_8 < 0.0) goto <D.438>; else goto <D.439>;
-  <D.438>:
+  if (_8 < 0.0) goto <D.437>; else goto <D.438>;
+  <D.437>:
   iftmp.36 = 1.0e+0;
-  goto <D.440>;
-  <D.439>:
+  goto <D.439>;
+  <D.438>:
   iftmp.36 = 0.0;
-  <D.440>:
+  <D.439>:
   _9 = iftmp.36 * 6.283185482025146484375e+0;
   _10 = _4 + _9;
   _11 = i * 4;
@@ -702,13 +702,13 @@ void SinOsc_aba (struct sinosc_state * st, float * restrict out, const float * f
   _21 = *_20;
   _22 = _21 * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _23 = phase + _22;
-  if (_23 >= 6.283185482025146484375e+0) goto <D.442>; else goto <D.443>;
-  <D.442>:
+  if (_23 >= 6.283185482025146484375e+0) goto <D.441>; else goto <D.442>;
+  <D.441>:
   iftmp.38 = 1.0e+0;
-  goto <D.444>;
-  <D.443>:
+  goto <D.443>;
+  <D.442>:
   iftmp.38 = 0.0;
-  <D.444>:
+  <D.443>:
   _24 = iftmp.38 * 6.283185482025146484375e+0;
   _25 = _18 - _24;
   _26 = i * 4;
@@ -721,22 +721,22 @@ void SinOsc_aba (struct sinosc_state * st, float * restrict out, const float * f
   _33 = *_32;
   _34 = _33 * 1.42475857305659548476123310578600467124488204717636108398e-4;
   _35 = phase + _34;
-  if (_35 >= 6.283185482025146484375e+0) goto <D.447>; else goto <D.448>;
-  <D.447>:
+  if (_35 >= 6.283185482025146484375e+0) goto <D.446>; else goto <D.447>;
+  <D.446>:
   iftmp.40 = 1.0e+0;
-  goto <D.449>;
-  <D.448>:
+  goto <D.448>;
+  <D.447>:
   iftmp.40 = 0.0;
-  <D.449>:
+  <D.448>:
   _36 = iftmp.40 * 6.283185482025146484375e+0;
   _37 = _30 - _36;
-  if (_37 < 0.0) goto <D.450>; else goto <D.451>;
-  <D.450>:
+  if (_37 < 0.0) goto <D.449>; else goto <D.450>;
+  <D.449>:
   iftmp.39 = 1.0e+0;
-  goto <D.452>;
-  <D.451>:
+  goto <D.451>;
+  <D.450>:
   iftmp.39 = 0.0;
-  <D.452>:
+  <D.451>:
   _38 = iftmp.39 * 6.283185482025146484375e+0;
   phase = _25 + _38;
   goto cont;
@@ -857,7 +857,7 @@ void default_init (void * restrict state)
 
 unsigned int default_process (void * restrict state, const float * restrict controls, float * restrict abus)
 {
-  unsigned int D.453;
+  unsigned int D.452;
   float e31[64];
   float e29[32];
   float e28[32];
@@ -877,85 +877,85 @@ unsigned int default_process (void * restrict state, const float * restrict cont
     {
       entry:
       done_action = 0;
-      _1 = &MEM[(struct default_state *)state].s15;
-      _2 = __builtin_assume_aligned (&e15[0], 64);
-      _3 = controls + 20;
+      _1 = controls + 56;
+      _2 = *_1;
+      _3 = controls + 36;
       _4 = *_3;
-      _5 = controls + 24;
+      _5 = controls + 32;
       _6 = *_5;
       _7 = controls + 28;
       _8 = *_7;
-      _9 = controls + 32;
+      _9 = controls + 24;
       _10 = *_9;
-      _11 = controls + 36;
+      _11 = controls + 20;
       _12 = *_11;
-      _13 = controls + 56;
-      _14 = *_13;
-      ADSR_bbbbbba (_1, _2, _4, _6, _8, _10, _12, _14, &done_action);
-      _15 = &MEM[(struct default_state *)state].s17;
-      _16 = __builtin_assume_aligned (&e17[0], 64);
-      _17 = controls + 20;
+      _13 = __builtin_assume_aligned (&e15[0], 64);
+      _14 = &MEM[(struct default_state *)state].s15;
+      ADSR_bbbbbba (_14, _13, _12, _10, _8, _6, _4, _2, &done_action);
+      _15 = controls + 52;
+      _16 = *_15;
+      _17 = controls + 48;
       _18 = *_17;
-      _19 = controls + 40;
+      _19 = controls + 44;
       _20 = *_19;
-      _21 = controls + 44;
+      _21 = controls + 40;
       _22 = *_21;
-      _23 = controls + 48;
+      _23 = controls + 20;
       _24 = *_23;
-      _25 = controls + 52;
-      _26 = *_25;
-      ADSR_bbbbbba (_15, _16, _18, _20, _22, _24, _26, 0.0, &done_action);
+      _25 = __builtin_assume_aligned (&e17[0], 64);
+      _26 = &MEM[(struct default_state *)state].s17;
+      ADSR_bbbbbba (_26, _25, _24, _22, _20, _18, _16, 0.0, &done_action);
       _27 = *controls;
       _28 = controls + 16;
       _29 = *_28;
       e18 = _27 * _29;
-      _30 = &MEM[(struct default_state *)state].s20;
-      _31 = __builtin_assume_aligned (&e20[0], 64);
-      SinOsc_bba (_30, _31, e18, 0.0);
+      _30 = __builtin_assume_aligned (&e20[0], 64);
+      _31 = &MEM[(struct default_state *)state].s20;
+      SinOsc_bba (_31, _30, e18, 0.0);
       _32 = *controls;
       _33 = controls + 8;
       _34 = *_33;
       e21 = _32 * _34;
-      _35 = __builtin_assume_aligned (&e22[0], 64);
-      _36 = __builtin_assume_aligned (&e17[0], 64);
-      Mul_baa (_35, e21, _36);
-      _37 = __builtin_assume_aligned (&e23[0], 64);
+      _35 = __builtin_assume_aligned (&e17[0], 64);
+      _36 = __builtin_assume_aligned (&e22[0], 64);
+      Mul_baa (_36, e21, _35);
+      _37 = __builtin_assume_aligned (&e22[0], 64);
       _38 = __builtin_assume_aligned (&e20[0], 64);
-      _39 = __builtin_assume_aligned (&e22[0], 64);
-      Mul_aaa (_37, _38, _39);
+      _39 = __builtin_assume_aligned (&e23[0], 64);
+      Mul_aaa (_39, _38, _37);
       _40 = *controls;
       _41 = controls + 12;
       _42 = *_41;
       e24 = _40 * _42;
-      _43 = __builtin_assume_aligned (&e25[0], 64);
-      _44 = __builtin_assume_aligned (&e23[0], 64);
-      Add_baa (_43, e24, _44);
-      _45 = &MEM[(struct default_state *)state].s27;
+      _43 = __builtin_assume_aligned (&e23[0], 64);
+      _44 = __builtin_assume_aligned (&e25[0], 64);
+      Add_baa (_44, e24, _43);
+      _45 = __builtin_assume_aligned (&e25[0], 64);
       _46 = __builtin_assume_aligned (&e27[0], 64);
-      _47 = __builtin_assume_aligned (&e25[0], 64);
-      SinOsc_aba (_45, _46, _47, 0.0);
-      _48 = __builtin_assume_aligned (&e28[0], 64);
-      _49 = __builtin_assume_aligned (&e27[0], 64);
-      _50 = controls + 4;
-      _51 = *_50;
-      Mul_aba (_48, _49, _51);
-      _52 = __builtin_assume_aligned (&e29[0], 64);
+      _47 = &MEM[(struct default_state *)state].s27;
+      SinOsc_aba (_47, _46, _45, 0.0);
+      _48 = controls + 4;
+      _49 = *_48;
+      _50 = __builtin_assume_aligned (&e27[0], 64);
+      _51 = __builtin_assume_aligned (&e28[0], 64);
+      Mul_aba (_51, _50, _49);
+      _52 = __builtin_assume_aligned (&e15[0], 64);
       _53 = __builtin_assume_aligned (&e28[0], 64);
-      _54 = __builtin_assume_aligned (&e15[0], 64);
-      Mul_aaa (_52, _53, _54);
-      _55 = __builtin_assume_aligned (&e31[0], 64);
-      _56 = __builtin_assume_aligned (&e29[0], 64);
-      Pan_aba (_55, _56, 0.0);
-      _57 = __builtin_assume_aligned (abus, 64);
-      _58 = __builtin_assume_aligned (&e31[0], 64);
-      Out_baa (_57, _58);
-      _59 = __builtin_assume_aligned (abus, 64);
+      _54 = __builtin_assume_aligned (&e29[0], 64);
+      Mul_aaa (_54, _53, _52);
+      _55 = __builtin_assume_aligned (&e29[0], 64);
+      _56 = __builtin_assume_aligned (&e31[0], 64);
+      Pan_aba (_56, _55, 0.0);
+      _57 = __builtin_assume_aligned (&e31[0], 64);
+      _58 = __builtin_assume_aligned (abus, 64);
+      Out_baa (_58, _57);
+      _59 = __builtin_assume_aligned (&e31[0], 64);
       _60 = _59 + 128;
-      _61 = __builtin_assume_aligned (&e31[0], 64);
+      _61 = __builtin_assume_aligned (abus, 64);
       _62 = _61 + 128;
-      Out_baa (_60, _62);
-      D.453 = done_action;
-      return D.453;
+      Out_baa (_62, _60);
+      D.452 = done_action;
+      return D.452;
     }
   finally
     {
@@ -974,1073 +974,1246 @@ unsigned int default_process (void * restrict state, const float * restrict cont
 }
 
 
-	.arch armv8-a
 	.file	"fake.c"
 	.text
-	.align	2
-	.p2align 5,,15
-	.type	ADSR_bbbbbba, %function
+	.p2align 4
+	.type	ADSR_bbbbbba, @function
 ADSR_bbbbbba:
 .LFB1:
 	.cfi_startproc
 .L2:
-	movi	v25.2s, #0
-	fmov	s29, 1.0e+0
-	ldr	s31, [x0]
-	ldr	s24, [x0, 12]
-	ldp	w4, w3, [x0, 4]
-	fcmpe	s1, s25
-	fcsel	s30, s29, s25, mi
-	fcmpe	s2, s25
-	fcsel	s27, s29, s25, mi
-	fcmpe	s4, s25
-	fcsel	s25, s29, s25, mi
-	fcmp	s5, s29
-	cset	w6, eq
-	fcmpe	s0, #0.0
-	cset	w7, gt
-	bgt	.L3
-	fcmpe	s3, #0.0
-	bmi	.L4
-	cbz	w3, .L82
-	cbnz	w4, .L83
-	mov	x3, 0
-	.p2align 5,,15
-.L7:
-	str	wzr, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	movi	v31.2s, #0
-	cmp	x3, 32
-	beq	.L21
-.L5:
-	cmp	w4, 1
-	bne	.L132
-	fmov	s26, 1.0e+0
-	mov	w5, 17408
-	movk	w5, 0x472c, lsl 16
-	fmov	s23, w5
-	fsub	s28, s26, s30
-	fmul	s28, s28, s1
-	.p2align 5,,15
-.L8:
-	fcmpe	s28, #0.0
-	bls	.L86
-	fmul	s29, s28, s23
-	fdiv	s29, s26, s29
-	fadd	s31, s31, s29
-	fcmpe	s31, s26
-	bge	.L108
-	str	s31, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L8
-.L21:
-	str	s31, [x0]
-	stp	w4, w7, [x0, 4]
-	str	s24, [x0, 12]
-	ret
-	.p2align 2,,3
-.L3:
-	cmp	w3, 0
-	mov	x3, 0
-	ccmp	w4, 1, 4, ne
-	bne	.L47
-	fsub	s30, s29, s30
-	mov	w4, 17408
-	movk	w4, 0x472c, lsl 16
-	fmov	s28, w4
-	fmul	s1, s30, s1
-	.p2align 5,,15
-.L46:
-.L52:
-	fcmpe	s1, #0.0
-	bls	.L111
-	fmul	s30, s1, s28
-	fdiv	s30, s29, s30
-	fadd	s31, s31, s30
-	fcmpe	s31, s29
-	bge	.L103
-.L75:
-	str	s31, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L46
-	mov	w4, 1
-	b	.L21
-	.p2align 2,,3
-.L57:
-	movi	v26.2s, #0
-	fmul	s29, s3, s26
-	fsub	s31, s31, s29
-	fmul	s31, s31, s26
-.L71:
-	fadd	s31, s31, s29
-	mov	w4, 17408
-	movk	w4, 0x472c, lsl 16
-	fmov	s29, 1.0e+0
-	fmov	s26, w4
-	mov	w5, 2
-	mov	w4, 3
-	fsub	s29, s29, s31
-	fmul	s30, s30, s26
-	fdiv	s30, s29, s30
-	fsub	s30, s28, s30
-	fcmpe	s31, s30
-	fcsel	s31, s31, s30, ge
-	csel	w4, w4, w5, ge
-.L51:
-.L77:
-.L78:
-.L79:
-.L80:
-.L81:
-	str	s31, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	beq	.L21
-.L47:
-	fmov	s28, s31
-	cmp	w4, 2
-	beq	.L55
-	cmp	w4, 3
-	beq	.L49
-	cmp	w4, 4
-	bne	.L157
-.L50:
-.L66:
-	fmov	s30, 1.0e+0
-	fsub	s30, s30, s25
-	fmul	s30, s30, s4
-	fcmpe	s30, #0.0
-	bls	.L69
-	mov	w5, 17408
-	movk	w5, 0x472c, lsl 16
-	fmov	s30, w5
-	fmul	s30, s4, s30
-	fdiv	s30, s24, s30
-	fsub	s31, s31, s30
-	fcmpe	s31, #0.0
-	bls	.L69
-	b	.L81
-	.p2align 2,,3
-.L111:
-	fmov	s28, 1.0e+0
-.L48:
-.L55:
-	fmov	s31, 1.0e+0
-	fsub	s30, s31, s27
-	fmul	s30, s30, s2
-	fcmpe	s30, #0.0
-	bls	.L56
-	fcmpe	s3, #0.0
-	bmi	.L57
-	fcmpe	s3, s31
-	fmov	s29, s3
-	fsub	s31, s31, s3
-	bgt	.L71
-	movi	v26.2s, #0
-	fmul	s31, s31, s26
-	b	.L71
-	.p2align 2,,3
-.L69:
-	ldr	w4, [x2]
-	movi	v31.2s, #0
-	orr	w5, w6, w4
-	mov	w4, 0
-	str	w5, [x2]
-	b	.L81
-	.p2align 2,,3
-.L56:
-	fcmpe	s3, #0.0
-	bmi	.L112
-.L153:
-	fcmpe	s3, s31
-	fsub	s31, s31, s3
-	bgt	.L114
-	movi	v30.2s, #0
-	mov	w4, 3
-	fmadd	s31, s31, s30, s3
-	b	.L81
-	.p2align 2,,3
-.L114:
-	fadd	s31, s31, s3
-	mov	w4, 3
-	b	.L81
-	.p2align 2,,3
-.L103:
-	mov	w4, 2
-	fmov	s31, 1.0e+0
-	b	.L81
-	.p2align 2,,3
-.L49:
-	fcmpe	s3, #0.0
-	bmi	.L113
-	fmov	s31, 1.0e+0
-	b	.L153
-	.p2align 2,,3
-.L112:
-	movi	v30.2s, #0
-	mov	w4, 3
-	fmsub	s31, s3, s30, s31
-	fmul	s31, s31, s30
-	fmadd	s31, s3, s30, s31
-	b	.L81
-	.p2align 2,,3
-.L113:
-	movi	v30.2s, #0
-	fmov	s31, 1.0e+0
-	mov	w4, 3
-	fmsub	s31, s3, s30, s31
-	fmul	s31, s31, s30
-	fmadd	s31, s3, s30, s31
-	b	.L81
+	pxor	%xmm7, %xmm7
+	movq	%rdi, %r8
+	movaps	%xmm0, %xmm6
+	movq	%rdx, %rdi
+	comiss	%xmm1, %xmm7
+	movss	(%r8), %xmm0
+	movl	4(%r8), %edx
+	movq	%rsi, %rax
+	movl	8(%r8), %r10d
+	movss	12(%r8), %xmm10
+	jbe	.L3
+	movss	.LC1(%rip), %xmm7
+	movaps	%xmm7, %xmm12
 .L4:
-	cbz	w3, .L158
-	mov	x3, 0
-	cbnz	w4, .L149
-	.p2align 5,,15
-.L40:
-	str	wzr, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L40
-.L151:
-	movi	v31.2s, #0
-	b	.L21
-.L82:
-	mov	x3, 0
-	b	.L5
-	.p2align 2,,3
-.L86:
-	fmov	s31, 1.0e+0
-.L9:
-	fmov	s26, 1.0e+0
-	fsub	s28, s26, s27
-	fmul	s28, s28, s2
-.L24:
-	fcmpe	s28, #0.0
-	bls	.L106
-	fcmpe	s3, s26
-	mov	w4, 17408
-	movk	w4, 0x472c, lsl 16
-	fmov	s22, w4
-	fsub	s29, s26, s3
-	fmov	s23, 1.0e+0
-	fmul	s22, s28, s22
-	bgt	.L13
-	movi	v21.2s, #0
-	fmul	s29, s29, s21
-	.p2align 5,,15
-.L13:
-	fadd	s29, s3, s29
-	fsub	s23, s23, s29
-	fdiv	s23, s23, s22
-	fsub	s31, s31, s23
-	fcmpe	s29, s31
-	bge	.L14
-	str	s31, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L24
-	mov	w4, 2
-	b	.L21
-	.p2align 2,,3
-.L108:
-	str	s26, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L86
-.L100:
-	mov	w4, 2
-	fmov	s31, 1.0e+0
-	b	.L21
-	.p2align 2,,3
-.L14:
-	str	s29, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	fmov	s24, s29
-	cmp	x3, 32
-	beq	.L89
-.L6:
-	fmov	s31, 1.0e+0
-	fsub	s31, s31, s25
-	fmul	s31, s31, s4
-.L20:
-	fcmpe	s31, #0.0
-	bls	.L19
-	mov	w4, 17408
-	movk	w4, 0x472c, lsl 16
-	fmov	s28, w4
-	fmul	s28, s4, s28
-	fdiv	s28, s24, s28
-	fsub	s29, s29, s28
-	fcmpe	s29, #0.0
-	bls	.L19
-	str	s29, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L20
-	fmov	s31, s29
-	mov	w4, 4
-	b	.L21
-	.p2align 2,,3
-.L19:
-	ldr	w4, [x2]
-	str	wzr, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	orr	w4, w6, w4
-	str	w4, [x2]
-	mov	w4, 0
-	cmp	x3, 32
-	bne	.L7
-	movi	v31.2s, #0
-	b	.L21
-	.p2align 2,,3
-.L106:
-	fcmpe	s3, s26
-	fsub	s26, s26, s3
-	bgt	.L12
-	movi	v24.2s, #0
-	fmadd	s24, s26, s24, s3
-	fmov	s29, s24
-	b	.L6
-	.p2align 2,,3
-.L12:
-	fadd	s24, s3, s26
-	fmov	s29, s24
-	b	.L6
-.L89:
-	fmov	s31, s29
-	mov	w4, 4
-	b	.L21
-.L149:
-	fmov	s24, s31
-	.p2align 5,,15
-.L38:
-	fmov	s30, 1.0e+0
-	mov	w4, 17408
-	movk	w4, 0x472c, lsl 16
-	fmov	s28, w4
-	fsub	s30, s30, s25
-	fmul	s30, s30, s4
-.L128:
-	fcmpe	s30, #0.0
-	bls	.L31
-	fmul	s29, s4, s28
-	fdiv	s29, s24, s29
-	fsub	s31, s31, s29
-	fcmpe	s31, #0.0
-	bls	.L31
-	str	s31, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L128
-	mov	w4, 4
-	b	.L21
-	.p2align 2,,3
-.L31:
-	ldr	w4, [x2]
-	str	wzr, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	orr	w6, w6, w4
-	str	w6, [x2]
-	mov	w4, 0
-	cmp	x3, 32
-	beq	.L151
-	str	wzr, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L40
-	b	.L151
-.L132:
-	cmp	w4, 2
-	beq	.L9
-	cmp	w4, 3
-	beq	.L84
-	cmp	w4, 4
-	bne	.L7
-	fmov	s29, s31
-	b	.L6
+	pxor	%xmm9, %xmm9
+	movaps	%xmm2, %xmm8
+	xorl	%esi, %esi
+	movl	$0, %ecx
+	cmpnltss	%xmm9, %xmm8
+	ucomiss	%xmm7, %xmm5
+	pxor	%xmm9, %xmm9
+	pxor	%xmm11, %xmm11
+	pxor	%xmm5, %xmm5
+	andps	%xmm8, %xmm9
+	andnps	%xmm7, %xmm8
+	setnp	%sil
+	orps	%xmm9, %xmm8
+	movaps	%xmm4, %xmm9
+	cmovne	%ecx, %esi
+	xorl	%r9d, %r9d
+	cmpnltss	%xmm11, %xmm9
+	pxor	%xmm11, %xmm11
+	comiss	%xmm5, %xmm6
+	leaq	128(%rax), %rcx
+	andps	%xmm9, %xmm11
+	andnps	%xmm7, %xmm9
+	orps	%xmm11, %xmm9
+	seta	%r9b
+	jbe	.L176
+	cmpl	$1, %edx
+	je	.L52
+	testl	%r10d, %r10d
+	jne	.L53
+.L52:
+	movaps	%xmm7, %xmm5
+	pxor	%xmm11, %xmm11
+	subss	%xmm12, %xmm5
+	movss	.LC2(%rip), %xmm12
+	mulss	%xmm5, %xmm1
+	.p2align 4
+	.p2align 3
+.L129:
+.L58:
+	comiss	%xmm1, %xmm11
+	jnb	.L177
+	movaps	%xmm1, %xmm6
+	movaps	%xmm7, %xmm5
+	mulss	%xmm12, %xmm6
+	divss	%xmm6, %xmm5
+	addss	%xmm5, %xmm0
+	comiss	%xmm7, %xmm0
+	jb	.L178
+	movl	$2, %edx
+	movaps	%xmm7, %xmm0
+.L57:
 .L83:
-	fmov	s24, s31
-	fmov	s29, s31
-	mov	x3, 0
-	b	.L6
 .L84:
-	fmov	s24, s31
-	fmov	s29, s31
-	b	.L6
-.L157:
-	movi	v31.2s, #0
-	b	.L81
-.L158:
-	cmp	w4, 1
-	bne	.L159
-	fsub	s30, s29, s30
-	mov	w5, 17408
-	movk	w5, 0x472c, lsl 16
-	mov	x3, 0
-	fmov	s26, w5
-	fmul	s28, s30, s1
-	.p2align 5,,15
-.L39:
-	fcmpe	s28, #0.0
-	bls	.L91
-	fmul	s30, s28, s26
-	fdiv	s30, s29, s30
-	fadd	s31, s31, s30
-	fcmpe	s31, s29
-	bge	.L29
-	str	s31, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L39
-	b	.L21
-	.p2align 2,,3
-.L29:
-	str	s29, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	beq	.L100
+.L85:
+.L86:
+.L87:
+	movss	%xmm0, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	je	.L27
+.L53:
+	movaps	%xmm0, %xmm6
+	cmpl	$2, %edx
+	je	.L61
+	cmpl	$3, %edx
+	je	.L55
+	pxor	%xmm5, %xmm5
+	cmpl	$4, %edx
+	jne	.L179
+.L56:
+.L72:
+	movaps	%xmm7, %xmm1
+	subss	%xmm9, %xmm1
+	mulss	%xmm4, %xmm1
+	comiss	%xmm1, %xmm5
+	jnb	.L172
+	movss	.LC2(%rip), %xmm6
+	movaps	%xmm10, %xmm1
+	mulss	%xmm4, %xmm6
+	divss	%xmm6, %xmm1
+	subss	%xmm1, %xmm0
+	comiss	%xmm0, %xmm5
+	jb	.L87
+.L172:
+.L75:
+	movl	(%rdi), %edx
+	pxor	%xmm0, %xmm0
+	addq	$4, %rax
+	movss	%xmm0, -4(%rax)
+	orl	%esi, %edx
+	movl	%edx, (%rdi)
+	xorl	%edx, %edx
+	cmpq	%rax, %rcx
+	jne	.L53
+.L27:
+	movl	%edx, 4(%r8)
+	movl	%r9d, 8(%r8)
+	movss	%xmm0, (%r8)
+	movss	%xmm10, 12(%r8)
+	ret
+	.p2align 4,,10
+	.p2align 3
+.L177:
+	movaps	%xmm7, %xmm6
+.L54:
+.L61:
+	movaps	%xmm7, %xmm1
+	pxor	%xmm5, %xmm5
+	subss	%xmm8, %xmm1
+	mulss	%xmm2, %xmm1
+	comiss	%xmm1, %xmm5
+	jnb	.L62
+	comiss	%xmm3, %xmm5
+	ja	.L180
+	comiss	%xmm7, %xmm3
+	movaps	%xmm7, %xmm0
+	subss	%xmm3, %xmm0
+	jbe	.L181
+	movaps	%xmm3, %xmm11
+.L77:
+	addss	%xmm11, %xmm0
+	mulss	.LC2(%rip), %xmm1
+	movaps	%xmm7, %xmm5
+	movl	$3, %edx
+	subss	%xmm0, %xmm5
+	divss	%xmm1, %xmm5
+	subss	%xmm5, %xmm6
+	comiss	%xmm6, %xmm0
+	jnb	.L87
+	movaps	%xmm6, %xmm0
+	movl	$2, %edx
+	jmp	.L87
+	.p2align 4,,10
+	.p2align 3
+.L62:
+	comiss	%xmm3, %xmm5
+	ja	.L182
+	comiss	%xmm7, %xmm3
+	movaps	%xmm7, %xmm0
+	subss	%xmm3, %xmm0
+	jbe	.L183
+.L173:
+	addss	%xmm3, %xmm0
+.L69:
+	movl	$3, %edx
+	jmp	.L87
+	.p2align 4,,10
+	.p2align 3
+.L55:
+	pxor	%xmm1, %xmm1
+	comiss	%xmm3, %xmm1
+	ja	.L184
+	comiss	%xmm7, %xmm3
+	movaps	%xmm7, %xmm0
+	subss	%xmm3, %xmm0
+	ja	.L173
+	mulss	%xmm1, %xmm0
+	jmp	.L173
+.L81:
+	.p2align 4,,10
+	.p2align 3
+.L178:
+	movss	%xmm0, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	jne	.L129
+	movl	$1, %edx
+	jmp	.L27
+	.p2align 4,,10
+	.p2align 3
+.L180:
+	movaps	%xmm3, %xmm11
+	movaps	%xmm7, %xmm0
+	mulss	%xmm5, %xmm11
+	subss	%xmm11, %xmm0
+	mulss	%xmm5, %xmm0
+	jmp	.L77
+	.p2align 4,,10
+	.p2align 3
+.L182:
+	movaps	%xmm3, %xmm1
+	movaps	%xmm7, %xmm0
+	mulss	%xmm5, %xmm1
+	subss	%xmm1, %xmm0
+	mulss	%xmm5, %xmm0
+	addss	%xmm1, %xmm0
+	jmp	.L69
+	.p2align 4,,10
+	.p2align 3
+.L3:
+	movss	.LC1(%rip), %xmm7
+	pxor	%xmm12, %xmm12
+	jmp	.L4
+	.p2align 4,,10
+	.p2align 3
+.L176:
+	comiss	%xmm3, %xmm5
+	ja	.L10
+	testl	%r10d, %r10d
+	je	.L11
+	testl	%edx, %edx
+	jne	.L89
+	.p2align 4
+	.p2align 3
+.L13:
+	movl	$0x00000000, (%rax)
+	addq	$4, %rax
+	pxor	%xmm0, %xmm0
+	cmpq	%rcx, %rax
+	je	.L27
+.L11:
+	cmpl	$1, %edx
+	jne	.L150
+	movaps	%xmm7, %xmm5
+	pxor	%xmm13, %xmm13
+	movss	.LC2(%rip), %xmm14
+	subss	%xmm12, %xmm5
+	mulss	%xmm1, %xmm5
+	.p2align 4
+	.p2align 3
+.L14:
+	comiss	%xmm5, %xmm13
+	jnb	.L91
+	movaps	%xmm5, %xmm11
+	movaps	%xmm7, %xmm6
+	mulss	%xmm14, %xmm11
+	divss	%xmm11, %xmm6
+	addss	%xmm6, %xmm0
+	comiss	%xmm7, %xmm0
+	jb	.L154
+	movss	%xmm7, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	je	.L103
 .L91:
-	fmov	s31, 1.0e+0
-.L28:
-	fmov	s29, 1.0e+0
-	fsub	s27, s29, s27
-	fmul	s27, s27, s2
+	movaps	%xmm7, %xmm0
+.L15:
+	movaps	%xmm7, %xmm6
+	pxor	%xmm13, %xmm13
+	subss	%xmm8, %xmm6
+	mulss	%xmm2, %xmm6
+.L30:
+	comiss	%xmm6, %xmm13
+	jnb	.L185
+	comiss	%xmm7, %xmm3
+	movaps	%xmm7, %xmm5
+	subss	%xmm3, %xmm5
+	jbe	.L186
+.L19:
+	movss	.LC2(%rip), %xmm14
+	addss	%xmm3, %xmm5
+	movaps	%xmm7, %xmm11
+	mulss	%xmm6, %xmm14
+	subss	%xmm5, %xmm11
+	divss	%xmm14, %xmm11
+	subss	%xmm11, %xmm0
+	comiss	%xmm0, %xmm5
+	jb	.L187
+	movss	%xmm5, (%rax)
+	addq	$4, %rax
+	movaps	%xmm5, %xmm10
+	cmpq	%rax, %rcx
+	je	.L94
+.L12:
+	movaps	%xmm7, %xmm0
+	pxor	%xmm6, %xmm6
+	subss	%xmm9, %xmm0
+	mulss	%xmm4, %xmm0
+.L26:
+	comiss	%xmm0, %xmm6
+	jnb	.L25
+	movss	.LC2(%rip), %xmm13
+	movaps	%xmm10, %xmm11
+	mulss	%xmm4, %xmm13
+	divss	%xmm13, %xmm11
+	subss	%xmm11, %xmm5
+	comiss	%xmm5, %xmm6
+	jnb	.L25
+	movss	%xmm5, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	jne	.L26
+	movaps	%xmm5, %xmm0
+	movl	$4, %edx
+	jmp	.L27
+	.p2align 4,,10
+	.p2align 3
+.L184:
+	movaps	%xmm3, %xmm5
+	movaps	%xmm7, %xmm0
+	mulss	%xmm1, %xmm5
+	subss	%xmm5, %xmm0
+	mulss	%xmm1, %xmm0
+	addss	%xmm5, %xmm0
+	jmp	.L69
+.L10:
+	testl	%r10d, %r10d
+	je	.L188
+	testl	%edx, %edx
+	je	.L139
+	jmp	.L99
+	.p2align 4,,10
+	.p2align 3
+.L25:
+	movl	(%rdi), %edx
+	movl	$0x00000000, (%rax)
+	addq	$4, %rax
+	orl	%esi, %edx
+	movl	%edx, (%rdi)
+	xorl	%edx, %edx
+	cmpq	%rax, %rcx
+	jne	.L13
+.L169:
+	pxor	%xmm0, %xmm0
+	jmp	.L27
+	.p2align 4,,10
+	.p2align 3
+.L187:
+	movss	%xmm0, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	jne	.L30
+.L97:
+	movl	$2, %edx
+	jmp	.L27
+	.p2align 4,,10
+	.p2align 3
+.L154:
+	movss	%xmm0, (%rax)
+	addq	$4, %rax
+	cmpq	%rcx, %rax
+	jne	.L14
+	jmp	.L27
+	.p2align 4,,10
+	.p2align 3
+.L185:
+	comiss	%xmm7, %xmm3
+	movaps	%xmm7, %xmm10
+	subss	%xmm3, %xmm10
+	jbe	.L189
+	addss	%xmm3, %xmm10
+	movaps	%xmm10, %xmm5
+	jmp	.L12
+.L103:
+	movl	$2, %edx
+	movaps	%xmm7, %xmm0
+	jmp	.L27
+.L94:
+	movaps	%xmm5, %xmm0
+.L170:
+	movl	$4, %edx
+	jmp	.L27
+.L186:
+	mulss	%xmm13, %xmm5
+	jmp	.L19
+.L150:
+	cmpl	$2, %edx
+	je	.L15
+	cmpl	$3, %edx
+	je	.L89
+	movaps	%xmm0, %xmm5
+	cmpl	$4, %edx
+	je	.L12
+	jmp	.L13
+.L189:
+	mulss	%xmm13, %xmm10
+	addss	%xmm3, %xmm10
+	movaps	%xmm10, %xmm5
+	jmp	.L12
+.L188:
+	cmpl	$1, %edx
+	jne	.L159
+	movaps	%xmm7, %xmm5
+	pxor	%xmm11, %xmm11
+	subss	%xmm12, %xmm5
+	movss	.LC2(%rip), %xmm12
+	mulss	%xmm5, %xmm1
+	.p2align 4
+	.p2align 3
 .L45:
-	fcmpe	s27, #0.0
-	bls	.L110
-	movi	v26.2s, #0
-	mov	w4, 17408
-	movk	w4, 0x472c, lsl 16
-	fmov	s28, w4
-	fmul	s28, s27, s28
-	fmsub	s30, s3, s26, s29
-	fmul	s30, s30, s26
-	fmadd	s30, s3, s26, s30
-	fsub	s23, s29, s30
-	fdiv	s28, s23, s28
-	fsub	s31, s31, s28
-	fcmpe	s31, s30
-	bls	.L35
-	str	s31, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	cmp	x3, 32
-	bne	.L45
-	mov	w4, 2
-	b	.L21
-	.p2align 2,,3
-.L110:
-	movi	v31.2s, #0
-	fmsub	s30, s3, s31, s29
-	fmul	s30, s30, s31
-	fmadd	s31, s3, s31, s30
-	fmov	s24, s31
-	b	.L38
-	.p2align 2,,3
-.L35:
-	str	s26, [x1, x3, lsl 2]
-	add	x3, x3, 1
-	fmov	s24, s26
-	fmov	s31, s26
-	cmp	x3, 32
-	bne	.L38
-	mov	w4, 4
-	b	.L21
+	comiss	%xmm1, %xmm11
+	jnb	.L96
+	movaps	%xmm1, %xmm6
+	movaps	%xmm7, %xmm5
+	mulss	%xmm12, %xmm6
+	divss	%xmm6, %xmm5
+	addss	%xmm5, %xmm0
+	comiss	%xmm7, %xmm0
+	jb	.L190
+	movss	%xmm7, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	je	.L103
+.L96:
+	movaps	%xmm7, %xmm0
+.L34:
+	movaps	%xmm7, %xmm1
+	pxor	%xmm5, %xmm5
+	subss	%xmm8, %xmm1
+	mulss	%xmm2, %xmm1
+	comiss	%xmm1, %xmm5
+	jnb	.L191
+.L158:
+	movss	.LC2(%rip), %xmm8
+	movaps	%xmm3, %xmm6
+	movaps	%xmm7, %xmm2
+	mulss	%xmm5, %xmm6
+	mulss	%xmm1, %xmm8
+	subss	%xmm6, %xmm2
+	mulss	%xmm5, %xmm2
+	addss	%xmm6, %xmm2
+	movaps	%xmm7, %xmm6
+	subss	%xmm2, %xmm6
+	divss	%xmm8, %xmm6
+	subss	%xmm6, %xmm0
+	comiss	%xmm0, %xmm2
+	jb	.L192
+	movl	$0x00000000, (%rax)
+	pxor	%xmm10, %xmm10
+	addq	$4, %rax
+	movaps	%xmm10, %xmm0
+	cmpq	%rax, %rcx
+	je	.L170
+.L44:
+	subss	%xmm9, %xmm7
+	pxor	%xmm1, %xmm1
+	mulss	%xmm4, %xmm7
+	comiss	%xmm7, %xmm1
+	jnb	.L37
+.L193:
+	movss	.LC2(%rip), %xmm3
+	movaps	%xmm10, %xmm2
+	mulss	%xmm4, %xmm3
+	divss	%xmm3, %xmm2
+	subss	%xmm2, %xmm0
+	comiss	%xmm0, %xmm1
+	jnb	.L37
+	movss	%xmm0, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	je	.L170
+	comiss	%xmm7, %xmm1
+	jb	.L193
+.L37:
+	movl	$0x00000000, (%rax)
+	orl	(%rdi), %esi
+	addq	$4, %rax
+	xorl	%edx, %edx
+	movl	%esi, (%rdi)
+	cmpq	%rax, %rcx
+	je	.L169
+.L139:
+	movq	%rcx, %rsi
+	subq	%rax, %rsi
+	andb	$4, %sil
+	je	.L46
+	movl	$0x00000000, (%rax)
+	addq	$4, %rax
+	cmpq	%rcx, %rax
+	je	.L169
+	.p2align 5
+	.p2align 4
+	.p2align 3
+.L46:
+	movl	$0x00000000, (%rax)
+	addq	$8, %rax
+	movl	$0x00000000, -4(%rax)
+	cmpq	%rcx, %rax
+	jne	.L46
+	jmp	.L169
+	.p2align 4,,10
+	.p2align 3
+.L192:
+	movss	%xmm0, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	je	.L97
+	comiss	%xmm1, %xmm5
+	jb	.L158
+.L191:
+	mulss	%xmm5, %xmm3
+	movaps	%xmm7, %xmm0
+	subss	%xmm3, %xmm0
+	mulss	%xmm5, %xmm0
+	addss	%xmm3, %xmm0
+	movaps	%xmm0, %xmm10
+	jmp	.L44
+	.p2align 4,,10
+	.p2align 3
+.L190:
+	movss	%xmm0, (%rax)
+	addq	$4, %rax
+	cmpq	%rax, %rcx
+	jne	.L45
+	jmp	.L27
+.L179:
+	movaps	%xmm5, %xmm0
+	jmp	.L87
 .L159:
-	mov	x3, 0
-	cmp	w4, 2
-	beq	.L28
-	cmp	w4, 3
-	beq	.L149
-	cmp	w4, 4
-	beq	.L38
-	b	.L40
+	cmpl	$2, %edx
+	je	.L34
+	cmpl	$3, %edx
+	jne	.L194
+.L99:
+	movaps	%xmm0, %xmm10
+	jmp	.L44
+.L194:
+	cmpl	$4, %edx
+	je	.L44
+	jmp	.L139
+.L89:
+	movaps	%xmm0, %xmm10
+	movaps	%xmm0, %xmm5
+	jmp	.L12
+.L183:
+	mulss	%xmm5, %xmm0
+	addss	%xmm3, %xmm0
+	jmp	.L69
+.L181:
+	mulss	%xmm5, %xmm0
+	movaps	%xmm3, %xmm11
+	jmp	.L77
 	.cfi_endproc
 .LFE1:
 	.size	ADSR_bbbbbba, .-ADSR_bbbbbba
-	.align	2
-	.p2align 5,,15
-	.global	default_init
-	.type	default_init, %function
+	.p2align 4
+	.globl	default_init
+	.type	default_init, @function
 default_init:
 .LFB10:
 	.cfi_startproc
-.L161:
-	stp	xzr, xzr, [x0]
-	stp	xzr, xzr, [x0, 16]
-	str	xzr, [x0, 32]
+.L196:
+	movq	$0, (%rdi)
+	movq	$0, 8(%rdi)
+	movq	$0, 16(%rdi)
+	movq	$0, 24(%rdi)
+	movq	$0, 32(%rdi)
 	ret
 	.cfi_endproc
 .LFE10:
 	.size	default_init, .-default_init
-	.align	2
-	.p2align 5,,15
-	.global	default_process
-	.type	default_process, %function
+	.p2align 4
+	.globl	default_process
+	.type	default_process, @function
 default_process:
 .LFB11:
 	.cfi_startproc
-.L163:
-	sub	sp, sp, #992
-	.cfi_def_cfa_offset 992
-	mov	x11, x1
-	add	x8, sp, 111
-	mov	x12, x2
-	and	x8, x8, -64
-	add	x2, sp, 44
-	stp	x29, x30, [sp]
-	.cfi_offset 29, -992
-	.cfi_offset 30, -984
-	mov	x29, sp
-	add	x1, x8, 768
-	ldr	s4, [x11, 36]
-	mov	x13, x0
-	ldr	s5, [x11, 56]
-	str	d15, [sp, 16]
-	.cfi_offset 79, -976
-	ldp	s0, s1, [x11, 20]
-	ldp	s2, s3, [x11, 28]
-	str	wzr, [sp, 44]
-	bl	ADSR_bbbbbba
-	movi	v5.2s, #0
-	ldp	s1, s2, [x11, 40]
-	add	x0, x0, 16
-	ldp	s3, s4, [x11, 48]
-	add	x1, x8, 640
-	bl	ADSR_bbbbbba
-	mov	w0, 26002
-	ldr	s23, [x11]
-	movk	w0, 0x3915, lsl 16
-	ldr	s25, [x11, 16]
-	fmov	s31, w0
-	ldr	s30, [x13, 32]
-	adrp	x6, .LANCHOR0
-	mov	w4, 4059
-	mov	w5, 63875
-	fmul	s25, s23, s25
-	add	x3, x8, 512
-	add	x7, x6, :lo12:.LANCHOR0
-	movk	w4, 0x40c9, lsl 16
-	movk	w5, 0x4222, lsl 16
-	fmov	s27, w4
-	fmov	s24, w5
-	fmul	s25, s25, s31
-	.p2align 5,,15
-.L164:
-	fadd	s31, s30, s5
-	fcmpe	s31, s27
-	bge	.L176
-	fcmpe	s31, #0.0
-	bmi	.L194
-	b	.L167
-	.p2align 2,,3
-.L191:
-	fmov	s30, s31
-.L176:
-	fsub	s31, s31, s27
-	fadd	s31, s31, s5
-.L167:
-	fmul	s31, s31, s24
-	fadd	s30, s30, s25
-	fcvtzu	x5, s31
-	fcmpe	s30, s27
-	lsl	x4, x5, 2
-	ucvtf	s26, x5
-	add	x5, x7, x4
-	ldr	s29, [x7, x4]
-	ldr	s28, [x5, 4]
-	fsub	s31, s31, s26
-	fsub	s28, s28, s29
-	fmadd	s29, s31, s28, s29
-	str	s29, [x3]
-	bge	.L195
-	fcmpe	s30, #0.0
-	add	x3, x3, 4
-	bmi	.L174
-	fadd	s31, s30, s5
-	cmp	x3, x1
-	beq	.L173
-	fmov	s30, s31
-	b	.L167
-	.p2align 2,,3
-.L174:
-	fadd	s30, s30, s27
-	cmp	x1, x3
-	bne	.L164
-	fmov	s31, s30
-.L173:
-	ldp	s28, s30, [x11, 8]
-	mov	w0, 4059
-	ldp	q22, q26, [x8, 736]
-	movk	w0, 0x40c9, lsl 16
-	fmul	s30, s23, s30
-	fmul	s28, s23, s28
-	ldp	q17, q16, [x8, 640]
-	fmov	s27, w0
-	ldp	q18, q19, [x8, 672]
-	mov	w0, 63875
-	ldp	q20, q21, [x8, 704]
-	movk	w0, 0x4222, lsl 16
-	ldp	q2, q1, [x8, 512]
-	movi	v25.2s, #0
-	ldp	q3, q4, [x8, 544]
-	str	s31, [x13, 32]
-	dup	v31.4s, v30.s[0]
-	ldr	s29, [x13, 36]
-	fmul	v17.4s, v17.4s, v28.s[0]
-	fmov	s23, w0
-	fmul	v18.4s, v18.4s, v28.s[0]
-	mov	w0, 26002
-	fmul	v20.4s, v20.4s, v28.s[0]
-	add	x6, x6, :lo12:.LANCHOR0
-	fmul	v30.4s, v26.4s, v28.s[0]
-	add	x10, x8, 256
-	fmul	v16.4s, v16.4s, v28.s[0]
-	add	x9, x8, 384
-	fmul	v19.4s, v19.4s, v28.s[0]
-	movk	w0, 0x3915, lsl 16
-	fmul	v21.4s, v21.4s, v28.s[0]
-	fmov	s24, w0
-	fmul	v22.4s, v22.4s, v28.s[0]
-	mov	x3, 1
-	mov	v15.16b, v31.16b
-	mov	v28.16b, v31.16b
-	ldp	q0, q5, [x8, 576]
-	mov	v26.16b, v31.16b
-	fmla	v28.4s, v2.4s, v17.4s
-	fmla	v15.4s, v1.4s, v16.4s
-	mov	v17.16b, v31.16b
-	ldp	q6, q7, [x8, 608]
-	fmla	v26.4s, v0.4s, v20.4s
-	stp	q28, q15, [x8, 384]
-	fmla	v17.4s, v3.4s, v18.4s
-	mov	v20.16b, v31.16b
-	mov	v18.16b, v31.16b
-	mov	v28.16b, v31.16b
-	fmla	v31.4s, v30.4s, v7.4s
-	fmla	v20.4s, v5.4s, v21.4s
-	fmla	v18.4s, v4.4s, v19.4s
-	fmla	v28.4s, v6.4s, v22.4s
-	stp	q26, q20, [x8, 448]
-	stp	q17, q18, [x8, 416]
-	stp	q28, q31, [x8, 480]
-	.p2align 5,,15
-.L177:
-	fadd	s31, s29, s25
-	fcmpe	s31, s27
-	bge	.L188
-	fcmpe	s31, #0.0
-	bmi	.L196
-	.p2align 5,,15
-.L187:
-	fmul	s31, s31, s23
-	add	x4, x9, x3, lsl 2
-	add	x7, x10, x3, lsl 2
-	ldr	s30, [x4, -4]
-	fcvtzu	x5, s31
-	fmadd	s30, s30, s24, s29
-	lsl	x4, x5, 2
-	ucvtf	s26, x5
-	add	x5, x6, x4
-	ldr	s29, [x6, x4]
-	ldr	s28, [x5, 4]
-	fsub	s31, s31, s26
-	fcmpe	s30, s27
-	fsub	s28, s28, s29
-	fmadd	s29, s31, s28, s29
-	str	s29, [x7, -4]
-	bge	.L197
-	fcmpe	s30, #0.0
-	add	x3, x3, 1
-	bmi	.L186
-	fadd	s31, s30, s25
-	cmp	x3, 33
-	beq	.L185
-	fmov	s29, s31
-	b	.L187
-	.p2align 2,,3
-.L194:
-	fadd	s31, s31, s27
-	b	.L167
-	.p2align 2,,3
-.L195:
-	fsub	s30, s30, s27
-	add	x3, x3, 4
-	fadd	s31, s30, s5
-	cmp	x3, x1
-	beq	.L173
-	fcmpe	s31, s27
-	fmov	s30, s31
-	bge	.L191
-	b	.L167
-	.p2align 2,,3
-.L186:
-	fadd	s29, s30, s27
-	cmp	x3, 33
-	bne	.L177
-	fmov	s31, s29
-.L185:
-	ldp	q24, q26, [x8, 256]
-	str	s31, [x13, 36]
-	ldp	q25, q28, [x8, 288]
-	add	x1, x12, 128
-	ldp	q27, q30, [x8, 320]
-	ldp	q29, q31, [x8, 352]
-	ldr	s23, [x11, 4]
-	ldp	q21, q7, [x8, 768]
-	ldp	q16, q17, [x8, 800]
-	ldp	q18, q19, [x8, 832]
-	ldp	q20, q22, [x8, 864]
-	fmul	v26.4s, v26.4s, v23.s[0]
-	fmul	v24.4s, v24.4s, v23.s[0]
-	fmul	v25.4s, v25.4s, v23.s[0]
-	fmul	v28.4s, v28.4s, v23.s[0]
-	fmul	v27.4s, v27.4s, v23.s[0]
-	fmul	v30.4s, v30.4s, v23.s[0]
-	fmul	v29.4s, v29.4s, v23.s[0]
-	fmul	v31.4s, v31.4s, v23.s[0]
-	fmul	v26.4s, v26.4s, v7.4s
-	fmov	v23.4s, 5.0e-1
-	fmul	v25.4s, v25.4s, v16.4s
-	fmul	v28.4s, v28.4s, v17.4s
-	fmul	v27.4s, v27.4s, v18.4s
-	fmul	v30.4s, v30.4s, v19.4s
-	fmul	v29.4s, v29.4s, v20.4s
-	fmul	v24.4s, v24.4s, v21.4s
-	fmul	v31.4s, v31.4s, v22.4s
-	fmul	v26.4s, v26.4s, v23.4s
-	fmul	v25.4s, v25.4s, v23.4s
-	fmul	v28.4s, v28.4s, v23.4s
-	fmul	v27.4s, v27.4s, v23.4s
-	fmul	v30.4s, v30.4s, v23.4s
-	fmul	v29.4s, v29.4s, v23.4s
-	fmul	v24.4s, v24.4s, v23.4s
-	stp	q25, q28, [x8, 32]
-	fmul	v31.4s, v31.4s, v23.4s
-	stp	q27, q30, [x8, 64]
-	stp	q24, q26, [x8]
-	stp	q29, q31, [x8, 96]
-	stp	q24, q26, [x8, 128]
-	stp	q25, q28, [x8, 160]
-	stp	q27, q30, [x8, 192]
-	ldr	w0, [sp, 44]
-	str	q29, [x8, 224]
-	stp	q24, q26, [x12]
-	stp	q25, q28, [x12, 32]
-	stp	q27, q30, [x12, 64]
-	stp	q29, q31, [x12, 96]
-	str	q24, [x12, 128]
-	stp	q26, q25, [x1, 16]
-	stp	q28, q27, [x1, 48]
-	stp	q30, q29, [x1, 80]
-	str	q31, [x12, 240]
-	ldr	d15, [sp, 16]
-	str	q31, [x8, 240]
-	ldp	x29, x30, [sp]
-	add	sp, sp, 992
+.L198:
+	leaq	8(%rsp), %r10
+	.cfi_def_cfa 10, 0
+	andq	$-64, %rsp
+	pushq	-8(%r10)
+	pushq	%rbp
+	movq	%rsp, %rbp
+	.cfi_escape 0x10,0x6,0x2,0x76,0
+	pushq	%r15
+	pushq	%r14
+	leaq	-948(%rbp), %r11
+	.cfi_escape 0x10,0xf,0x2,0x76,0x78
+	.cfi_escape 0x10,0xe,0x2,0x76,0x70
+	movq	%rdi, %r14
+	leaq	-688(%rbp), %r15
+	pushq	%r13
+	.cfi_escape 0x10,0xd,0x2,0x76,0x68
+	leaq	-560(%rbp), %r13
+	pushq	%r12
+	pushq	%r10
+	.cfi_escape 0xf,0x3,0x76,0x58,0x6
+	.cfi_escape 0x10,0xc,0x2,0x76,0x60
+	pushq	%rbx
+	.cfi_escape 0x10,0x3,0x2,0x76,0x50
+	movq	%rsi, %rbx
+	subq	$960, %rsp
+	movss	20(%rsi), %xmm15
+	movss	56(%rbx), %xmm5
+	movq	%rsi, -984(%rbp)
+	movss	36(%rbx), %xmm4
+	movss	32(%rbx), %xmm3
+	movq	%rdx, -1000(%rbp)
+	movq	%r11, %rdx
+	movss	28(%rbx), %xmm2
+	movss	24(%rbx), %xmm1
+	movaps	%xmm15, %xmm0
+	leaq	-944(%rbp), %rsi
+	movq	%rdi, -976(%rbp)
+	movl	$0, -948(%rbp)
+	call	ADSR_bbbbbba
+	movss	48(%rbx), %xmm3
+	movss	52(%rbx), %xmm4
+	leaq	16(%r14), %rdi
+	movss	44(%rbx), %xmm2
+	movaps	%xmm15, %xmm0
+	movq	%r11, %rdx
+	pxor	%xmm5, %xmm5
+	movss	40(%rbx), %xmm1
+	leaq	-816(%rbp), %rsi
+	call	ADSR_bbbbbba
+	movss	(%rbx), %xmm6
+	movss	.LC3(%rip), %xmm0
+	movss	32(%r14), %xmm3
+	movabsq	$-9223372036854775808, %r14
+	movss	%xmm6, -988(%rbp)
+	mulss	16(%rbx), %xmm6
+	leaq	sinf_lookup__table(%rip), %rbx
+	leaq	4(%rbx), %r12
+	mulss	%xmm6, %xmm0
+	movss	%xmm0, -968(%rbp)
+	.p2align 4
+	.p2align 3
+.L199:
+	pxor	%xmm1, %xmm1
+	movss	.LC4(%rip), %xmm2
+	addss	%xmm3, %xmm1
+	comiss	%xmm2, %xmm1
+	jb	.L250
+	subss	%xmm2, %xmm1
+	pxor	%xmm7, %xmm7
+	addss	%xmm7, %xmm1
+	.p2align 4
+	.p2align 3
+.L202:
+	mulss	.LC5(%rip), %xmm1
+	comiss	.LC6(%rip), %xmm1
+	jnb	.L205
+	cvttss2siq	%xmm1, %rax
+.L206:
+	movss	(%rbx,%rax,4), %xmm2
+	leaq	0(,%rax,4), %rcx
+	testq	%rax, %rax
+	js	.L207
+	pxor	%xmm4, %xmm4
+	cvtsi2ssq	%rax, %xmm4
+.L208:
+	movss	(%r12,%rcx), %xmm0
+	subss	%xmm4, %xmm1
+	movss	%xmm3, -964(%rbp)
+	subss	%xmm2, %xmm0
+	call	fmaf@PLT
+	movss	-964(%rbp), %xmm3
+	addss	-968(%rbp), %xmm3
+	comiss	.LC4(%rip), %xmm3
+	movss	%xmm0, (%r15)
+	movaps	%xmm3, %xmm0
+	jb	.L246
+	movss	.LC4(%rip), %xmm2
+	pxor	%xmm1, %xmm1
+	addq	$4, %r15
+	subss	%xmm2, %xmm0
+	addss	%xmm0, %xmm1
+	cmpq	%r13, %r15
+	je	.L212
+	comiss	.LC4(%rip), %xmm1
+	jb	.L233
+	movaps	%xmm1, %xmm3
+	subss	%xmm2, %xmm1
+	pxor	%xmm7, %xmm7
+	addss	%xmm7, %xmm1
+	jmp	.L202
+	.p2align 4,,10
+	.p2align 3
+.L205:
+	movaps	%xmm1, %xmm0
+	subss	.LC6(%rip), %xmm0
+	cvttss2siq	%xmm0, %rax
+	xorq	%r14, %rax
+	jmp	.L206
+	.p2align 4,,10
+	.p2align 3
+.L246:
+	pxor	%xmm7, %xmm7
+	comiss	%xmm3, %xmm7
+	jbe	.L251
+	movss	.LC4(%rip), %xmm3
+	addq	$4, %r15
+	addss	%xmm0, %xmm3
+	cmpq	%r13, %r15
+	jne	.L199
+	movaps	%xmm3, %xmm1
+.L212:
+	movq	-976(%rbp), %rax
+	movq	-984(%rbp), %rdi
+	xorl	%r15d, %r15d
+	leaq	-432(%rbp), %r14
+	movaps	-800(%rbp), %xmm8
+	movaps	-784(%rbp), %xmm7
+	movss	8(%rdi), %xmm0
+	movss	%xmm1, 32(%rax)
+	movss	-988(%rbp), %xmm1
+	movaps	-768(%rbp), %xmm6
+	movaps	-752(%rbp), %xmm5
+	mulss	%xmm1, %xmm0
+	movaps	-736(%rbp), %xmm4
+	movaps	-720(%rbp), %xmm3
+	movaps	-704(%rbp), %xmm2
+	mulss	12(%rdi), %xmm1
+	shufps	$0, %xmm0, %xmm0
+	mulps	%xmm0, %xmm8
+	mulps	%xmm0, %xmm7
+	shufps	$0, %xmm1, %xmm1
+	mulps	%xmm0, %xmm6
+	mulps	%xmm0, %xmm5
+	mulps	%xmm0, %xmm4
+	mulps	%xmm0, %xmm3
+	mulps	%xmm0, %xmm2
+	mulps	-816(%rbp), %xmm0
+	mulps	-688(%rbp), %xmm0
+	mulps	-672(%rbp), %xmm8
+	mulps	-624(%rbp), %xmm5
+	mulps	-656(%rbp), %xmm7
+	mulps	-640(%rbp), %xmm6
+	mulps	-608(%rbp), %xmm4
+	addps	%xmm1, %xmm0
+	mulps	-592(%rbp), %xmm3
+	mulps	-576(%rbp), %xmm2
+	addps	%xmm1, %xmm5
+	movaps	%xmm0, -560(%rbp)
+	movaps	%xmm8, %xmm0
+	addps	%xmm1, %xmm7
+	addps	%xmm1, %xmm0
+	addps	%xmm1, %xmm6
+	addps	%xmm1, %xmm4
+	movaps	%xmm5, -496(%rbp)
+	movss	36(%rax), %xmm5
+	addps	%xmm1, %xmm3
+	movaps	%xmm7, -528(%rbp)
+	addps	%xmm1, %xmm2
+	movaps	%xmm0, -544(%rbp)
+	movaps	%xmm4, -480(%rbp)
+	pxor	%xmm4, %xmm4
+	movaps	%xmm6, -512(%rbp)
+	movaps	%xmm3, -464(%rbp)
+	movaps	%xmm2, -448(%rbp)
+	.p2align 4
+	.p2align 3
+.L216:
+	movaps	%xmm5, %xmm1
+	movss	.LC4(%rip), %xmm2
+	addss	%xmm4, %xmm1
+	comiss	.LC4(%rip), %xmm1
+	jnb	.L231
+	comiss	%xmm1, %xmm4
+	jbe	.L230
+	addss	.LC4(%rip), %xmm1
+.L230:
+	mulss	.LC5(%rip), %xmm1
+	comiss	.LC6(%rip), %xmm1
+	jnb	.L221
+	cvttss2siq	%xmm1, %rax
+.L222:
+	movss	(%rbx,%rax,4), %xmm2
+	leaq	0(,%rax,4), %rcx
+	testq	%rax, %rax
+	js	.L223
+	pxor	%xmm3, %xmm3
+	cvtsi2ssq	%rax, %xmm3
+.L224:
+	movss	(%r12,%rcx), %xmm0
+	subss	%xmm3, %xmm1
+	movss	%xmm5, -964(%rbp)
+	subss	%xmm2, %xmm0
+	call	fmaf@PLT
+	movss	.LC3(%rip), %xmm1
+	mulss	0(%r13,%r15,4), %xmm1
+	pxor	%xmm4, %xmm4
+	movss	-964(%rbp), %xmm5
+	movss	%xmm0, (%r14,%r15,4)
+	addss	%xmm5, %xmm1
+	comiss	.LC4(%rip), %xmm1
+	jb	.L248
+	movss	.LC4(%rip), %xmm2
+	addq	$1, %r15
+	subss	%xmm2, %xmm1
+	addss	%xmm4, %xmm1
+	cmpq	$32, %r15
+	je	.L228
+	comiss	.LC4(%rip), %xmm1
+	jb	.L235
+	movaps	%xmm1, %xmm5
+.L231:
+	subss	%xmm2, %xmm1
+	addss	%xmm4, %xmm1
+	jmp	.L230
+	.p2align 4,,10
+	.p2align 3
+.L207:
+	movq	%rax, %rsi
+	andl	$1, %eax
+	pxor	%xmm4, %xmm4
+	shrq	%rsi
+	orq	%rax, %rsi
+	cvtsi2ssq	%rsi, %xmm4
+	addss	%xmm4, %xmm4
+	jmp	.L208
+	.p2align 4,,10
+	.p2align 3
+.L251:
+	movaps	%xmm7, %xmm1
+	addq	$4, %r15
+	addss	%xmm3, %xmm1
+	cmpq	%r13, %r15
+	je	.L212
+.L233:
+	movaps	%xmm1, %xmm3
+	jmp	.L202
+	.p2align 4,,10
+	.p2align 3
+.L250:
+	pxor	%xmm7, %xmm7
+	comiss	%xmm1, %xmm7
+	jbe	.L202
+	addss	.LC4(%rip), %xmm1
+	jmp	.L202
+	.p2align 4,,10
+	.p2align 3
+.L248:
+	comiss	%xmm1, %xmm4
+	jbe	.L252
+	movss	.LC4(%rip), %xmm5
+	addq	$1, %r15
+	addss	%xmm1, %xmm5
+	cmpq	$32, %r15
+	jne	.L216
+	movaps	%xmm5, %xmm1
+.L228:
+	movq	-976(%rbp), %rax
+	movaps	-416(%rbp), %xmm8
+	movaps	-400(%rbp), %xmm7
+	movaps	-384(%rbp), %xmm6
+	movss	%xmm1, 36(%rax)
+	movq	-984(%rbp), %rax
+	movaps	-320(%rbp), %xmm1
+	movaps	-368(%rbp), %xmm5
+	movaps	-352(%rbp), %xmm4
+	movss	4(%rax), %xmm0
+	movaps	-336(%rbp), %xmm3
+	movaps	-832(%rbp), %xmm2
+	movq	-1000(%rbp), %rdi
+	shufps	$0, %xmm0, %xmm0
+	mulps	%xmm0, %xmm1
+	mulps	%xmm0, %xmm8
+	mulps	%xmm0, %xmm7
+	mulps	%xmm0, %xmm6
+	mulps	%xmm0, %xmm5
+	mulps	%xmm0, %xmm4
+	mulps	%xmm0, %xmm3
+	mulps	-432(%rbp), %xmm0
+	mulps	-928(%rbp), %xmm8
+	mulps	-912(%rbp), %xmm7
+	mulps	-896(%rbp), %xmm6
+	mulps	-880(%rbp), %xmm5
+	mulps	-864(%rbp), %xmm4
+	mulps	-848(%rbp), %xmm3
+	mulps	-944(%rbp), %xmm0
+	mulps	%xmm1, %xmm2
+	movss	.LC8(%rip), %xmm1
+	shufps	$0, %xmm1, %xmm1
+	mulps	%xmm1, %xmm8
+	mulps	%xmm1, %xmm7
+	mulps	%xmm1, %xmm0
+	mulps	%xmm1, %xmm6
+	mulps	%xmm1, %xmm5
+	mulps	%xmm1, %xmm4
+	movaps	%xmm8, 16(%rdi)
+	mulps	%xmm1, %xmm3
+	movaps	%xmm7, 32(%rdi)
+	mulps	%xmm2, %xmm1
+	movaps	%xmm0, (%rdi)
+	movaps	%xmm6, 48(%rdi)
+	movaps	%xmm5, 64(%rdi)
+	movaps	%xmm4, 80(%rdi)
+	movaps	%xmm3, 96(%rdi)
+	movaps	%xmm1, 112(%rdi)
+	movaps	%xmm0, 128(%rdi)
+	movaps	%xmm8, 144(%rdi)
+	movaps	%xmm7, 160(%rdi)
+	movl	-948(%rbp), %eax
+	movaps	%xmm6, 176(%rdi)
+	movaps	%xmm5, 192(%rdi)
+	movaps	%xmm4, 208(%rdi)
+	movaps	%xmm3, 224(%rdi)
+	movaps	%xmm1, 240(%rdi)
+	addq	$960, %rsp
+	popq	%rbx
+	popq	%r10
 	.cfi_remember_state
-	.cfi_restore 29
-	.cfi_restore 30
-	.cfi_restore 79
-	.cfi_def_cfa_offset 0
+	.cfi_def_cfa 10, 0
+	popq	%r12
+	popq	%r13
+	popq	%r14
+	popq	%r15
+	popq	%rbp
+	leaq	-8(%r10), %rsp
+	.cfi_def_cfa 7, 8
 	ret
-	.p2align 2,,3
-.L193:
+	.p2align 4,,10
+	.p2align 3
+.L221:
 	.cfi_restore_state
-	fmov	s29, s31
-.L188:
-	fsub	s31, s31, s27
-	fadd	s31, s31, s25
-	b	.L187
-	.p2align 2,,3
-.L196:
-	fadd	s31, s31, s27
-	b	.L187
-	.p2align 2,,3
-.L197:
-	fsub	s30, s30, s27
-	add	x3, x3, 1
-	fadd	s31, s30, s25
-	cmp	x3, 33
-	beq	.L185
-	fcmpe	s31, s27
-	fmov	s29, s31
-	bge	.L193
-	b	.L187
+	movabsq	$-9223372036854775808, %rdx
+	movaps	%xmm1, %xmm0
+	subss	.LC6(%rip), %xmm0
+	cvttss2siq	%xmm0, %rax
+	xorq	%rdx, %rax
+	jmp	.L222
+	.p2align 4,,10
+	.p2align 3
+.L223:
+	movq	%rax, %rsi
+	andl	$1, %eax
+	pxor	%xmm3, %xmm3
+	shrq	%rsi
+	orq	%rax, %rsi
+	cvtsi2ssq	%rsi, %xmm3
+	addss	%xmm3, %xmm3
+	jmp	.L224
+	.p2align 4,,10
+	.p2align 3
+.L252:
+	addq	$1, %r15
+	addss	%xmm4, %xmm1
+	cmpq	$32, %r15
+	je	.L228
+.L235:
+	movaps	%xmm1, %xmm5
+	jmp	.L230
 	.cfi_endproc
 .LFE11:
 	.size	default_process, .-default_process
-	.global	default_state_size
+	.globl	default_state_size
 	.data
-	.align	4
-	.set	.LANCHOR0,. + 0
-	.type	sinf_lookup__table, %object
-	.size	sinf_lookup__table, 1028
-sinf_lookup__table:
-	.word	0
-	.word	1019808432
-	.word	1028193072
-	.word	1033283845
-	.word	1036565814
-	.word	1039839859
-	.word	1041645699
-	.word	1043271843
-	.word	1044891074
-	.word	1046502419
-	.word	1048104909
-	.word	1049136788
-	.word	1049927730
-	.word	1050712805
-	.word	1051491540
-	.word	1052263466
-	.word	1053028118
-	.word	1053785035
-	.word	1054533760
-	.word	1055273845
-	.word	1056004842
-	.word	1056726312
-	.word	1057201213
-	.word	1057551770
-	.word	1057896922
-	.word	1058236459
-	.word	1058570176
-	.word	1058897874
-	.word	1059219354
-	.word	1059534422
-	.word	1059842890
-	.word	1060144571
-	.word	1060439283
-	.word	1060726850
-	.word	1061007098
-	.word	1061279857
-	.word	1061544963
-	.word	1061802258
-	.word	1062051586
-	.word	1062292797
-	.word	1062525746
-	.word	1062750291
-	.word	1062966299
-	.word	1063173637
-	.word	1063372184
-	.word	1063561817
-	.word	1063742424
-	.word	1063913895
-	.word	1064076126
-	.word	1064229022
-	.word	1064372488
-	.word	1064506440
-	.word	1064630795
-	.word	1064745479
-	.word	1064850424
-	.word	1064945565
-	.word	1065030847
-	.word	1065106216
-	.word	1065171628
-	.word	1065227044
-	.word	1065272429
-	.word	1065307757
-	.word	1065333007
-	.word	1065348163
-	.word	1065353216
-	.word	1065348163
-	.word	1065333007
-	.word	1065307757
-	.word	1065272429
-	.word	1065227043
-	.word	1065171628
-	.word	1065106216
-	.word	1065030846
-	.word	1064945565
-	.word	1064850424
-	.word	1064745479
-	.word	1064630794
-	.word	1064506439
-	.word	1064372488
-	.word	1064229022
-	.word	1064076126
-	.word	1063913894
-	.word	1063742424
-	.word	1063561817
-	.word	1063372183
-	.word	1063173638
-	.word	1062966298
-	.word	1062750290
-	.word	1062525744
-	.word	1062292797
-	.word	1062051586
-	.word	1061802257
-	.word	1061544964
-	.word	1061279856
-	.word	1061007096
-	.word	1060726848
-	.word	1060439283
-	.word	1060144570
-	.word	1059842888
-	.word	1059534422
-	.word	1059219353
-	.word	1058897872
-	.word	1058570173
-	.word	1058236458
-	.word	1057896921
-	.word	1057551768
-	.word	1057201213
-	.word	1056726309
-	.word	1056004838
-	.word	1055273846
-	.word	1054533759
-	.word	1053785031
-	.word	1053028112
-	.word	1052263466
-	.word	1051491538
-	.word	1050712800
-	.word	1049927731
-	.word	1049136786
-	.word	1048104901
-	.word	1046502408
-	.word	1044891073
-	.word	1043271837
-	.word	1041645690
-	.word	1039839862
-	.word	1036565808
-	.word	1033283829
-	.word	1028193021
-	.word	1019808422
-	.word	-1279541970
-	.word	-1127675132
-	.word	-1119290580
-	.word	-1114199796
-	.word	-1110917817
-	.word	-1107643763
-	.word	-1105837947
-	.word	-1104211799
-	.word	-1102592563
-	.word	-1100981229
-	.word	-1099378736
-	.word	-1098346856
-	.word	-1097555912
-	.word	-1096770842
-	.word	-1095992105
-	.word	-1095220177
-	.word	-1094455531
-	.word	-1093698611
-	.word	-1092949883
-	.word	-1092209797
-	.word	-1091478805
-	.word	-1090757334
-	.word	-1090282433
-	.word	-1089931877
-	.word	-1089586725
-	.word	-1089247187
-	.word	-1088913472
-	.word	-1088585774
-	.word	-1088264293
-	.word	-1087949224
-	.word	-1087640758
-	.word	-1087339076
-	.word	-1087044363
-	.word	-1086756798
-	.word	-1086476550
-	.word	-1086203793
-	.word	-1085938685
-	.word	-1085681389
-	.word	-1085432061
-	.word	-1085190849
-	.word	-1084957900
-	.word	-1084733354
-	.word	-1084517351
-	.word	-1084310011
-	.word	-1084111464
-	.word	-1083921830
-	.word	-1083741223
-	.word	-1083569752
-	.word	-1083407519
-	.word	-1083254627
-	.word	-1083111160
-	.word	-1082977208
-	.word	-1082852853
-	.word	-1082738168
-	.word	-1082633223
-	.word	-1082538081
-	.word	-1082452802
-	.word	-1082377432
-	.word	-1082312020
-	.word	-1082256604
-	.word	-1082211219
-	.word	-1082175890
-	.word	-1082150641
-	.word	-1082135485
-	.word	-1082130432
-	.word	-1082135485
-	.word	-1082150641
-	.word	-1082175891
-	.word	-1082211219
-	.word	-1082256605
-	.word	-1082312020
-	.word	-1082377432
-	.word	-1082452802
-	.word	-1082538083
-	.word	-1082633225
-	.word	-1082738170
-	.word	-1082852855
-	.word	-1082977208
-	.word	-1083111160
-	.word	-1083254627
-	.word	-1083407523
-	.word	-1083569755
-	.word	-1083741227
-	.word	-1083921834
-	.word	-1084111464
-	.word	-1084310011
-	.word	-1084517351
-	.word	-1084733359
-	.word	-1084957905
-	.word	-1085190854
-	.word	-1085432061
-	.word	-1085681390
-	.word	-1085938685
-	.word	-1086203793
-	.word	-1086476553
-	.word	-1086756801
-	.word	-1087044369
-	.word	-1087339076
-	.word	-1087640758
-	.word	-1087949227
-	.word	-1088264297
-	.word	-1088585777
-	.word	-1088913476
-	.word	-1089247194
-	.word	-1089586725
-	.word	-1089931877
-	.word	-1090282436
-	.word	-1090757341
-	.word	-1091478813
-	.word	-1092209812
-	.word	-1092949898
-	.word	-1093698612
-	.word	-1094455531
-	.word	-1095220185
-	.word	-1095992113
-	.word	-1096770850
-	.word	-1097555928
-	.word	-1098346873
-	.word	-1099378737
-	.word	-1100981230
-	.word	-1102592580
-	.word	-1104211817
-	.word	-1105837964
-	.word	-1107643830
-	.word	-1110917884
-	.word	-1114199799
-	.word	-1119290586
-	.word	-1127675273
-	.word	0
-	.zero	4
-	.type	default_state_size, %object
+	.align 8
+	.type	default_state_size, @object
 	.size	default_state_size, 8
 default_state_size:
-	.xword	40
+	.quad	40
+	.align 32
+	.type	sinf_lookup__table, @object
+	.size	sinf_lookup__table, 1028
+sinf_lookup__table:
+	.long	0
+	.long	1019808432
+	.long	1028193072
+	.long	1033283845
+	.long	1036565814
+	.long	1039839859
+	.long	1041645699
+	.long	1043271843
+	.long	1044891074
+	.long	1046502419
+	.long	1048104909
+	.long	1049136788
+	.long	1049927730
+	.long	1050712805
+	.long	1051491540
+	.long	1052263466
+	.long	1053028118
+	.long	1053785035
+	.long	1054533760
+	.long	1055273845
+	.long	1056004842
+	.long	1056726312
+	.long	1057201213
+	.long	1057551770
+	.long	1057896922
+	.long	1058236459
+	.long	1058570176
+	.long	1058897874
+	.long	1059219354
+	.long	1059534422
+	.long	1059842890
+	.long	1060144571
+	.long	1060439283
+	.long	1060726850
+	.long	1061007098
+	.long	1061279857
+	.long	1061544963
+	.long	1061802258
+	.long	1062051586
+	.long	1062292797
+	.long	1062525746
+	.long	1062750291
+	.long	1062966299
+	.long	1063173637
+	.long	1063372184
+	.long	1063561817
+	.long	1063742424
+	.long	1063913895
+	.long	1064076126
+	.long	1064229022
+	.long	1064372488
+	.long	1064506440
+	.long	1064630795
+	.long	1064745479
+	.long	1064850424
+	.long	1064945565
+	.long	1065030847
+	.long	1065106216
+	.long	1065171628
+	.long	1065227044
+	.long	1065272429
+	.long	1065307757
+	.long	1065333007
+	.long	1065348163
+	.long	1065353216
+	.long	1065348163
+	.long	1065333007
+	.long	1065307757
+	.long	1065272429
+	.long	1065227043
+	.long	1065171628
+	.long	1065106216
+	.long	1065030846
+	.long	1064945565
+	.long	1064850424
+	.long	1064745479
+	.long	1064630794
+	.long	1064506439
+	.long	1064372488
+	.long	1064229022
+	.long	1064076126
+	.long	1063913894
+	.long	1063742424
+	.long	1063561817
+	.long	1063372183
+	.long	1063173638
+	.long	1062966298
+	.long	1062750290
+	.long	1062525744
+	.long	1062292797
+	.long	1062051586
+	.long	1061802257
+	.long	1061544964
+	.long	1061279856
+	.long	1061007096
+	.long	1060726848
+	.long	1060439283
+	.long	1060144570
+	.long	1059842888
+	.long	1059534422
+	.long	1059219353
+	.long	1058897872
+	.long	1058570173
+	.long	1058236458
+	.long	1057896921
+	.long	1057551768
+	.long	1057201213
+	.long	1056726309
+	.long	1056004838
+	.long	1055273846
+	.long	1054533759
+	.long	1053785031
+	.long	1053028112
+	.long	1052263466
+	.long	1051491538
+	.long	1050712800
+	.long	1049927731
+	.long	1049136786
+	.long	1048104901
+	.long	1046502408
+	.long	1044891073
+	.long	1043271837
+	.long	1041645690
+	.long	1039839862
+	.long	1036565808
+	.long	1033283829
+	.long	1028193021
+	.long	1019808422
+	.long	-1279541970
+	.long	-1127675132
+	.long	-1119290580
+	.long	-1114199796
+	.long	-1110917817
+	.long	-1107643763
+	.long	-1105837947
+	.long	-1104211799
+	.long	-1102592563
+	.long	-1100981229
+	.long	-1099378736
+	.long	-1098346856
+	.long	-1097555912
+	.long	-1096770842
+	.long	-1095992105
+	.long	-1095220177
+	.long	-1094455531
+	.long	-1093698611
+	.long	-1092949883
+	.long	-1092209797
+	.long	-1091478805
+	.long	-1090757334
+	.long	-1090282433
+	.long	-1089931877
+	.long	-1089586725
+	.long	-1089247187
+	.long	-1088913472
+	.long	-1088585774
+	.long	-1088264293
+	.long	-1087949224
+	.long	-1087640758
+	.long	-1087339076
+	.long	-1087044363
+	.long	-1086756798
+	.long	-1086476550
+	.long	-1086203793
+	.long	-1085938685
+	.long	-1085681389
+	.long	-1085432061
+	.long	-1085190849
+	.long	-1084957900
+	.long	-1084733354
+	.long	-1084517351
+	.long	-1084310011
+	.long	-1084111464
+	.long	-1083921830
+	.long	-1083741223
+	.long	-1083569752
+	.long	-1083407519
+	.long	-1083254627
+	.long	-1083111160
+	.long	-1082977208
+	.long	-1082852853
+	.long	-1082738168
+	.long	-1082633223
+	.long	-1082538081
+	.long	-1082452802
+	.long	-1082377432
+	.long	-1082312020
+	.long	-1082256604
+	.long	-1082211219
+	.long	-1082175890
+	.long	-1082150641
+	.long	-1082135485
+	.long	-1082130432
+	.long	-1082135485
+	.long	-1082150641
+	.long	-1082175891
+	.long	-1082211219
+	.long	-1082256605
+	.long	-1082312020
+	.long	-1082377432
+	.long	-1082452802
+	.long	-1082538083
+	.long	-1082633225
+	.long	-1082738170
+	.long	-1082852855
+	.long	-1082977208
+	.long	-1083111160
+	.long	-1083254627
+	.long	-1083407523
+	.long	-1083569755
+	.long	-1083741227
+	.long	-1083921834
+	.long	-1084111464
+	.long	-1084310011
+	.long	-1084517351
+	.long	-1084733359
+	.long	-1084957905
+	.long	-1085190854
+	.long	-1085432061
+	.long	-1085681390
+	.long	-1085938685
+	.long	-1086203793
+	.long	-1086476553
+	.long	-1086756801
+	.long	-1087044369
+	.long	-1087339076
+	.long	-1087640758
+	.long	-1087949227
+	.long	-1088264297
+	.long	-1088585777
+	.long	-1088913476
+	.long	-1089247194
+	.long	-1089586725
+	.long	-1089931877
+	.long	-1090282436
+	.long	-1090757341
+	.long	-1091478813
+	.long	-1092209812
+	.long	-1092949898
+	.long	-1093698612
+	.long	-1094455531
+	.long	-1095220185
+	.long	-1095992113
+	.long	-1096770850
+	.long	-1097555928
+	.long	-1098346873
+	.long	-1099378737
+	.long	-1100981230
+	.long	-1102592580
+	.long	-1104211817
+	.long	-1105837964
+	.long	-1107643830
+	.long	-1110917884
+	.long	-1114199799
+	.long	-1119290586
+	.long	-1127675273
+	.long	0
+	.section	.rodata.cst4,"aM",@progbits,4
+	.align 4
+.LC1:
+	.long	1065353216
+	.align 4
+.LC2:
+	.long	1194083328
+	.align 4
+.LC3:
+	.long	957703570
+	.align 4
+.LC4:
+	.long	1086918619
+	.align 4
+.LC5:
+	.long	1109588355
+	.align 4
+.LC6:
+	.long	1593835520
+	.align 4
+.LC8:
+	.long	1056964608
 	.ident	"GCC: (Debian 14.2.0-19) 14.2.0"
 	.section	.note.GNU-stack,"",@progbits
 process call 0
@@ -2072,8 +2245,8 @@ i	ch0	ch1
 24	-0.0027469	-0.0027469
 25	-0.00152711	-0.00152711
 26	-7.38774e-05	-7.38774e-05
-27	0.00146578	0.00146578
-28	0.00293262	0.00293262
+27	0.00146579	0.00146579
+28	0.00293263	0.00293263
 29	0.00420014	0.00420014
 30	0.0052027	0.0052027
 31	0.00593386	0.00593386
@@ -2082,7 +2255,7 @@ process call 1
 i	ch0	ch1
 0	0.0064213	0.0064213
 1	0.00669024	0.00669024
-2	0.00672932	0.00672932
+2	0.00672933	0.00672933
 3	0.00646829	0.00646829
 4	0.00577994	0.00577994
 5	0.00451126	0.00451126
@@ -2152,9 +2325,9 @@ process call 3
 i	ch0	ch1
 0	0.00764164	0.00764164
 1	0.00432345	0.00432345
-2	0.00182418	0.00182418
-3	0.000401932	0.000401932
-4	0.000214795	0.000214795
+2	0.00182417	0.00182417
+3	0.000401926	0.000401926
+4	0.000214789	0.000214789
 5	0.0013591	0.0013591
 6	0.0038694	0.0038694
 7	0.0076573	0.0076573
@@ -2165,55 +2338,55 @@ i	ch0	ch1
 12	0.0239839	0.0239839
 13	0.0203709	0.0203709
 14	0.0138715	0.0138715
-15	0.00558787	0.00558787
+15	0.00558788	0.00558788
 16	-0.00305274	-0.00305274
 17	-0.0107817	-0.0107817
 18	-0.0168368	-0.0168368
-19	-0.0210384	-0.0210384
+19	-0.0210383	-0.0210383
 20	-0.0236425	-0.0236425
 21	-0.0250954	-0.0250954
 22	-0.0258151	-0.0258151
-23	-0.026039	-0.026039
+23	-0.0260389	-0.0260389
 24	-0.0257784	-0.0257784
 25	-0.0248387	-0.0248387
 26	-0.0228964	-0.0228964
 27	-0.0196366	-0.0196366
 28	-0.014916	-0.014916
-29	-0.00888159	-0.00888159
-30	-0.00199904	-0.00199904
-31	0.00504633	0.00504633
+29	-0.00888157	-0.00888157
+30	-0.00199903	-0.00199903
+31	0.00504634	0.00504634
 
 process call 4
 i	ch0	ch1
-0	0.0115459	0.0115459
+0	0.011546	0.011546
 1	0.0169655	0.0169655
 2	0.0210506	0.0210506
 3	0.0238219	0.0238219
 4	0.0254608	0.0254608
 5	0.0261449	0.0261449
 6	0.0259303	0.0259303
-7	0.0246579	0.0246579
+7	0.024658	0.024658
 8	0.0219684	0.0219684
 9	0.0174024	0.0174024
 10	0.0106328	0.0106328
-11	0.00174732	0.00174732
-12	-0.008509	-0.008509
-13	-0.0187082	-0.0187082
+11	0.00174733	0.00174733
+12	-0.00850899	-0.00850899
+13	-0.0187081	-0.0187081
 14	-0.0270482	-0.0270482
 15	-0.0319185	-0.0319185
 16	-0.0324879	-0.0324879
 17	-0.0289848	-0.0289848
 18	-0.0225487	-0.0225487
 19	-0.0147487	-0.0147487
-20	-0.00706458	-0.00706458
-21	-0.000552429	-0.000552429
-22	0.00422009	0.00422009
-23	0.00705151	0.00705151
-24	0.00792722	0.00792722
-25	0.00688232	0.00688232
-26	0.00396097	0.00396097
-27	-0.000727496	-0.000727496
-28	-0.0069051	-0.0069051
+20	-0.00706461	-0.00706461
+21	-0.000552441	-0.000552441
+22	0.00422008	0.00422008
+23	0.00705149	0.00705149
+24	0.0079272	0.0079272
+25	0.0068823	0.0068823
+26	0.00396095	0.00396095
+27	-0.000727509	-0.000727509
+28	-0.00690512	-0.00690512
 29	-0.014036	-0.014036
 30	-0.0213334	-0.0213334
 31	-0.0278848	-0.0278848
@@ -2227,7 +2400,7 @@ i	ch0	ch1
 4	-0.0352228	-0.0352228
 5	-0.0339158	-0.0339158
 6	-0.0331997	-0.0331997
-7	-0.0334427	-0.0334427
+7	-0.0334426	-0.0334426
 8	-0.0346835	-0.0346835
 9	-0.0365731	-0.0365731
 10	-0.0383518	-0.0383518
@@ -2235,8 +2408,8 @@ i	ch0	ch1
 12	-0.0368626	-0.0368626
 13	-0.0311877	-0.0311877
 14	-0.0214584	-0.0214584
-15	-0.00835576	-0.00835576
-16	0.00636202	0.00636202
+15	-0.00835578	-0.00835578
+16	0.006362	0.006362
 17	0.0203396	0.0203396
 18	0.0314178	0.0314178
 19	0.0383275	0.0383275
@@ -2245,7 +2418,7 @@ i	ch0	ch1
 22	0.0377254	0.0377254
 23	0.0346283	0.0346283
 24	0.0321439	0.0321439
-25	0.0309742	0.0309742
+25	0.0309743	0.0309743
 26	0.0314019	0.0314019
 27	0.0333292	0.0333292
 28	0.0363297	0.0363297
@@ -2261,11 +2434,11 @@ i	ch0	ch1
 3	0.0253193	0.0253193
 4	0.0176291	0.0176291
 5	0.0106602	0.0106602
-6	0.00523627	0.00523627
-7	0.00190291	0.00190291
-8	0.000982451	0.000982451
-9	0.00265416	0.00265416
-10	0.00697681	0.00697681
+6	0.00523625	0.00523625
+7	0.00190289	0.00190289
+8	0.000982431	0.000982431
+9	0.00265414	0.00265414
+10	0.00697679	0.00697679
 11	0.0138006	0.0138006
 12	0.0225816	0.0225816
 13	0.032185	0.032185
@@ -2273,17 +2446,17 @@ i	ch0	ch1
 15	0.0463331	0.0463331
 16	0.0467481	0.0467481
 17	0.0410545	0.0410545
-18	0.0297028	0.0297028
-19	0.0145514	0.0145514
-20	-0.00176876	-0.00176876
-21	-0.0167653	-0.0167653
-22	-0.0287998	-0.0287998
+18	0.0297029	0.0297029
+19	0.0145515	0.0145515
+20	-0.00176872	-0.00176872
+21	-0.0167652	-0.0167652
+22	-0.0287997	-0.0287997
 23	-0.0373279	-0.0373279
 24	-0.0426966	-0.0426966
 25	-0.0457008	-0.0457008
 26	-0.047152	-0.047152
 27	-0.0475834	-0.0475834
-28	-0.0471369	-0.0471369
+28	-0.0471368	-0.0471368
 29	-0.0455456	-0.0455456
 30	-0.0422891	-0.0422891
 31	-0.0368199	-0.0368199
@@ -2292,20 +2465,20 @@ process call 7
 i	ch0	ch1
 0	-0.0288179	-0.0288179
 1	-0.018456	-0.018456
-2	-0.0064516	-0.0064516
-3	0.00604299	0.00604299
+2	-0.00645158	-0.00645158
+3	0.00604302	0.00604302
 4	0.0177709	0.0177709
 5	0.0277198	0.0277198
 6	0.0353472	0.0353472
 7	0.0406068	0.0406068
 8	0.0437712	0.0437712
-9	0.0451835	0.0451835
+9	0.0451836	0.0451836
 10	0.04501	0.04501
 11	0.0430688	0.0430688
 12	0.0388373	0.0388373
 13	0.0315801	0.0315801
 14	0.0207022	0.0207022
-15	0.00620091	0.00620091
+15	0.00620094	0.00620094
 16	-0.0108866	-0.0108866
 17	-0.0283742	-0.0283742
 18	-0.043316	-0.043316
@@ -2315,17 +2488,17 @@ i	ch0	ch1
 22	-0.0410533	-0.0410533
 23	-0.0283376	-0.0283376
 24	-0.0153351	-0.0153351
-25	-0.00397487	-0.00397487
-26	0.00463373	0.00463373
+25	-0.00397494	-0.00397494
+26	0.00463368	0.00463368
 27	0.0100527	0.0100527
 28	0.0122231	0.0122231
 29	0.0112159	0.0112159
-30	0.00712582	0.00712582
-31	0.000126452	0.000126452
+30	0.00712577	0.00712577
+31	0.000126396	0.000126396
 
 process call 8
 i	ch0	ch1
-0	-0.00937818	-0.00937818
+0	-0.00937822	-0.00937822
 1	-0.0206016	-0.0206016
 2	-0.032349	-0.032349
 3	-0.0431831	-0.0431831
@@ -2335,7 +2508,7 @@ i	ch0	ch1
 7	-0.059239	-0.059239
 8	-0.0573711	-0.0573711
 9	-0.0551811	-0.0551811
-10	-0.053708	-0.053708
+10	-0.0537079	-0.0537079
 11	-0.0536354	-0.0536354
 12	-0.0551242	-0.0551242
 13	-0.0577558	-0.0577558
@@ -2343,12 +2516,12 @@ i	ch0	ch1
 15	-0.0616363	-0.0616363
 16	-0.0592402	-0.0592402
 17	-0.0514744	-0.0514744
-18	-0.0374768	-0.0374768
-19	-0.0179461	-0.0179461
-20	0.00471435	0.00471435
+18	-0.0374769	-0.0374769
+19	-0.0179462	-0.0179462
+20	0.00471429	0.00471429
 21	0.0269884	0.0269884
-22	0.045393	0.045393
-23	0.0576425	0.0576425
+22	0.0453929	0.0453929
+23	0.0576424	0.0576424
 24	0.063229	0.063229
 25	0.0632615	0.0632615
 26	0.0598012	0.0598012
@@ -2356,7 +2529,7 @@ i	ch0	ch1
 28	0.0509268	0.0509268
 29	0.0485563	0.0485563
 30	0.0485375	0.0485375
-31	0.0508429	0.0508429
+31	0.050843	0.050843
 
 process call 9
 i	ch0	ch1
@@ -2364,28 +2537,28 @@ i	ch0	ch1
 1	0.0597635	0.0597635
 2	0.0640032	0.0640032
 3	0.0661744	0.0661744
-4	0.0651073	0.0651073
+4	0.0651072	0.0651072
 5	0.0602587	0.0602587
 6	0.0519362	0.0519362
 7	0.041246	0.041246
 8	0.0297334	0.0297334
-9	0.0189963	0.0189963
-10	0.0103399	0.0103399
-11	0.0046589	0.0046589
-12	0.00248713	0.00248713
-13	0.00411793	0.00411793
-14	0.00966014	0.00966014
+9	0.0189962	0.0189962
+10	0.0103398	0.0103398
+11	0.00465884	0.00465884
+12	0.00248707	0.00248707
+13	0.00411787	0.00411787
+14	0.00966008	0.00966008
 15	0.0189496	0.0189496
 16	0.0313086	0.0313086
-17	0.0452513	0.0452513
-18	0.0583521	0.0583521
+17	0.0452512	0.0452512
+18	0.058352	0.058352
 19	0.0675292	0.0675292
 20	0.0697957	0.0697957
 21	0.0633309	0.0633309
-22	0.0483229	0.0483229
-23	0.0270883	0.0270883
-24	0.00329488	0.00329488
-25	-0.019295	-0.019295
+22	0.048323	0.048323
+23	0.0270884	0.0270884
+24	0.00329493	0.00329493
+25	-0.0192949	-0.0192949
 26	-0.0379778	-0.0379778
 27	-0.0516115	-0.0516115
 28	-0.0604419	-0.0604419

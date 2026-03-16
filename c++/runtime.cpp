@@ -52,23 +52,23 @@ runtime::~runtime() = default;
 
 bool runtime::try_enqueue(const rt_command& command) noexcept
 {
-  return commands_.try_push(command);
+  return commands_.push(command);
 }
 
 bool runtime::try_pop_retired(retire_token& token) noexcept
 {
-  return retired_modules_.try_pop(token);
+  return retired_modules_.pop(token);
 }
 
 bool runtime::retire_module(module_instance* module) noexcept
 {
-  return module != nullptr && retired_modules_.try_push(retire_token{module});
+  return module != nullptr && retired_modules_.push(retire_token{module});
 }
 
 void runtime::drain_commands() noexcept
 {
   rt_command command;
-  while (commands_.try_pop(command)) {
+  while (commands_.pop(command)) {
     apply_command(command);
   }
 }
