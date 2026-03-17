@@ -66,12 +66,7 @@ bool runtime::retire_module(module_instance* module) noexcept
 }
 
 void runtime::drain_commands() noexcept
-{
-  rt_command command;
-  while (commands_.pop(command)) {
-    apply_command(command);
-  }
-}
+{ commands_.consume_all([this](rt_command cmd) { return apply_command(cmd); }); }
 
 void runtime::start()
 {
