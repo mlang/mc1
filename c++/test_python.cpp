@@ -19,6 +19,8 @@ namespace mc1 {
 
 namespace {
 
+constexpr uint64_t osc_immediate_time_tag = 1;
+
 DAG parse_dag_or_throw(pybind11::bytes bytes_object)
 {
   auto bytes = std::as_bytes(std::span(std::string_view(bytes_object)));
@@ -123,7 +125,8 @@ void enqueue_controls(
     runtime& runtime,
     const Result::CompiledSynth& compiled_synth,
     uint32_t module_id,
-    pybind11::handle step)
+    pybind11::handle step,
+    uint64_t time_tag = osc_immediate_time_tag)
 {
   auto controls = validate_control_step(step);
   for (auto item : controls) {
@@ -135,7 +138,7 @@ void enqueue_controls(
     auto values = parse_control_values(item.second, control_name, slot->width);
     for (size_t offset = 0; offset < values.size(); ++offset) {
       rt_command command{
-        .sample_offset = 0,
+        .time_tag = time_tag,
         .payload = rt_payload{set_control_value{
           .module_id = module_id,
           .control_index = static_cast<uint32_t>(slot->index + offset),
@@ -286,7 +289,7 @@ pybind11::list runtime_module_ids_per_block(
   auto* instance_ptr = instance.get();
 
   rt_command start{
-    .sample_offset = 0,
+    .time_tag = osc_immediate_time_tag,
     .payload = rt_payload{start_module{
       .module_id = instance_ptr->module_id,
       .module = instance_ptr,
@@ -311,8 +314,8 @@ pybind11::list runtime_module_ids_per_block(
     }
     blocks_module_ids.append(std::move(ids));
 
-    retire_token token;
-    while (rt.try_pop_retired(token)) {}
+    rt_event event;
+    while (rt.try_pop_event(event)) {}
   }
 
   return blocks_module_ids;
@@ -351,7 +354,7 @@ pybind11::list runtime_render_blocks(
     instances.push_back(std::move(instance));
 
     rt_command start{
-      .sample_offset = 0,
+      .time_tag = osc_immediate_time_tag,
       .payload = rt_payload{start_module{
         .module_id = instance_ptr->module_id,
         .module = instance_ptr,

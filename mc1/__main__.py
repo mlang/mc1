@@ -88,7 +88,7 @@ def main(argv=None):
 
 Example:
     perft(drone)
-    dsp.append("default", freq=440)""",
+    dsp.append(IMMEDIATE, "default", freq=440)""",
         exitmsg="",
     )
 

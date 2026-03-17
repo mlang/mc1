@@ -1,14 +1,17 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <cmath>
 #include <cstdint>
 #include <format>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <print>
 #include <span>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -24,6 +27,14 @@
 namespace mc1 {
 
 namespace {
+
+template<typename... Ts>
+struct overloaded : Ts... {
+  using Ts::operator()...;
+};
+
+template<typename... Ts>
+overloaded(Ts...) -> overloaded<Ts...>;
 
 DAG parse_dag_or_throw(pybind11::bytes bytes_object)
 {
@@ -53,6 +64,40 @@ uint32_t validate_non_negative_arg(long value, const char* name)
     throw pybind11::value_error(std::string(name) + " must fit in uint32");
   }
   return static_cast<uint32_t>(value);
+}
+
+uint64_t validate_time_tag_arg(pybind11::handle value, const char* name)
+{
+  if (pybind11::isinstance<pybind11::bool_>(value) || !pybind11::isinstance<pybind11::int_>(value)) {
+    throw pybind11::value_error(std::string(name) + " must be an OSC timetag integer");
+  }
+  try {
+    return pybind11::cast<uint64_t>(value);
+  } catch (const pybind11::cast_error&) {
+    throw pybind11::value_error(std::string(name) + " must fit in uint64");
+  }
+}
+
+std::optional<double> validate_timeout_arg(pybind11::handle value, const char* name)
+{
+  if (value.is_none()) return std::nullopt;
+
+  if (pybind11::isinstance<pybind11::bool_>(value)) {
+    throw pybind11::value_error(std::string(name) + " must be None or a non-negative number");
+  }
+
+  try {
+    auto timeout = pybind11::cast<double>(value);
+    if (timeout < 0.0) {
+      throw pybind11::value_error(std::string(name) + " must be >= 0");
+    }
+    if (!std::isfinite(timeout)) {
+      throw pybind11::value_error(std::string(name) + " must be finite");
+    }
+    return timeout;
+  } catch (const pybind11::cast_error&) {
+    throw pybind11::value_error(std::string(name) + " must be None or a non-negative number");
+  }
 }
 
 } // namespace
@@ -106,7 +151,9 @@ class DSP
   runtime runtime_;
   std::unordered_map<std::string, Result::CompiledSynth> compiled_synths_by_name_;
   std::unordered_map<uint32_t, std::unique_ptr<module_instance>> modules_by_id_;
+  std::unordered_map<uint32_t, bool> pending_idle_status_by_request_id_;
   uint32_t next_module_id_ = 1;
+  uint32_t next_request_id_ = 1;
 
   static uint32_t validate_positive(long value, const char* name)
   {
@@ -116,6 +163,16 @@ class DSP
   static uint32_t validate_non_negative(long value, const char* name)
   {
     return validate_non_negative_arg(value, name);
+  }
+
+  static uint64_t validate_time_tag(pybind11::handle value, const char* name)
+  {
+    return validate_time_tag_arg(value, name);
+  }
+
+  static std::optional<double> validate_timeout(pybind11::handle value, const char* name)
+  {
+    return validate_timeout_arg(value, name);
   }
 
   static uint32_t validate_output_channels(
@@ -182,14 +239,25 @@ class DSP
   }
 
   template<typename Payload>
-  void enqueue_command(Payload payload, const char* action)
+  void enqueue_command(uint64_t time_tag, Payload payload, const char* action)
   {
     rt_command command{
-      .sample_offset = 0,
+      .time_tag = time_tag,
       .payload = rt_payload{payload},
     };
     if (!runtime_.try_enqueue(command)) {
       throw std::runtime_error(std::string(action) + ": rt command queue overflow");
+    }
+  }
+
+  void enqueue_idle_query(uint32_t request_id)
+  {
+    rt_command command{
+      .time_tag = 1,
+      .payload = rt_payload{query_idle_status{.request_id = request_id}},
+    };
+    if (!runtime_.try_enqueue(command)) {
+      throw std::runtime_error("wait_until_idle failed: rt command queue overflow");
     }
   }
 
@@ -202,15 +270,33 @@ class DSP
     return *it->second;
   }
 
-  void reap_retired_modules()
+  void drain_runtime_events()
   {
-    retire_token token;
-    while (runtime_.try_pop_retired(token)) {
-      modules_by_id_.erase(token.module->module_id);
+    rt_event event;
+    while (runtime_.try_pop_event(event)) {
+      std::visit(overloaded{
+        [this](const module_retired_event& retired) {
+          modules_by_id_.erase(retired.module_id);
+        },
+        [this](const idle_status_event& idle_status) {
+          pending_idle_status_by_request_id_.insert_or_assign(idle_status.request_id, idle_status.idle);
+        },
+      }, event.payload);
     }
   }
 
+  std::optional<bool> consume_idle_status(uint32_t request_id)
+  {
+    auto it = pending_idle_status_by_request_id_.find(request_id);
+    if (it == pending_idle_status_by_request_id_.end()) return std::nullopt;
+
+    auto idle = it->second;
+    pending_idle_status_by_request_id_.erase(it);
+    return idle;
+  }
+
   uint32_t create_module(
+      uint64_t time_tag,
       std::string_view synth_name,
       module_insert_mode insert_mode,
       uint32_t anchor_module_id,
@@ -259,6 +345,7 @@ class DSP
     modules_by_id_.insert_or_assign(module_id, std::move(instance));
     try {
       enqueue_command(
+          time_tag,
           start_module{
             .module_id = module_id,
             .module = instance_ptr,
@@ -288,7 +375,7 @@ public:
 
   void compile_graph(pybind11::bytes b)
   {
-    reap_retired_modules();
+    drain_runtime_events();
 
     auto dag = parse_dag_or_throw(b);
 
@@ -303,26 +390,43 @@ public:
     }
   }
 
-  uint32_t append(std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t append(pybind11::handle time_tag, std::string_view synth_name, pybind11::kwargs controls)
   {
-    reap_retired_modules();
-    return create_module(synth_name, module_insert_mode::append, 0, "append failed", controls);
+    drain_runtime_events();
+    return create_module(
+        validate_time_tag(time_tag, "time_tag"),
+        synth_name,
+        module_insert_mode::append,
+        0,
+        "append failed",
+        controls);
   }
 
-  uint32_t prepend(std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t prepend(pybind11::handle time_tag, std::string_view synth_name, pybind11::kwargs controls)
   {
-    reap_retired_modules();
-    return create_module(synth_name, module_insert_mode::prepend, 0, "prepend failed", controls);
+    drain_runtime_events();
+    return create_module(
+        validate_time_tag(time_tag, "time_tag"),
+        synth_name,
+        module_insert_mode::prepend,
+        0,
+        "prepend failed",
+        controls);
   }
 
-  uint32_t insert_before(long before_module_id, std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t insert_before(
+      pybind11::handle time_tag,
+      long before_module_id,
+      std::string_view synth_name,
+      pybind11::kwargs controls)
   {
-    reap_retired_modules();
+    drain_runtime_events();
 
     auto validated_module_id = validate_non_negative(before_module_id, "before_module_id");
     get_module_instance(validated_module_id);
 
     return create_module(
+        validate_time_tag(time_tag, "time_tag"),
         synth_name,
         module_insert_mode::before,
         validated_module_id,
@@ -330,14 +434,19 @@ public:
         controls);
   }
 
-  uint32_t insert_after(long after_module_id, std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t insert_after(
+      pybind11::handle time_tag,
+      long after_module_id,
+      std::string_view synth_name,
+      pybind11::kwargs controls)
   {
-    reap_retired_modules();
+    drain_runtime_events();
 
     auto validated_module_id = validate_non_negative(after_module_id, "after_module_id");
     get_module_instance(validated_module_id);
 
     return create_module(
+        validate_time_tag(time_tag, "time_tag"),
         synth_name,
         module_insert_mode::after,
         validated_module_id,
@@ -345,10 +454,11 @@ public:
         controls);
   }
 
-  void set(long module_id, pybind11::kwargs controls)
+  void set(pybind11::handle time_tag, long module_id, pybind11::kwargs controls)
   {
-    reap_retired_modules();
+    drain_runtime_events();
 
+    auto validated_time_tag = validate_time_tag(time_tag, "time_tag");
     auto validated_module_id = validate_non_negative(module_id, "module_id");
     auto& instance = get_module_instance(validated_module_id);
 
@@ -378,6 +488,7 @@ public:
 
       for (size_t offset = 0; offset < values.size(); ++offset) {
         enqueue_command(
+            validated_time_tag,
             set_control_value{
               .module_id = validated_module_id,
               .control_index = static_cast<uint32_t>(slot->index + offset),
@@ -388,14 +499,15 @@ public:
     }
   }
 
-  void remove(long module_id)
+  void remove(pybind11::handle time_tag, long module_id)
   {
-    reap_retired_modules();
+    drain_runtime_events();
 
+    auto validated_time_tag = validate_time_tag(time_tag, "time_tag");
     auto validated_module_id = validate_non_negative(module_id, "module_id");
     get_module_instance(validated_module_id);
 
-    enqueue_command(stop_module{validated_module_id}, "remove failed");
+    enqueue_command(validated_time_tag, stop_module{validated_module_id}, "remove failed");
   }
 
   void start()
@@ -408,16 +520,64 @@ public:
     runtime_.stop();
   }
 
+  bool wait_until_idle(pybind11::handle timeout)
+  {
+    drain_runtime_events();
+
+    if (!runtime_.started()) {
+      throw pybind11::value_error("wait_until_idle is only available while DSP is started");
+    }
+
+    auto validated_timeout = validate_timeout(timeout, "timeout");
+    auto deadline = validated_timeout
+      ? std::optional<std::chrono::steady_clock::time_point>{
+          std::chrono::steady_clock::now() +
+            std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(*validated_timeout))}
+      : std::nullopt;
+
+    auto request_id = next_request_id_++;
+    auto query_pending = false;
+
+    {
+      pybind11::gil_scoped_release release;
+      while (true) {
+        drain_runtime_events();
+        if (query_pending) {
+          if (auto idle = consume_idle_status(request_id)) {
+            if (*idle) break;
+            request_id = next_request_id_++;
+            query_pending = false;
+          }
+        }
+        if (deadline && std::chrono::steady_clock::now() >= *deadline) {
+          return false;
+        }
+        if (!query_pending) {
+          try {
+            enqueue_idle_query(request_id);
+            query_pending = true;
+          } catch (const std::runtime_error&) {
+          }
+        }
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+      }
+    }
+
+    drain_runtime_events();
+    return true;
+  }
+
   std::vector<uint32_t> module_ids()
   {
-    reap_retired_modules();
+    drain_runtime_events();
 
     if (runtime_.started()) {
       throw pybind11::value_error("module_ids is only available while DSP is stopped");
     }
 
     auto ids = runtime_.module_ids();
-    reap_retired_modules();
+    drain_runtime_events();
     return ids;
   }
 
@@ -458,13 +618,14 @@ PYBIND11_MODULE(_core, m, py::mod_gil_not_used())
   .def_property_readonly("output_channels", &DSP::output_channels)
   .def_property_readonly("module_ids", &DSP::module_ids)
   .def("compile", &DSP::compile_graph, py::arg("dag_bytes"))
-  .def("append", &DSP::append, py::arg("synth_name"))
-  .def("prepend", &DSP::prepend, py::arg("synth_name"))
-  .def("insert_before", &DSP::insert_before, py::arg("before_module_id"), py::arg("synth_name"))
-  .def("insert_after", &DSP::insert_after, py::arg("after_module_id"), py::arg("synth_name"))
-  .def("set", &DSP::set, py::arg("module_id"))
-  .def("remove", &DSP::remove, py::arg("module_id"))
+  .def("append", &DSP::append, py::arg("time_tag"), py::arg("synth_name"))
+  .def("prepend", &DSP::prepend, py::arg("time_tag"), py::arg("synth_name"))
+  .def("insert_before", &DSP::insert_before, py::arg("time_tag"), py::arg("before_module_id"), py::arg("synth_name"))
+  .def("insert_after", &DSP::insert_after, py::arg("time_tag"), py::arg("after_module_id"), py::arg("synth_name"))
+  .def("set", &DSP::set, py::arg("time_tag"), py::arg("module_id"))
+  .def("remove", &DSP::remove, py::arg("time_tag"), py::arg("module_id"))
   .def("start", &DSP::start)
   .def("stop", &DSP::stop)
+  .def("wait_until_idle", &DSP::wait_until_idle, py::arg("timeout") = py::none())
   .def("__repr__", &DSP::repr);
 }

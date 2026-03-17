@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <chrono>
 #include <iterator>
 #include <variant>
 
@@ -18,6 +19,33 @@ struct overloaded : Ts... {
 
 template<typename... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
+
+constexpr uint64_t osc_immediate_time_tag = 1;
+constexpr uint64_t ntp_epoch_offset_seconds = 2'208'988'800ULL;
+constexpr uint64_t nanoseconds_per_second = 1'000'000'000ULL;
+constexpr uint64_t ntp_fraction_scale = 1ULL << 32;
+
+uint64_t unix_nanoseconds_to_ntp_time_tag(uint64_t unix_nanoseconds) noexcept
+{
+  const uint64_t unix_seconds = unix_nanoseconds / nanoseconds_per_second;
+  const uint64_t remainder_nanoseconds = unix_nanoseconds % nanoseconds_per_second;
+  const uint64_t ntp_seconds = unix_seconds + ntp_epoch_offset_seconds;
+  const uint64_t ntp_fraction = (remainder_nanoseconds * ntp_fraction_scale) / nanoseconds_per_second;
+  return (ntp_seconds << 32) | ntp_fraction;
+}
+
+uint64_t current_time_tag() noexcept
+{
+  const auto now = std::chrono::system_clock::now().time_since_epoch();
+  const auto unix_nanoseconds = static_cast<uint64_t>(
+      std::chrono::duration_cast<std::chrono::nanoseconds>(now).count());
+  return unix_nanoseconds_to_ntp_time_tag(unix_nanoseconds);
+}
+
+bool is_due_time_tag(uint64_t command_time_tag, uint64_t now_time_tag) noexcept
+{
+  return command_time_tag == osc_immediate_time_tag || command_time_tag <= now_time_tag;
+}
 
 void ma_trampoline(
     ma_device* device,
@@ -51,41 +79,76 @@ runtime::runtime(
 runtime::~runtime() = default;
 
 bool runtime::try_enqueue(const rt_command& command) noexcept
+{ return commands_.push(command); }
+
+bool runtime::try_pop_event(rt_event& event) noexcept
+{ return events_.pop(event); }
+
+bool runtime::push_event(const rt_event& event) noexcept
+{ return events_.push(event); }
+
+bool runtime::retire_module(uint32_t module_id) noexcept
 {
-  return commands_.push(command);
+  return push_event(rt_event{
+    .payload = rt_event_payload{module_retired_event{.module_id = module_id}},
+  });
 }
 
-bool runtime::try_pop_retired(retire_token& token) noexcept
+void runtime::collect_commands() noexcept
 {
-  return retired_modules_.pop(token);
+  rt_command cmd;
+  while (scheduled_commands_.size() < scheduled_commands_.capacity() && commands_.pop(cmd)) {
+    auto insert_at = std::upper_bound(
+        scheduled_commands_.begin(),
+        scheduled_commands_.end(),
+        cmd.time_tag,
+        [](uint64_t time_tag, const scheduled_command& scheduled) {
+          return time_tag < scheduled.command.time_tag;
+        });
+    scheduled_commands_.insert(insert_at, scheduled_command{
+      .sequence = next_sequence_++,
+      .command = cmd,
+    });
+  }
 }
 
-bool runtime::retire_module(module_instance* module) noexcept
+void runtime::consume_due_commands(uint64_t now_time_tag) noexcept
 {
-  return module != nullptr && retired_modules_.push(retire_token{module});
-}
+  collect_commands();
 
-void runtime::drain_commands() noexcept
-{ commands_.consume_all([this](rt_command cmd) { return apply_command(cmd); }); }
+  while (!scheduled_commands_.empty()) {
+    auto& scheduled = scheduled_commands_.front();
+    if (!is_due_time_tag(scheduled.command.time_tag, now_time_tag)) break;
+
+    auto command = scheduled.command;
+    scheduled_commands_.erase(scheduled_commands_.begin());
+    apply_command(command);
+  }
+}
 
 void runtime::start()
-{
-  audio_device_->start();
-}
+{ audio_device_->start(); }
 
 void runtime::stop() noexcept
-{
-  audio_device_->stop();
-}
+{ audio_device_->stop(); }
 
 bool runtime::started() const noexcept
+{ return audio_device_->started(); }
+
+bool runtime::idle() noexcept
 {
-  return audio_device_->started();
+  collect_commands();
+  return commands_.empty() && scheduled_commands_.empty() && modules_.empty();
 }
 
 std::vector<uint32_t> runtime::module_ids()
 {
-  drain_commands();
+  return module_ids(current_time_tag());
+}
+
+std::vector<uint32_t> runtime::module_ids(uint64_t now_time_tag)
+{
+  consume_due_commands(now_time_tag);
 
   return modules_
     | std::views::transform([](module_instance* module) { return module->module_id; })
@@ -102,16 +165,14 @@ module_instance* runtime::find_module(uint32_t module_id) noexcept
 
 void runtime::apply_command(const rt_command& command) noexcept
 {
-  assert(command.sample_offset == 0);
-
   std::visit(overloaded{
     [this](const start_module& payload) noexcept {
       if (find_module(payload.module_id) != nullptr) {
-        retire_module(payload.module);
+        retire_module(payload.module_id);
         return;
       }
       if (modules_.size() >= modules_.capacity()) {
-        retire_module(payload.module);
+        retire_module(payload.module_id);
         return;
       }
 
@@ -132,7 +193,7 @@ void runtime::apply_command(const rt_command& command) noexcept
               return module != nullptr && module->module_id == payload.anchor_module_id;
             });
         if (anchor == modules_.end()) {
-          retire_module(payload.module);
+          retire_module(payload.module_id);
           return;
         }
         insert_at = payload.insert_mode == module_insert_mode::before ? anchor : std::next(anchor);
@@ -149,7 +210,7 @@ void runtime::apply_command(const rt_command& command) noexcept
       if (it == modules_.end()) return;
 
       auto* module = *it;
-      if (!retire_module(module)) return;
+      if (!retire_module(module->module_id)) return;
 
       modules_.erase(it);
     },
@@ -157,6 +218,14 @@ void runtime::apply_command(const rt_command& command) noexcept
       auto* module = find_module(payload.module_id);
       if (module == nullptr) return;
       module->module.set_control(payload.control_index, payload.value);
+    },
+    [this](const query_idle_status& payload) noexcept {
+      push_event(rt_event{
+        .payload = rt_event_payload{idle_status_event{
+          .request_id = payload.request_id,
+          .idle = idle(),
+        }},
+      });
     },
   }, command.payload);
 }
@@ -183,7 +252,7 @@ void runtime::render_block(float* output, const float* input, size_t frame_offse
     auto* module = modules_[index];
     module->module.process(abus_.data());
 
-    if (module->module.should_remove() && retire_module(module)) {
+    if (module->module.should_remove() && retire_module(module->module_id)) {
       modules_.erase(modules_.begin() + static_cast<std::ptrdiff_t>(index));
       continue;
     }
@@ -203,13 +272,17 @@ void runtime::render_block(float* output, const float* input, size_t frame_offse
 
 void runtime::process(float* output, const float* input, uint32_t frame_count)
 {
-  assert(frame_count % block_size_ == 0);
+  process(output, input, frame_count, 0);
+}
 
-  drain_commands();
+void runtime::process(float* output, const float* input, uint32_t frame_count, uint64_t now_time_tag)
+{
+  assert(frame_count % block_size_ == 0);
 
   const size_t total_frames = static_cast<size_t>(frame_count);
 
   for (size_t frame_offset = 0; frame_offset < total_frames; frame_offset += block_size_) {
+    consume_due_commands(now_time_tag == 0 ? current_time_tag() : now_time_tag);
     render_block(output, input, frame_offset);
   }
 }

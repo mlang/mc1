@@ -27,12 +27,10 @@ struct module_instance final {
   Result::Module module;
 };
 
-struct retire_token final {
-  module_instance* module{};
+struct scheduled_command final {
+  uint64_t sequence{};
+  rt_command command{};
 };
-
-static_assert(std::is_trivially_copyable_v<retire_token>);
-static_assert(std::is_trivially_destructible_v<retire_token>);
 
 class runtime final
 {
@@ -45,27 +43,34 @@ public:
   ~runtime();
 
   bool try_enqueue(const rt_command& command) noexcept;
-  bool try_pop_retired(retire_token& token) noexcept;
+  bool try_pop_event(rt_event& event) noexcept;
 
   void start();
   void stop() noexcept;
   bool started() const noexcept;
   std::vector<uint32_t> module_ids();
+  std::vector<uint32_t> module_ids(uint64_t now_time_tag);
 
   void process(float* output, const float* input, uint32_t frame_count);
+  void process(float* output, const float* input, uint32_t frame_count, uint64_t now_time_tag);
 
 private:
   size_t block_size_;
   uint32_t input_channels_;
   uint32_t output_channels_;
   aligned_float_buffer abus_;
-  fixed_spsc_queue<rt_command, 1024> commands_;
-  fixed_spsc_queue<retire_token, 1024> retired_modules_;
+  fixed_spsc_queue<rt_command, 8192> commands_;
+  fixed_spsc_queue<rt_event, 8192> events_;
+  boost::container::static_vector<scheduled_command, 8192> scheduled_commands_{};
   boost::container::static_vector<module_instance*, 1024> modules_{};
   std::unique_ptr<audio_device> audio_device_;
+  uint64_t next_sequence_ = 0;
 
-  bool retire_module(module_instance* module) noexcept;
-  void drain_commands() noexcept;
+  bool push_event(const rt_event& event) noexcept;
+  bool retire_module(uint32_t module_id) noexcept;
+  void collect_commands() noexcept;
+  void consume_due_commands(uint64_t now_time_tag) noexcept;
+  bool idle() noexcept;
   module_instance* find_module(uint32_t module_id) noexcept;
   void apply_command(const rt_command& command) noexcept;
   void render_block(float* output, const float* input, size_t frame_offset) noexcept;

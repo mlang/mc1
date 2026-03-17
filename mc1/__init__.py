@@ -25,10 +25,10 @@ Simple example:
 
 With the native extension built, the same graph can be compiled and played:
 
-    >>> from mc1 import DSP
+    >>> from mc1 import DSP, IMMEDIATE
     >>> dsp = DSP()
     >>> dsp.compile(graph_bytes)
-    >>> _ = dsp.append("beep", freq=660)
+    >>> _ = dsp.append(IMMEDIATE, "beep", freq=660)
 
 Use `perft(...)` when you want to hand serialized graph bytes directly to the
 native performance/compiler test entry point.
@@ -38,6 +38,7 @@ import mc1._core
 from mc1._core import DSP
 from mc1.dag import *
 from mc1.graphs import drone
+from mc1.timetag import DEFAULT_LATENCY, IMMEDIATE, add, after, latency, now
 
 __all__ = (
     "ADSR",
@@ -50,6 +51,12 @@ __all__ = (
     "Trigger",
     "default",
     "drone",
+    "DEFAULT_LATENCY",
+    "IMMEDIATE",
+    "add",
+    "after",
+    "latency",
+    "now",
     "perft",
 )
 

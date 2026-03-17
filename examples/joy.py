@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-import time
+
+from mc1 import add, latency, now
 
 
 BPM = 72
-EPSILON = 1e-12
 
 
 @dataclass(frozen=True, slots=True)
@@ -367,75 +367,44 @@ def _build_parts():
 
 PARTS = _build_parts()
 
-def voice(events, *, bpm, dsp_instance, synth_name="default", voice_controls):
+def voice(events, *, bpm, dsp_instance, start_time, synth_name="default", voice_controls):
     if bpm <= 0:
         raise ValueError("bpm must be > 0")
 
     seconds_per_beat = 60.0 / bpm
-    active_module_id = None
+    elapsed = 0.0
 
-    try:
-        for event in events:
-            if event.midi_note is None:
-                yield event.beats * seconds_per_beat
-                continue
-
+    for event in events:
+        duration = event.beats * seconds_per_beat
+        if event.midi_note is not None:
             controls = dict(voice_controls)
             controls.update(event.controls)
             controls["freq"] = midi2cps(event.midi_note)
             controls["gate"] = 1
 
-            active_module_id = dsp_instance.append(synth_name, **controls)
-            yield event.beats * seconds_per_beat
-            dsp_instance.set(active_module_id, gate=0)
-            active_module_id = None
-    finally:
-        if active_module_id is not None:
-            try:
-                dsp_instance.set(active_module_id, gate=0)
-            except Exception:
-                pass
+            note_start = add(start_time, elapsed)
+            module_id = dsp_instance.append(note_start, synth_name, **controls)
+            dsp_instance.set(add(note_start, duration), module_id, gate=0)
+
+        elapsed += duration
+
+    return elapsed
 
 
-def _next_delay(generator):
-    delay = float(next(generator))
-    if delay < 0:
-        raise ValueError("voice generators must yield non-negative delays")
-    return delay
-
-
-def play(generators, sleep=time.sleep):
-    generators = list(generators)
-    active = []
-
-    try:
-        for index, generator in enumerate(generators):
-            try:
-                active.append([index, generator, _next_delay(generator)])
-            except StopIteration:
-                pass
-
-        while active:
-            wait = min(state[2] for state in active)
-            if wait > 0:
-                sleep(wait)
-
-            ready = []
-            for state in active:
-                state[2] -= wait
-                if state[2] <= EPSILON:
-                    ready.append(state)
-
-            active = [state for state in active if state[2] > EPSILON]
-
-            for index, generator, _ in sorted(ready, key=lambda state: state[0]):
-                try:
-                    active.append([index, generator, _next_delay(generator)])
-                except StopIteration:
-                    pass
-    finally:
-        for generator in generators:
-            generator.close()
+def play(parts, *, bpm, dsp_instance, start_time):
+    return max(
+        (
+            voice(
+                part.events,
+                bpm=bpm,
+                dsp_instance=dsp_instance,
+                start_time=start_time,
+                voice_controls=part.voice_controls,
+            )
+            for part in parts
+        ),
+        default=0.0,
+    )
 
 
 def release_tail(*parts):
@@ -450,21 +419,18 @@ def release_tail(*parts):
     return max(releases, default=0.0)
 
 
-def main(dsp_instance=None, sleep=time.sleep):
+def main(dsp_instance=None):
     if dsp_instance is None:
         dsp_instance = globals().get("dsp")
     if dsp_instance is None:
         raise RuntimeError("pass dsp_instance explicitly or run via: python -m mc1 examples/default_melody.py")
 
-    generators = [
-        voice(part.events, bpm=BPM, dsp_instance=dsp_instance, voice_controls=part.voice_controls)
-        for part in PARTS
-    ]
+    start_time = latency(base=now())
+    play(PARTS, bpm=BPM, dsp_instance=dsp_instance, start_time=start_time)
 
     dsp_instance.start()
     try:
-        play(generators, sleep=sleep)
-        sleep(release_tail(*((part.events, part.voice_controls) for part in PARTS)))
+        dsp_instance.wait_until_idle()
     finally:
         dsp_instance.stop()
 
