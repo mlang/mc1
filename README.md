@@ -42,13 +42,11 @@ uv run python -m mc1
 
 ## Demo
 
-Run the bundled two-voice default-synth melody example with:
+Run the bundled default-synth arrangement example with:
 
 ```bash
 uv run python -m mc1 examples/default_melody.py
 ```
-
-The script keeps the score in MIDI note numbers, uses small helpers like `midi2cps`, and schedules two concurrent voice generators through the package's default FM synth.
 
 ## Repository Layout
 

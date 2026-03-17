@@ -6,7 +6,7 @@ import runpy
 import pytest
 
 
-EXAMPLE_PATH = pathlib.Path(__file__).resolve().parents[1] / "examples" / "default_melody.py"
+EXAMPLE_PATH = pathlib.Path(__file__).resolve().parents[1] / "examples" / "joy.py"
 
 
 class FakeDSP:
@@ -37,6 +37,25 @@ def load_example():
 def test_midi2cps_maps_a440():
     example = load_example()
     assert example["midi2cps"](69) == pytest.approx(440.0)
+
+
+def test_parts_cover_all_translated_midi_lines():
+    example = load_example()
+
+    assert [part.name for part in example["PARTS"]] == [
+        "Treble",
+        "Alto",
+        "Tenor",
+        "Bass",
+        "Piano_1",
+        "Piano_2",
+        "Piano2_1",
+        "Piano2_2",
+        "Piano3_1",
+        "Piano3_2",
+        "Piano4_1",
+        "Piano4_2",
+    ]
 
 
 def test_voice_yields_note_and_rest_durations():
@@ -107,7 +126,7 @@ def test_main_requires_explicit_dsp_outside_mc1_host():
         example["main"](sleep=lambda delay: None)
 
 
-def test_main_plays_two_voices_and_releases_every_note():
+def test_main_plays_all_parts_and_releases_every_note():
     example = load_example()
     dsp = FakeDSP()
     sleeps = []
@@ -120,8 +139,13 @@ def test_main_plays_two_voices_and_releases_every_note():
     append_calls = [call for call in dsp.calls if call[0] == "append"]
     set_calls = [call for call in dsp.calls if call[0] == "set"]
 
-    assert len(append_calls) == len(example["LEAD"]) + len(example["BASS"])
-    assert {call[3]["carrier_ratio"] for call in append_calls} == {0.5, 1.0}
+    expected_notes = sum(
+        event.midi_note is not None
+        for part in example["PARTS"]
+        for event in part.events
+    )
+    assert len(append_calls) == expected_notes
+    assert {call[3]["carrier_ratio"] for call in append_calls} == {0.5, 0.75, 1.0}
 
     appended_ids = {call[1] for call in append_calls}
     released_ids = {
@@ -131,8 +155,15 @@ def test_main_plays_two_voices_and_releases_every_note():
     }
     assert released_ids == appended_ids
 
-    expected_total = (16 * 60.0 / example["BPM"]) + max(
-        example["LEAD_CONTROLS"]["release"],
-        example["BASS_CONTROLS"]["release"],
+    expected_total = (
+        max(
+            sum(event.beats for event in part.events)
+            for part in example["PARTS"]
+        )
+        * 60.0
+        / example["BPM"]
+    ) + max(
+        part.voice_controls["release"]
+        for part in example["PARTS"]
     )
     assert sum(sleeps) == pytest.approx(expected_total)
