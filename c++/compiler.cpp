@@ -291,7 +291,7 @@ protected:
     std::optional<gccjit::type> return_type = std::nullopt
   ) const
   {
-    return ctx.gcc.new_function(GCC_JIT_FUNCTION_INTERNAL,
+    return ctx.gcc.new_function(GCC_JIT_FUNCTION_ALWAYS_INLINE,
       return_type.value_or(
         ctx.gcc.get_type(rate() == 'a' ? GCC_JIT_TYPE_VOID : GCC_JIT_TYPE_FLOAT)
       ),
