@@ -13,12 +13,11 @@ using a monotonic anchor, and resumes tasks from a shared background executor
 thread when their deadlines arrive. This keeps the task code simple while
 making timing explicit and deterministic from the clock's point of view.
 
-Each clock carries its own notion of current logical time, exposed only while a
-task is running. That allows routines to inspect the clock they are executing
-on, coordinate against the same timeline, and pause or stop without tying the
-API to a specific audio backend. The design is intentionally smaller than a
-full sequencer: it is a foundation for "process-style" scheduling where timing
-is driven by routines themselves rather than by a precomputed event list.
+Each clock carries its own notion of current logical time. Tasks can inspect
+the clock they are executing on, and outside code can query that same timeline
+directly. The design is intentionally smaller than a full sequencer: it is a
+foundation for "process-style" scheduling where timing is driven by routines
+themselves rather than by a precomputed event list.
 """
 
 from __future__ import annotations
@@ -153,7 +152,7 @@ class LogicalClock:
         self._epoch = time.time()
         self._monotonic_anchor = time.monotonic()
         self._seconds = 0.0
-        self._active_handles = 0
+        self._running_steps = 0
         self._lock = threading.Lock()
 
     @property
@@ -163,7 +162,7 @@ class LogicalClock:
     @property
     def seconds(self) -> float:
         with self._lock:
-            return self._seconds
+            return self._current_seconds_locked()
 
     @property
     def time(self) -> float:
@@ -174,29 +173,29 @@ class LogicalClock:
             raise TypeError("play() expects a generator instance")
 
         with self._lock:
-            if self._active_handles == 0:
-                self._reanchor_locked()
-            self._active_handles += 1
-            due_seconds = self._seconds
+            due_seconds = self._current_seconds_locked()
 
-        handle = TaskHandle(_done_callback=self._deactivate_handle)
+        handle = TaskHandle()
         self._shared_executor().submit(_ScheduledTask( clock=self, generator=gen, handle=handle, due_seconds=due_seconds))
         return handle
 
-    def _set_seconds(self, seconds: float) -> None:
+    def _begin_step(self, seconds: float) -> None:
         with self._lock:
+            self._running_steps += 1
             self._seconds = seconds
+
+    def _end_step(self) -> None:
+        with self._lock:
+            self._running_steps -= 1
+
+    def _current_seconds_locked(self) -> float:
+        if self._running_steps > 0:
+            return self._seconds
+        return time.monotonic() - self._monotonic_anchor
 
     def _due_at(self, due_seconds: float) -> float:
         with self._lock:
             return self._monotonic_anchor + due_seconds
-
-    def _deactivate_handle(self) -> None:
-        with self._lock:
-            self._active_handles -= 1
-
-    def _reanchor_locked(self) -> None:
-        self._monotonic_anchor = time.monotonic() - self._seconds
 
     @classmethod
     def _shared_executor(cls) -> "_SharedExecutor":
@@ -253,7 +252,7 @@ class _SharedExecutor:
             should_resubmit = False
             try:
                 _scheduler_state.clock = task.clock
-                task.clock._set_seconds(task.due_seconds)
+                task.clock._begin_step(task.due_seconds)
                 delay = _coerce_delay(next(task.generator))
                 if task.handle._complete_step():
                     task.due_seconds += delay
@@ -263,6 +262,7 @@ class _SharedExecutor:
             except BaseException as exc:
                 task.handle._finish(exception=exc)
             finally:
+                task.clock._end_step()
                 _scheduler_state.clock = None
 
             if should_resubmit: self.submit(task)
