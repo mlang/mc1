@@ -247,8 +247,7 @@ class _SharedExecutor:
             self._condition.notify()
 
     def _run(self) -> None:
-        while True:
-            task = self._next_task()
+        while task := self._next_task():
             if not task.handle._begin_step(): continue
 
             should_resubmit = False
