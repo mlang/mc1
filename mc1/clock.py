@@ -1,3 +1,26 @@
+"""Logical-time scheduling for small musical or realtime control routines.
+
+This module solves the gap between immediate Python execution and timed
+musical processes that need to advance in logical time. In that setting, a
+routine should be able to say "run me again 250 ms later" without manually
+sleeping, tracking deadlines, or accumulating drift from work done between
+events.
+
+The approach here is cooperative scheduling: a task is written as a generator
+that yields its next delay in seconds. The clock records task progress in its
+own logical timeline, converts those logical deadlines to wall-clock wakeups
+using a monotonic anchor, and resumes tasks from a shared background executor
+thread when their deadlines arrive. This keeps the task code simple while
+making timing explicit and deterministic from the clock's point of view.
+
+Each clock carries its own notion of current logical time, exposed only while a
+task is running. That allows routines to inspect the clock they are executing
+on, coordinate against the same timeline, and pause or stop without tying the
+API to a specific audio backend. The design is intentionally smaller than a
+full sequencer: it is a foundation for "process-style" scheduling where timing
+is driven by routines themselves rather than by a precomputed event list.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Generator
