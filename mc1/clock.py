@@ -140,8 +140,7 @@ class LogicalClock:
 
     def __init__(self) -> None:
         self._epoch = time.time()
-        self._seconds = 0.0
-        self._running_steps = 0
+        self._active_seconds: float | None = None
         self._lock = threading.Lock()
 
     @property
@@ -170,16 +169,15 @@ class LogicalClock:
 
     def _begin_step(self, seconds: float) -> None:
         with self._lock:
-            self._running_steps += 1
-            self._seconds = seconds
+            self._active_seconds = seconds
 
     def _end_step(self) -> None:
         with self._lock:
-            self._running_steps -= 1
+            self._active_seconds = None
 
     def _current_seconds_locked(self) -> float:
-        if self._running_steps > 0:
-            return self._seconds
+        if self._active_seconds is not None:
+            return self._active_seconds
         return time.time() - self._epoch
 
     @classmethod
@@ -233,7 +231,7 @@ class _SharedExecutor:
                     should_resubmit = True
             except StopIteration:
                 task.handle._finish()
-            except BaseException as exc:
+            except Exception as exc:
                 task.handle._finish(exception=exc)
             finally:
                 task.clock._end_step()
