@@ -1,4 +1,4 @@
-"""Logical-time scheduling for small musical or realtime control routines.
+"""Wall-clock scheduling for small musical or realtime control routines.
 
 This module solves the gap between immediate Python execution and timed
 musical processes that need to advance in logical time. In that setting, a
@@ -8,16 +8,16 @@ events.
 
 The approach here is cooperative scheduling: a task is written as a generator
 that yields its next delay in seconds. The clock records task progress in its
-own logical timeline, converts those logical deadlines to wall-clock wakeups
-using a monotonic anchor, and resumes tasks from a shared background executor
-thread when their deadlines arrive. This keeps the task code simple while
-making timing explicit and deterministic from the clock's point of view.
+own timeline, projects those deadlines onto the system wall clock using its
+start epoch, and resumes tasks from a shared background executor thread when
+their deadlines arrive. This keeps the task code simple while letting callers
+derive real-world timestamps directly from the same clock state.
 
-Each clock carries its own notion of current logical time. Tasks can inspect
-the clock they are executing on, and outside code can query that same timeline
-directly. The design is intentionally smaller than a full sequencer: it is a
-foundation for "process-style" scheduling where timing is driven by routines
-themselves rather than by a precomputed event list.
+Each clock carries its own notion of current time relative to its start epoch.
+Tasks can inspect the clock they are executing on, and outside code can query
+that same timeline directly. The design is intentionally smaller than a full
+sequencer: it is a foundation for "process-style" scheduling where timing is
+driven by routines themselves rather than by a precomputed event list.
 """
 
 from __future__ import annotations
@@ -150,7 +150,6 @@ class LogicalClock:
 
     def __init__(self) -> None:
         self._epoch = time.time()
-        self._monotonic_anchor = time.monotonic()
         self._seconds = 0.0
         self._running_steps = 0
         self._lock = threading.Lock()
@@ -191,11 +190,11 @@ class LogicalClock:
     def _current_seconds_locked(self) -> float:
         if self._running_steps > 0:
             return self._seconds
-        return time.monotonic() - self._monotonic_anchor
+        return time.time() - self._epoch
 
     def _due_at(self, due_seconds: float) -> float:
         with self._lock:
-            return self._monotonic_anchor + due_seconds
+            return self._epoch + due_seconds
 
     @classmethod
     def _shared_executor(cls) -> "_SharedExecutor":
@@ -278,7 +277,7 @@ class _SharedExecutor:
                     continue
 
                 queued_task = self._queue[0]
-                delay = queued_task.due_at - time.monotonic()
+                delay = queued_task.due_at - time.time()
                 if delay > 0:
                     self._condition.wait(timeout=delay)
                     continue
