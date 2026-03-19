@@ -29,7 +29,6 @@ from inspect import isgenerator
 from itertools import count
 from math import isfinite
 from numbers import Real
-from typing import NamedTuple
 import heapq
 import threading
 import time
@@ -183,10 +182,6 @@ class LogicalClock:
             return self._seconds
         return time.time() - self._epoch
 
-    def _due_at(self, due_seconds: float) -> float:
-        with self._lock:
-            return self._epoch + due_seconds
-
     @classmethod
     def _shared_executor(cls) -> "_SharedExecutor":
         with cls._executor_lock:
@@ -202,17 +197,10 @@ class _ScheduledTask:
     handle: TaskHandle
     due_seconds: float
 
-
-class _QueuedTask(NamedTuple):
-    due_at: float
-    sequence: int
-    task: _ScheduledTask
-
-
 class _SharedExecutor:
     def __init__(self) -> None:
         self._condition = threading.Condition()
-        self._queue: list[_QueuedTask] = []
+        self._queue: list[tuple[float, int, _ScheduledTask]] = []
         self._sequence = count()
         self._thread: threading.Thread | None = None
 
@@ -227,11 +215,7 @@ class _SharedExecutor:
                 self._thread.start()
             heapq.heappush(
                 self._queue,
-                _QueuedTask(
-                    due_at=task.clock._due_at(task.due_seconds),
-                    sequence=next(self._sequence),
-                    task=task,
-                )
+                (task.clock.epoch + task.due_seconds, next(self._sequence), task)
             )
             self._condition.notify()
 
@@ -260,21 +244,21 @@ class _SharedExecutor:
     def _next_task(self) -> _ScheduledTask:
         with self._condition:
             while True:
-                while self._queue and self._queue[0].task.handle.done():
+                while self._queue and self._queue[0][2].handle.done():
                     heapq.heappop(self._queue)
 
                 if not self._queue:
                     self._condition.wait()
                     continue
 
-                queued_task = self._queue[0]
-                delay = queued_task.due_at - time.time()
+                due_at, _, task = self._queue[0]
+                delay = due_at - time.time()
                 if delay > 0:
                     self._condition.wait(timeout=delay)
                     continue
 
                 heapq.heappop(self._queue)
-                return queued_task.task
+                return task
 
 
 def _coerce_delay(value: object) -> float:
