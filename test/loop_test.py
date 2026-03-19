@@ -129,6 +129,13 @@ def test_beat_time_rejects_invalid_tempo():
         beat_time.tempo = 0.0
 
 
+def test_logical_time_rejects_unknown_attributes():
+    logical_time = loop.LogicalTime()
+
+    with pytest.raises(AttributeError):
+        logical_time.tempo = 60.0
+
+
 def test_run_preserves_supplied_time_position_and_reanchors_wallclock(monkeypatch):
     monkeypatch.setattr(loop.pytime, "time", lambda: 500.0)
     current_time = loop.LogicalTime(1.5, wallclock_time=10.0)

@@ -26,6 +26,8 @@ def _coerce_tempo(value: float) -> float:
 
 
 class LogicalTime:
+    __slots__ = ("_seconds", "_wallclock_time")
+
     def __init__(self, seconds: float = 0.0, *, wallclock_time: float | None = None) -> None:
         self._seconds = _coerce_offset(seconds, name="seconds")
         if wallclock_time is None:
@@ -49,11 +51,13 @@ class LogicalTime:
 
     def __iadd__(self, delay: float) -> LogicalTime:
         delay = _coerce_delay(delay)
-        self._seconds += delay
+        self._seconds += self._delay_seconds(delay)
         return self
 
 
 class BeatTime(LogicalTime):
+    __slots__ = ("_beats", "_tempo")
+
     def __init__(
         self,
         beats: float = 0.0,
@@ -83,7 +87,7 @@ class BeatTime(LogicalTime):
     def __iadd__(self, delay: float) -> BeatTime:
         delay = _coerce_delay(delay)
         self._beats += delay
-        self._seconds += self._delay_seconds(delay)
+        super().__iadd__(delay)
         return self
 
 
@@ -181,7 +185,7 @@ async def run(gen: RoutineFactory[ReturnT], *, time: Time | None = None) -> Retu
 
 
 async def main() -> None:
-    await run(doit, time=BeatTime())
+    await run(doit)
 
 
 if __name__ == "__main__":
