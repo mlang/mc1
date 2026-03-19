@@ -22,7 +22,7 @@ driven by routines themselves rather than by a precomputed event list.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Generator
+from collections.abc import Generator
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from inspect import isgenerator
@@ -61,7 +61,6 @@ class _TaskState(Enum):
 
 @dataclass(slots=True)
 class TaskHandle:
-    _done_callback: Callable[[], None] | None = field(default=None, repr=False)
     _event: threading.Event = field(default_factory=threading.Event, init=False, repr=False)
     _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
     _state: _TaskState = field(default=_TaskState.PENDING, init=False, repr=False)
@@ -72,13 +71,11 @@ class TaskHandle:
             if self._state.is_terminal:
                 return False
 
-            callback = None
             if self._state is _TaskState.PENDING:
-                callback = self._finish_locked(_TaskState.CANCELLED)
+                self._finish_locked(_TaskState.CANCELLED)
             elif self._state is _TaskState.RUNNING:
                 self._state = _TaskState.CANCELLING
 
-        if callback is not None: callback()
         return True
 
     def done(self) -> bool: return self._event.is_set()
@@ -107,14 +104,12 @@ class TaskHandle:
             if self._state.is_terminal:
                 return False
 
-            callback = None
             if self._state is _TaskState.CANCELLING:
-                callback = self._finish_locked(_TaskState.CANCELLED)
+                self._finish_locked(_TaskState.CANCELLED)
             elif self._state is _TaskState.RUNNING:
                 self._state = _TaskState.PENDING
                 return True
 
-        if callback is not None: callback()
         return False
 
     def _finish(self, *, exception: BaseException | None = None, cancelled: bool = False) -> None:
@@ -125,24 +120,20 @@ class TaskHandle:
                 terminal_state = _TaskState.FINISHED
             else:
                 terminal_state = _TaskState.FAILED
-            callback = self._finish_locked(terminal_state, exception=exception)
-        if callback is not None: callback()
+            self._finish_locked(terminal_state, exception=exception)
 
     def _finish_locked(
         self,
         terminal_state: _TaskState,
         *,
         exception: BaseException | None = None,
-    ) -> Callable[[], None] | None:
+    ) -> None:
         if self._state.is_terminal:
-            return None
+            return
 
         self._state = terminal_state
         self._exception = exception
         self._event.set()
-        callback = self._done_callback
-        self._done_callback = None
-        return callback
 
 class LogicalClock:
     _executor: "_SharedExecutor | None" = None
