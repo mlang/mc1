@@ -1,268 +1,153 @@
-"""Wall-clock scheduling for small musical or realtime control routines.
-
-This module solves the gap between immediate Python execution and timed
-musical processes that need to advance in logical time. In that setting, a
-routine should be able to say "run me again 250 ms later" without manually
-sleeping, tracking deadlines, or accumulating drift from work done between
-events.
-
-The approach here is cooperative scheduling: a task is written as a generator
-that yields its next delay in seconds. The clock records task progress in its
-own timeline, projects those deadlines onto the system wall clock using its
-start epoch, and resumes tasks from a shared background executor thread when
-their deadlines arrive. This keeps the task code simple while letting callers
-derive real-world timestamps directly from the same clock state.
-
-Each clock carries its own notion of current time relative to its start epoch.
-Tasks can inspect the clock they are executing on, and outside code can query
-that same timeline directly. The design is intentionally smaller than a full
-sequencer: it is a foundation for "process-style" scheduling where timing is
-driven by routines themselves rather than by a precomputed event list.
-"""
-
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Generator
+from contextvars import ContextVar
 from dataclasses import dataclass, field
-from enum import Enum, auto
+import heapq
 from inspect import isgenerator
 from itertools import count
 from math import isfinite
 from numbers import Real
-import heapq
-import threading
-import time
+import time as pytime
 
 
-_scheduler_state = threading.local()
-type TaskGenerator = Generator[float, None, None]
+def _coerce_offset(value: float, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError(f"{name} must be a real number")
+
+    value = float(value)
+    if not isfinite(value):
+        raise ValueError(f"{name} must be finite")
+    return value
+
+
+Routine = Generator[float, None, None]
+_current_clock: ContextVar["LogicalClock"] = ContextVar("current_clock")
 
 
 def current_clock() -> "LogicalClock":
-    clock = getattr(_scheduler_state, "clock", None)
-    if clock is None:
-        raise RuntimeError("current_clock() is only available while a task is running")
-    return clock
+    try:
+        return _current_clock.get()
+    except LookupError as exc:
+        raise RuntimeError("current_clock() is only available while a routine is running") from exc
 
 
-class _TaskState(Enum):
-    PENDING = auto()
-    RUNNING = auto()
-    CANCELLING = auto()
-    CANCELLED = auto()
-    FINISHED = auto()
-    FAILED = auto()
+def doit() -> Routine:
+    clock = current_clock()
+    print(clock.time)
+    yield 0.5
+    print(clock.time)
+    yield 0.5
+    print(clock.time)
+    yield 0.5
+    print(clock.time)
+    yield 0.5
+    print(clock.time)
 
-    @property
-    def is_terminal(self) -> bool:
-        return self in {self.CANCELLED, self.FINISHED, self.FAILED}
 
+def _coerce_delay(delay: float) -> float:
+    if isinstance(delay, bool) or not isinstance(delay, Real):
+        raise TypeError("routine must yield a real-number delay")
 
-@dataclass(slots=True)
-class TaskHandle:
-    _event: threading.Event = field(default_factory=threading.Event, init=False, repr=False)
-    _lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
-    _state: _TaskState = field(default=_TaskState.PENDING, init=False, repr=False)
-    _exception: BaseException | None = field(default=None, init=False, repr=False)
+    delay = float(delay)
+    if delay < 0 or not isfinite(delay):
+        raise ValueError("routine delay must be a finite non-negative number")
+    return delay
 
-    def cancel(self) -> bool:
-        with self._lock:
-            if self._state.is_terminal:
-                return False
-
-            if self._state is _TaskState.PENDING:
-                self._finish_locked(_TaskState.CANCELLED)
-            elif self._state is _TaskState.RUNNING:
-                self._state = _TaskState.CANCELLING
-
-        return True
-
-    def done(self) -> bool: return self._event.is_set()
-
-    def cancelled(self) -> bool:
-        with self._lock:
-            return self._state is _TaskState.CANCELLED
-
-    def exception(self) -> BaseException | None:
-        with self._lock:
-            return self._exception
-
-    def wait(self, timeout: float | None = None) -> bool:
-        return self._event.wait(timeout)
-
-    def _begin_step(self) -> bool:
-        with self._lock:
-            if self._state is not _TaskState.PENDING:
-                return False
-
-            self._state = _TaskState.RUNNING
-            return True
-
-    def _complete_step(self) -> bool:
-        with self._lock:
-            if self._state.is_terminal:
-                return False
-
-            if self._state is _TaskState.CANCELLING:
-                self._finish_locked(_TaskState.CANCELLED)
-            elif self._state is _TaskState.RUNNING:
-                self._state = _TaskState.PENDING
-                return True
-
-        return False
-
-    def _finish(self, *, exception: BaseException | None = None, cancelled: bool = False) -> None:
-        with self._lock:
-            if cancelled:
-                terminal_state = _TaskState.CANCELLED
-            elif exception is None:
-                terminal_state = _TaskState.FINISHED
-            else:
-                terminal_state = _TaskState.FAILED
-            self._finish_locked(terminal_state, exception=exception)
-
-    def _finish_locked(
-        self,
-        terminal_state: _TaskState,
-        *,
-        exception: BaseException | None = None,
-    ) -> None:
-        if self._state.is_terminal:
-            return
-
-        self._state = terminal_state
-        self._exception = exception
-        self._event.set()
 
 class LogicalClock:
-    _executor: "_SharedExecutor | None" = None
-    _executor_lock = threading.Lock()
+    __slots__ = ('_origin', '_sequence', '_queue', '_seconds')
 
-    def __init__(self) -> None:
-        self._epoch = time.time()
-        self._active_seconds: float | None = None
-        self._lock = threading.Lock()
-
-    @property
-    def epoch(self) -> float:
-        return self._epoch
+    def __init__(self, seconds: float = 0) -> None:
+        self._seconds = seconds
+        self._queue: list[_ScheduledRoutine] = []
+        self._sequence = count()
+        self._origin = pytime.time()
 
     @property
     def seconds(self) -> float:
-        with self._lock:
-            return self._current_seconds_locked()
+        return self._seconds
 
     @property
     def time(self) -> float:
-        return self.epoch + self.seconds
+        return self._origin + self.seconds
 
-    def play(self, gen: TaskGenerator) -> TaskHandle:
-        if not isgenerator(gen):
-            raise TypeError("play() expects a generator instance")
+    def play(
+        self,
+        routine: Routine,
+        *,
+        relative: float | None = None,
+        absolute: float | None = None,
+    ) -> None:
+        if relative is not None and absolute is not None:
+            raise ValueError("play() accepts at most one of relative= or absolute=")
 
-        with self._lock:
-            due_seconds = self._current_seconds_locked()
+        if not isgenerator(routine):
+            raise TypeError("play() expects a routine factory returning a generator")
 
-        handle = TaskHandle()
-        self._shared_executor().submit(_ScheduledTask( clock=self, generator=gen, handle=handle, due_seconds=due_seconds))
-        return handle
+        if relative is not None:
+            due_seconds = self.seconds + _coerce_delay(relative)
+        elif absolute is not None:
+            due_seconds = max(self.seconds, _coerce_offset(absolute, name="absolute"))
+        else:
+            due_seconds = self.seconds
 
-    def _begin_step(self, seconds: float) -> None:
-        with self._lock:
-            self._active_seconds = seconds
-
-    def _end_step(self) -> None:
-        with self._lock:
-            self._active_seconds = None
-
-    def _current_seconds_locked(self) -> float:
-        if self._active_seconds is not None:
-            return self._active_seconds
-        return time.time() - self._epoch
-
-    @classmethod
-    def _shared_executor(cls) -> "_SharedExecutor":
-        with cls._executor_lock:
-            if cls._executor is None:
-                cls._executor = _SharedExecutor()
-            return cls._executor
-
-
-@dataclass(slots=True)
-class _ScheduledTask:
-    clock: LogicalClock
-    generator: TaskGenerator
-    handle: TaskHandle
-    due_seconds: float
-
-class _SharedExecutor:
-    def __init__(self) -> None:
-        self._condition = threading.Condition()
-        self._queue: list[tuple[float, int, _ScheduledTask]] = []
-        self._sequence = count()
-        self._thread: threading.Thread | None = None
-
-    def submit(self, task: _ScheduledTask) -> None:
-        with self._condition:
-            if self._thread is None:
-                self._thread = threading.Thread(
-                    target=self._run,
-                    name="LogicalClockExecutor",
-                    daemon=True,
-                )
-                self._thread.start()
-            heapq.heappush(
-                self._queue,
-                (task.clock.epoch + task.due_seconds, next(self._sequence), task)
+        heapq.heappush(
+            self._queue,
+            _ScheduledRoutine(
+                due_seconds=due_seconds,
+                sequence=next(self._sequence),
+                routine=routine
             )
-            self._condition.notify()
+        )
 
-    def _run(self) -> None:
-        while task := self._next_task():
-            if not task.handle._begin_step(): continue
+    def step(self) -> bool:
+        if not self._queue:
+            return False
 
-            should_resubmit = False
-            try:
-                _scheduler_state.clock = task.clock
-                task.clock._begin_step(task.due_seconds)
-                delay = _coerce_delay(next(task.generator))
-                if task.handle._complete_step():
-                    task.due_seconds += delay
-                    should_resubmit = True
-            except StopIteration:
-                task.handle._finish()
-            except Exception as exc:
-                task.handle._finish(exception=exc)
-            finally:
-                task.clock._end_step()
-                _scheduler_state.clock = None
+        entry = heapq.heappop(self._queue)
+        self._seconds = entry.due_seconds
+        clock_token = _current_clock.set(self)
 
-            if should_resubmit: self.submit(task)
+        try:
+            delay = next(entry.routine)
+        except StopIteration:
+            return True
+        finally:
+            _current_clock.reset(clock_token)
 
-    def _next_task(self) -> _ScheduledTask:
-        with self._condition:
-            while True:
-                while self._queue and self._queue[0][2].handle.done():
-                    heapq.heappop(self._queue)
+        entry.due_seconds += _coerce_delay(delay)
+        entry.sequence = next(self._sequence)
+        heapq.heappush(self._queue, entry)
+        return True
 
-                if not self._queue:
-                    self._condition.wait()
-                    continue
+    async def run(self) -> None:
+        loop = asyncio.get_running_loop()
+        wallclock_origin = loop.time() - self.seconds
 
-                due_at, _, task = self._queue[0]
-                delay = due_at - time.time()
-                if delay > 0:
-                    self._condition.wait(timeout=delay)
-                    continue
+        while self._queue:
+            next_due = self._queue[0].due_seconds
+            delay = wallclock_origin + next_due - loop.time()
+            if delay > 0:
+                await asyncio.sleep(delay)
 
-                heapq.heappop(self._queue)
-                return task
+            while self._queue and self._queue[0].due_seconds <= next_due:
+                self.step()
 
 
-def _coerce_delay(value: object) -> float:
-    if isinstance(value, bool) or not isinstance(value, Real):
-        raise TypeError(f"tasks must yield a real delay, got {value!r}")
-    delay = float(value)
-    if not isfinite(delay) or delay < 0.0:
-        raise ValueError(f"tasks must yield a finite non-negative delay, got {value!r}")
-    return delay
+async def main() -> None:
+    clock = LogicalClock()
+    clock.play(doit())
+    await clock.run()
+
+
+@dataclass(order=True, slots=True)
+class _ScheduledRoutine:
+    due_seconds: float
+    sequence: int
+    routine: Routine = field(compare=False)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
