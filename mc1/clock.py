@@ -193,10 +193,12 @@ class RoutineHandle:
             heapq.heapify(self._clock._queue)
         self._clock._routine_finished.set()
 
-    async def wait(self):
-        while self._scheduled in self._clock._queue:
-            await self._clock._routine_finished.wait()
-
+    def __await__(self):
+        async def wait():
+            while self._scheduled in self._clock._queue:
+                await self._clock._routine_finished.wait()
+                self._clock._routine_finished.clear()
+        return wait().__await__()
 
 @dataclass(order=True, slots=True)
 class _ScheduledRoutine:
@@ -229,7 +231,7 @@ async def main() -> None:
     clock = LogicalClock()
     r = clock.schedule(doit(), at=1.0)
     clock.start()
-    await r.wait()
+    await r
     await clock.wait_for_idle()
     clock.stop()
 
