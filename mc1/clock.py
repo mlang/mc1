@@ -1,3 +1,18 @@
+"""Logical-time scheduling for generator-driven routines.
+
+This module provides an asyncio-backed scheduler that advances a logical
+seconds timeline independently of routine execution cost. Routines cooperate by
+yielding finite non-negative delays, which are accumulated onto their next due
+time and ordered in a priority queue. Dispatch is synchronized to monotonic
+wallclock time so future work is released near its scheduled logical instant
+without accumulating processing drift.
+
+The scheduler also exposes a wallclock projection of the current logical
+position. When no work is queued, logical time continues to advance from the
+last settled value, so newly scheduled relative work is anchored to the current
+logical instant rather than to the time when the queue last drained.
+"""
+
 from __future__ import annotations
 
 import asyncio
