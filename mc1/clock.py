@@ -60,6 +60,9 @@ class LogicalClock:
         self._state_changed: asyncio.Event | None = None
         self._task = None
 
+    def __repr__(self):
+        return f"<{self.__class__.__name__} seconds={self.seconds}>"
+
     @property
     def seconds(self) -> float:
         if self._idle_started_at is not None:
