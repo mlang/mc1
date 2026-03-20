@@ -12,16 +12,6 @@ from numbers import Real
 import time as pytime
 
 
-def _coerce_offset(value: float, *, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, Real):
-        raise TypeError(f"{name} must be a real number")
-
-    value = float(value)
-    if not isfinite(value):
-        raise ValueError(f"{name} must be finite")
-    return value
-
-
 Routine = Generator[float, None, None]
 _current_clock: ContextVar["LogicalClock"] = ContextVar("current_clock")
 
@@ -31,6 +21,132 @@ def current_clock() -> "LogicalClock":
         return _current_clock.get()
     except LookupError as exc:
         raise RuntimeError("current_clock() is only available while a routine is running") from exc
+
+
+class LogicalClock:
+    __slots__ = (
+        '_wallclock_origin',
+        '_sequence',
+        '_queue',
+        '_seconds',
+        '_idle_started_at',
+        '_state_changed',
+    )
+
+    def __init__(self, seconds: float = 0) -> None:
+        self._seconds = seconds
+        self._queue: list[_ScheduledRoutine] = []
+        self._sequence = count()
+        self._wallclock_origin = pytime.time()
+        self._idle_started_at: float | None = None
+        self._state_changed: asyncio.Event | None = None
+
+    @property
+    def seconds(self) -> float:
+        if self._idle_started_at is not None:
+            return self._seconds + (pytime.monotonic() - self._idle_started_at)
+
+        return self._seconds
+
+    @property
+    def time(self) -> float:
+        return self._wallclock_origin + self.seconds
+
+    def play(
+        self,
+        routine: Routine,
+        *,
+        relative: float | None = None,
+        absolute: float | None = None,
+    ) -> None:
+        if relative is not None and absolute is not None:
+            raise ValueError("play() accepts at most one of relative= or absolute=")
+
+        if not isgenerator(routine):
+            raise TypeError("play() expects a routine factory returning a generator")
+
+        current_seconds = self.seconds
+        if self._idle_started_at is not None:
+            self._seconds = current_seconds
+            self._idle_started_at = None
+
+        if relative is not None:
+            due_seconds = current_seconds + _coerce_delay(relative)
+        elif absolute is not None:
+            due_seconds = max(current_seconds, _coerce_offset(absolute, name="absolute"))
+        else:
+            due_seconds = current_seconds
+
+        heapq.heappush(
+            self._queue,
+            _ScheduledRoutine(
+                due_seconds=due_seconds,
+                sequence=next(self._sequence),
+                routine=routine
+            )
+        )
+        if self._state_changed is not None:
+            self._state_changed.set()
+
+    def _step(self) -> None:
+        entry = heapq.heappop(self._queue)
+        self._seconds = entry.due_seconds
+        clock_token = _current_clock.set(self)
+
+        try:
+            delay = next(entry.routine)
+        except StopIteration:
+            return
+        finally:
+            _current_clock.reset(clock_token)
+
+        entry.due_seconds += _coerce_delay(delay)
+        entry.sequence = next(self._sequence)
+        heapq.heappush(self._queue, entry)
+
+    async def run(self) -> None:
+        if self._state_changed is not None:
+            raise RuntimeError("LogicalClock.run() is already running")
+
+        self._state_changed = asyncio.Event()
+        active_origin: float | None = None
+
+        try:
+            while True:
+                if not self._queue:
+                    active_origin = None
+                    if self._idle_started_at is None:
+                        self._idle_started_at = pytime.monotonic()
+                    await self._state_changed.wait()
+                    self._state_changed.clear()
+                    continue
+
+                self._idle_started_at = None
+                if active_origin is None:
+                    active_origin = pytime.monotonic() - self._seconds
+                next_due = self._queue[0].due_seconds
+                delay = active_origin + next_due - pytime.monotonic()
+                if delay > 0:
+                    try:
+                        await asyncio.wait_for(self._state_changed.wait(), timeout=delay)
+                    except TimeoutError:
+                        pass
+                    else:
+                        self._state_changed.clear()
+                        continue
+
+                while self._queue and self._queue[0].due_seconds <= next_due:
+                    self._step()
+        finally:
+            self._seconds = self.seconds
+            self._idle_started_at = None
+            self._state_changed = None
+
+
+async def main() -> None:
+    clock = LogicalClock()
+    clock.play(doit())
+    await clock.run()
 
 
 def doit() -> Routine:
@@ -56,97 +172,21 @@ def _coerce_delay(delay: float) -> float:
     return delay
 
 
-class LogicalClock:
-    __slots__ = ('_origin', '_sequence', '_queue', '_seconds')
-
-    def __init__(self, seconds: float = 0) -> None:
-        self._seconds = seconds
-        self._queue: list[_ScheduledRoutine] = []
-        self._sequence = count()
-        self._origin = pytime.time()
-
-    @property
-    def seconds(self) -> float:
-        return self._seconds
-
-    @property
-    def time(self) -> float:
-        return self._origin + self.seconds
-
-    def play(
-        self,
-        routine: Routine,
-        *,
-        relative: float | None = None,
-        absolute: float | None = None,
-    ) -> None:
-        if relative is not None and absolute is not None:
-            raise ValueError("play() accepts at most one of relative= or absolute=")
-
-        if not isgenerator(routine):
-            raise TypeError("play() expects a routine factory returning a generator")
-
-        if relative is not None:
-            due_seconds = self.seconds + _coerce_delay(relative)
-        elif absolute is not None:
-            due_seconds = max(self.seconds, _coerce_offset(absolute, name="absolute"))
-        else:
-            due_seconds = self.seconds
-
-        heapq.heappush(
-            self._queue,
-            _ScheduledRoutine(
-                due_seconds=due_seconds,
-                sequence=next(self._sequence),
-                routine=routine
-            )
-        )
-
-    def step(self) -> bool:
-        if not self._queue:
-            return False
-
-        entry = heapq.heappop(self._queue)
-        self._seconds = entry.due_seconds
-        clock_token = _current_clock.set(self)
-
-        try:
-            delay = next(entry.routine)
-        except StopIteration:
-            return True
-        finally:
-            _current_clock.reset(clock_token)
-
-        entry.due_seconds += _coerce_delay(delay)
-        entry.sequence = next(self._sequence)
-        heapq.heappush(self._queue, entry)
-        return True
-
-    async def run(self) -> None:
-        loop = asyncio.get_running_loop()
-        wallclock_origin = loop.time() - self.seconds
-
-        while self._queue:
-            next_due = self._queue[0].due_seconds
-            delay = wallclock_origin + next_due - loop.time()
-            if delay > 0:
-                await asyncio.sleep(delay)
-
-            while self._queue and self._queue[0].due_seconds <= next_due:
-                self.step()
-
-
-async def main() -> None:
-    clock = LogicalClock()
-    clock.play(doit())
-    await clock.run()
-
-
 @dataclass(order=True, slots=True)
 class _ScheduledRoutine:
     due_seconds: float
     sequence: int
     routine: Routine = field(compare=False)
+
+
+def _coerce_offset(value: float, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError(f"{name} must be a real number")
+
+    value = float(value)
+    if not isfinite(value):
+        raise ValueError(f"{name} must be finite")
+    return value
 
 
 if __name__ == "__main__":
