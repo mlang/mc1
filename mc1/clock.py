@@ -75,11 +75,11 @@ class LogicalClock:
         self,
         routine: Routine,
         *,
-        relative: float | None = None,
-        absolute: float | None = None,
+        delay: float | None = None,
+        at: float | None = None,
     ) -> "RoutineHandle":
-        if relative is not None and absolute is not None:
-            raise ValueError("schedule() accepts at most one of relative= or absolute=")
+        if delay is not None and at is not None:
+            raise ValueError("schedule() accepts at most one of relative= or at=")
 
         if not isgenerator(routine):
             raise TypeError("schedule() expects a routine factory returning a generator")
@@ -89,10 +89,10 @@ class LogicalClock:
             self._seconds = current_seconds
             self._idle_started_at = None
 
-        if relative is not None:
-            due_seconds = current_seconds + _coerce_delay(relative)
-        elif absolute is not None:
-            due_seconds = max(current_seconds, _coerce_offset(absolute, name="absolute"))
+        if delay is not None:
+            due_seconds = current_seconds + _coerce_delay(delay)
+        elif at is not None:
+            due_seconds = max(current_seconds, _coerce_offset(at, name="at"))
         else:
             due_seconds = current_seconds
 
@@ -237,16 +237,15 @@ async def main() -> None:
 
 
 def doit() -> Routine:
-    clock = current_clock()
-    print(clock.time)
+    print(current_clock().time)
     yield 0.5
-    print(clock.time)
+    print(current_clock().time)
     yield 0.5
-    print(clock.time)
+    print(current_clock().time)
     yield 0.5
-    print(clock.time)
+    print(current_clock().time)
     yield 0.5
-    print(clock.time)
+    print(current_clock().time)
 
 
 if __name__ == "__main__":
