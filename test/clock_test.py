@@ -40,7 +40,7 @@ def test_start_waits_for_work_until_cancelled():
     asyncio.run(exercise())
 
 
-def test_relative_play_after_idle_uses_current_time():
+def test_relative_schedule_after_idle_uses_current_time():
     async def exercise():
         clock = LogicalClock()
         fired = asyncio.Event()
@@ -55,7 +55,7 @@ def test_relative_play_after_idle_uses_current_time():
 
         await asyncio.sleep(0.03)
         scheduled_at = clock.seconds
-        clock.play(_instant_routine(record), relative=0.08)
+        clock.schedule(_instant_routine(record), relative=0.08)
 
         await asyncio.sleep(0.05)
         assert not fired.is_set()
@@ -70,7 +70,7 @@ def test_relative_play_after_idle_uses_current_time():
     asyncio.run(exercise())
 
 
-def test_play_wakes_runner_while_waiting_for_later_event():
+def test_schedule_wakes_runner_while_waiting_for_later_event():
     async def exercise():
         clock = LogicalClock()
         early_fired = asyncio.Event()
@@ -87,10 +87,10 @@ def test_play_wakes_runner_while_waiting_for_later_event():
             else:
                 long_fired.set()
 
-        clock.play(_instant_routine(lambda seconds: record("long", seconds)), relative=0.20)
+        clock.schedule(_instant_routine(lambda seconds: record("long", seconds)), relative=0.20)
 
         await asyncio.sleep(0.05)
-        clock.play(_instant_routine(lambda seconds: record("early", seconds)), absolute=0.06)
+        clock.schedule(_instant_routine(lambda seconds: record("early", seconds)), absolute=0.06)
 
         await asyncio.wait_for(early_fired.wait(), timeout=0.2)
         assert observed["early"] == pytest.approx(0.06, abs=0.03)
@@ -106,7 +106,7 @@ def test_play_wakes_runner_while_waiting_for_later_event():
     asyncio.run(exercise())
 
 
-def test_playing_later_event_does_not_delay_current_head():
+def test_scheduleing_later_event_does_not_delay_current_head():
     async def exercise():
         clock = LogicalClock()
         early_fired = asyncio.Event()
@@ -123,10 +123,10 @@ def test_playing_later_event_does_not_delay_current_head():
             else:
                 later_fired.set()
 
-        clock.play(_instant_routine(lambda seconds: record("early", seconds)), absolute=0.06)
+        clock.schedule(_instant_routine(lambda seconds: record("early", seconds)), absolute=0.06)
 
         await asyncio.sleep(0.02)
-        clock.play(_instant_routine(lambda seconds: record("later", seconds)), absolute=0.20)
+        clock.schedule(_instant_routine(lambda seconds: record("later", seconds)), absolute=0.20)
 
         await asyncio.wait_for(early_fired.wait(), timeout=0.2)
         assert observed["early"] == pytest.approx(0.06, abs=0.03)
@@ -161,7 +161,7 @@ def test_start_compensates_for_step_processing_drift():
             yield 0.0
 
         started_at = pytime.monotonic()
-        clock.play(routine())
+        clock.schedule(routine())
 
         await asyncio.wait_for(completed.wait(), timeout=0.5)
         elapsed = pytime.monotonic() - started_at
@@ -183,8 +183,8 @@ def test_wait_for_idle_returns_when_queue_drains():
             yield delay
             fired.append(name)
 
-        clock.play(routine("later", 0.04))
-        clock.play(routine("sooner", 0.01))
+        clock.schedule(routine("later", 0.04))
+        clock.schedule(routine("sooner", 0.01))
 
         assert clock.start() is True
         task = clock._task
@@ -217,7 +217,7 @@ def test_wait_for_idle_stays_pending_while_clock_is_stopped():
         def routine():
             yield 0.05
 
-        clock.play(routine())
+        clock.schedule(routine())
         assert clock.start() is True
         first_task = clock._task
         assert first_task is not None

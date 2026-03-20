@@ -71,7 +71,7 @@ class LogicalClock:
     def time(self) -> float:
         return self._wallclock_origin + self.seconds
 
-    def play(
+    def schedule(
         self,
         routine: Routine,
         *,
@@ -79,10 +79,10 @@ class LogicalClock:
         absolute: float | None = None,
     ) -> "RoutineHandle":
         if relative is not None and absolute is not None:
-            raise ValueError("play() accepts at most one of relative= or absolute=")
+            raise ValueError("schedule() accepts at most one of relative= or absolute=")
 
         if not isgenerator(routine):
-            raise TypeError("play() expects a routine factory returning a generator")
+            raise TypeError("schedule() expects a routine factory returning a generator")
 
         current_seconds = self.seconds
         if self._idle_started_at is not None:
@@ -227,7 +227,7 @@ def _coerce_offset(value: float, *, name: str) -> float:
 
 async def main() -> None:
     clock = LogicalClock()
-    r = clock.play(doit())
+    r = clock.schedule(doit(), at=1.0)
     clock.start()
     await r.wait()
     await clock.wait_for_idle()
