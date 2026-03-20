@@ -62,7 +62,7 @@ class LogicalClock:
         *,
         relative: float | None = None,
         absolute: float | None = None,
-    ) -> None:
+    ) -> "RoutineHandle":
         if relative is not None and absolute is not None:
             raise ValueError("play() accepts at most one of relative= or absolute=")
 
@@ -81,16 +81,15 @@ class LogicalClock:
         else:
             due_seconds = current_seconds
 
-        heapq.heappush(
-            self._queue,
-            _ScheduledRoutine(
-                due_seconds=due_seconds,
-                sequence=next(self._sequence),
-                routine=routine
-            )
+        scheduled = _ScheduledRoutine(
+            due_seconds=due_seconds,
+            sequence=next(self._sequence),
+            routine=routine
         )
+        heapq.heappush(self._queue, scheduled)
         if self._state_changed is not None:
             self._state_changed.set()
+        return RoutineHandle(self, scheduled)
 
     def _step(self) -> None:
         entry = heapq.heappop(self._queue)
@@ -166,6 +165,24 @@ class LogicalClock:
         return False
 
 
+class RoutineHandle:
+    __slots__ = ('_clock', '_scheduled')
+
+    def __init__(self, clock, scheduled):
+        self._clock = clock
+        self._scheduled = scheduled
+
+    def cancel(self):
+        self._clock._queue.remove(self._scheduled)
+        if self._clock._queue:
+            heapq.heapify(self._clock._queue)
+        self._clock._routine_finished.set()
+
+    async def wait(self):
+        while self._scheduled in self._clock._queue:
+            await self._clock._routine_finished.wait()
+
+
 @dataclass(order=True, slots=True)
 class _ScheduledRoutine:
     due_seconds: float
@@ -195,9 +212,11 @@ def _coerce_offset(value: float, *, name: str) -> float:
 
 async def main() -> None:
     clock = LogicalClock()
-    clock.play(doit())
+    r = clock.play(doit())
     clock.start()
+    await r.wait()
     await clock.wait_for_idle()
+    clock.stop()
 
 
 def doit() -> Routine:
