@@ -30,7 +30,9 @@ class LogicalClock:
         '_queue',
         '_seconds',
         '_idle_started_at',
+        '_routine_finished',
         '_state_changed',
+        '_task'
     )
 
     def __init__(self, seconds: float = 0) -> None:
@@ -39,7 +41,9 @@ class LogicalClock:
         self._sequence = count()
         self._wallclock_origin = pytime.time()
         self._idle_started_at: float | None = None
+        self._routine_finished = asyncio.Event()
         self._state_changed: asyncio.Event | None = None
+        self._task = None
 
     @property
     def seconds(self) -> float:
@@ -96,6 +100,7 @@ class LogicalClock:
         try:
             delay = next(entry.routine)
         except StopIteration:
+            self._routine_finished.set()
             return
         finally:
             _current_clock.reset(clock_token)
@@ -104,9 +109,9 @@ class LogicalClock:
         entry.sequence = next(self._sequence)
         heapq.heappush(self._queue, entry)
 
-    async def run(self) -> None:
+    async def _run(self) -> None:
         if self._state_changed is not None:
-            raise RuntimeError("LogicalClock.run() is already running")
+            raise RuntimeError("LogicalClock._run() is already running")
 
         self._state_changed = asyncio.Event()
         active_origin: float | None = None
@@ -142,11 +147,57 @@ class LogicalClock:
             self._idle_started_at = None
             self._state_changed = None
 
+    def start(self) -> bool:
+        if self._task is None:
+            self._task = asyncio.create_task(self._run())
+            return True
+        return False
+
+    async def wait_for_idle(self) -> None:
+        while self._queue:
+            await self._routine_finished.wait()
+            self._routine_finished.clear()
+
+    def stop(self) -> bool:
+        if self._task is not None:
+            self._task.cancel()
+            self._task = None
+            return True
+        return False
+
+
+@dataclass(order=True, slots=True)
+class _ScheduledRoutine:
+    due_seconds: float
+    sequence: int
+    routine: Routine = field(compare=False)
+
+
+def _coerce_delay(delay: float) -> float:
+    if isinstance(delay, bool) or not isinstance(delay, Real):
+        raise TypeError("routine must yield a real-number delay")
+
+    delay = float(delay)
+    if delay < 0 or not isfinite(delay):
+        raise ValueError("routine delay must be a finite non-negative number")
+    return delay
+
+
+def _coerce_offset(value: float, *, name: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, Real):
+        raise TypeError(f"{name} must be a real number")
+
+    value = float(value)
+    if not isfinite(value):
+        raise ValueError(f"{name} must be finite")
+    return value
+
 
 async def main() -> None:
     clock = LogicalClock()
     clock.play(doit())
-    await clock.run()
+    clock.start()
+    await clock.wait_for_idle()
 
 
 def doit() -> Routine:
@@ -160,33 +211,6 @@ def doit() -> Routine:
     print(clock.time)
     yield 0.5
     print(clock.time)
-
-
-def _coerce_delay(delay: float) -> float:
-    if isinstance(delay, bool) or not isinstance(delay, Real):
-        raise TypeError("routine must yield a real-number delay")
-
-    delay = float(delay)
-    if delay < 0 or not isfinite(delay):
-        raise ValueError("routine delay must be a finite non-negative number")
-    return delay
-
-
-@dataclass(order=True, slots=True)
-class _ScheduledRoutine:
-    due_seconds: float
-    sequence: int
-    routine: Routine = field(compare=False)
-
-
-def _coerce_offset(value: float, *, name: str) -> float:
-    if isinstance(value, bool) or not isinstance(value, Real):
-        raise TypeError(f"{name} must be a real number")
-
-    value = float(value)
-    if not isfinite(value):
-        raise ValueError(f"{name} must be finite")
-    return value
 
 
 if __name__ == "__main__":

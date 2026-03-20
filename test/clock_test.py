@@ -17,10 +17,12 @@ def _instant_routine(callback):
     return routine()
 
 
-def test_run_waits_for_work_until_cancelled():
+def test_start_waits_for_work_until_cancelled():
     async def exercise():
         clock = LogicalClock()
-        task = asyncio.create_task(clock.run())
+        assert clock.start() is True
+        task = clock._task
+        assert task is not None
 
         await asyncio.sleep(0.02)
 
@@ -31,7 +33,7 @@ def test_run_waits_for_work_until_cancelled():
 
         assert clock.seconds > elapsed
 
-        task.cancel()
+        assert clock.stop() is True
         with pytest.raises(asyncio.CancelledError):
             await task
 
@@ -43,7 +45,9 @@ def test_relative_play_after_idle_uses_current_time():
         clock = LogicalClock()
         fired = asyncio.Event()
         observed: list[float] = []
-        task = asyncio.create_task(clock.run())
+        assert clock.start() is True
+        task = clock._task
+        assert task is not None
 
         def record(seconds: float) -> None:
             observed.append(seconds)
@@ -59,7 +63,7 @@ def test_relative_play_after_idle_uses_current_time():
         await asyncio.wait_for(fired.wait(), timeout=0.2)
         assert observed == [pytest.approx(scheduled_at + 0.08, abs=0.03)]
 
-        task.cancel()
+        assert clock.stop() is True
         with pytest.raises(asyncio.CancelledError):
             await task
 
@@ -72,7 +76,9 @@ def test_play_wakes_runner_while_waiting_for_later_event():
         early_fired = asyncio.Event()
         long_fired = asyncio.Event()
         observed: dict[str, float] = {}
-        task = asyncio.create_task(clock.run())
+        assert clock.start() is True
+        task = clock._task
+        assert task is not None
 
         def record(name: str, seconds: float) -> None:
             observed[name] = seconds
@@ -93,7 +99,7 @@ def test_play_wakes_runner_while_waiting_for_later_event():
         await asyncio.wait_for(long_fired.wait(), timeout=0.2)
         assert observed["long"] == pytest.approx(0.20, abs=0.03)
 
-        task.cancel()
+        assert clock.stop() is True
         with pytest.raises(asyncio.CancelledError):
             await task
 
@@ -106,7 +112,9 @@ def test_playing_later_event_does_not_delay_current_head():
         early_fired = asyncio.Event()
         later_fired = asyncio.Event()
         observed: dict[str, float] = {}
-        task = asyncio.create_task(clock.run())
+        assert clock.start() is True
+        task = clock._task
+        assert task is not None
 
         def record(name: str, seconds: float) -> None:
             observed[name] = seconds
@@ -127,18 +135,20 @@ def test_playing_later_event_does_not_delay_current_head():
         await asyncio.wait_for(later_fired.wait(), timeout=0.2)
         assert observed["later"] == pytest.approx(0.20, abs=0.03)
 
-        task.cancel()
+        assert clock.stop() is True
         with pytest.raises(asyncio.CancelledError):
             await task
 
     asyncio.run(exercise())
 
 
-def test_run_compensates_for_step_processing_drift():
+def test_start_compensates_for_step_processing_drift():
     async def exercise():
         clock = LogicalClock()
         completed = asyncio.Event()
-        task = asyncio.create_task(clock.run())
+        assert clock.start() is True
+        task = clock._task
+        assert task is not None
 
         def routine():
             for _ in range(5):
@@ -157,8 +167,79 @@ def test_run_compensates_for_step_processing_drift():
         elapsed = pytime.monotonic() - started_at
         assert elapsed < 0.21
 
-        task.cancel()
+        assert clock.stop() is True
         with pytest.raises(asyncio.CancelledError):
             await task
+
+    asyncio.run(exercise())
+
+
+def test_wait_for_idle_returns_when_queue_drains():
+    async def exercise():
+        clock = LogicalClock()
+        fired: list[str] = []
+
+        def routine(name: str, delay: float):
+            yield delay
+            fired.append(name)
+
+        clock.play(routine("later", 0.04))
+        clock.play(routine("sooner", 0.01))
+
+        assert clock.start() is True
+        task = clock._task
+        assert task is not None
+
+        await asyncio.wait_for(clock.wait_for_idle(), timeout=0.2)
+        assert fired == ["sooner", "later"]
+        assert clock._queue == []
+
+        assert clock.stop() is True
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(exercise())
+
+
+def test_wait_for_idle_returns_immediately_when_queue_is_empty():
+    async def exercise():
+        clock = LogicalClock()
+
+        await asyncio.wait_for(clock.wait_for_idle(), timeout=0.01)
+
+    asyncio.run(exercise())
+
+
+def test_wait_for_idle_stays_pending_while_clock_is_stopped():
+    async def exercise():
+        clock = LogicalClock()
+
+        def routine():
+            yield 0.05
+
+        clock.play(routine())
+        assert clock.start() is True
+        first_task = clock._task
+        assert first_task is not None
+
+        waiter = asyncio.create_task(clock.wait_for_idle())
+        await asyncio.sleep(0.01)
+
+        assert clock.stop() is True
+        with pytest.raises(asyncio.CancelledError):
+            await first_task
+
+        await asyncio.sleep(0.06)
+        assert not waiter.done()
+
+        assert clock.start() is True
+        second_task = clock._task
+        assert second_task is not None
+
+        await asyncio.wait_for(waiter, timeout=0.2)
+
+        assert clock.stop() is True
+        with pytest.raises(asyncio.CancelledError):
+            await second_task
 
     asyncio.run(exercise())
