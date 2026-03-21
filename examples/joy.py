@@ -364,6 +364,11 @@ PARTS = tuple(
 
 def voice(events, *, bpm, latency=0.1, synth_name="default", voice_controls):
     seconds_per_beat = 60.0 / bpm
+    legato = 0.8
+
+
+    def here():
+        return timetag.from_unix(current_clock().time + latency)
 
     for event in events:
         duration = event.beats * seconds_per_beat
@@ -373,9 +378,11 @@ def voice(events, *, bpm, latency=0.1, synth_name="default", voice_controls):
             controls["freq"] = midi2cps(event.midi_note)
             controls["gate"] = 1
 
-            module_id = dsp.append(timetag.from_unix(current_clock().time + latency), synth_name, **controls)
-            yield duration
-            dsp.set(timetag.from_unix(current_clock().time + latency), module_id, gate=0)
+            module_id = dsp.append(here(), synth_name, **controls)
+            sustain = duration * legato
+            yield sustain
+            dsp.set(here(), module_id, gate=0)
+            yield (duration - sustain)
         else:
             yield duration
 
