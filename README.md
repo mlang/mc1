@@ -45,7 +45,7 @@ uv run python -m mc1
 Run the bundled default-synth arrangement example with:
 
 ```bash
-uv run python -m mc1 examples/default_melody.py
+uv run python -m mc1 examples/joy.py
 ```
 
 ## Repository Layout
