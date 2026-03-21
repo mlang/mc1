@@ -40,6 +40,18 @@ uv run python -m mc1
 
 `uv run python -m mc1` starts the current MiniCollider REPL. The first build of the native modules happens as part of the normal Python package build flow.
 
+## Async Execution
+
+`python -m mc1` runs the host on an `asyncio` event loop.
+
+In the REPL, top-level `await` is enabled, so scheduled routines can be awaited directly from the prompt. This is useful when you want to block until a scheduled routine has finished before continuing interactive work.
+
+```python
+await clock.schedule(tune())
+```
+
+`clock.schedule(...)` returns an awaitable handle. Awaiting that handle waits until the scheduled routine or routine group has left the clock queue.
+
 ## Demo
 
 Run the bundled default-synth arrangement example with:
@@ -47,6 +59,8 @@ Run the bundled default-synth arrangement example with:
 ```bash
 uv run python -m mc1 examples/joy.py
 ```
+
+When `python -m mc1` executes a script, it waits for the logical clock to drain before exiting. A script can schedule work and return without adding explicit shutdown code just to keep scheduled routines alive until they complete.
 
 ## Repository Layout
 
