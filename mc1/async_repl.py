@@ -55,29 +55,34 @@ class AsyncInteractiveConsole(code.InteractiveConsole):
             self.showtraceback()
 
 
-def interact(locals=None, init=None):
+def interact(banner="Async REPL", locals=None):
     loop = asyncio.new_event_loop()
-    def loop_thread_main():
+    def loop_thread():
         asyncio.set_event_loop(loop)
         loop.run_forever()
 
-    t = threading.Thread(target=loop_thread_main, name="asyncio-loop", daemon=True)
+    t = threading.Thread(target=loop_thread, name="asyncio-loop", daemon=True)
     t.start()
 
-    if init is not None:
-        asyncio.run_coroutine_threadsafe(init(locals), loop).result()
+    if locals is not None:
+        if callable(locals):
+            locals = locals()
+        if inspect.iscoroutine(locals):
+            locals = asyncio.run_coroutine_threadsafe(locals, loop).result()
 
     console = AsyncInteractiveConsole(locals=locals, loop=loop)
     try:
-        console.interact(banner='Async REPL (top-level await enabled). Ctrl-D to exit.')
+        console.interact(banner=banner)
     finally:
         loop.call_soon_threadsafe(loop.stop)
         t.join(timeout=1)
 
 from mc1.clock import *
 
-async def init(locals):
-    locals['clock'].start()
+async def init():
+    clock = LogicalClock()
+    clock.start()
+    return {'asyncio': asyncio, 'clock': clock}
 
 if __name__ == "__main__":
-    interact({"asyncio": asyncio, "clock": LogicalClock()}, init=init)
+    interact(locals=init)

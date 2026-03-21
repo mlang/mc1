@@ -61,7 +61,7 @@ class LogicalClock:
         self._wallclock_origin = pytime.time()
 
     def __repr__(self):
-        return f"<{self.__class__.__name__} seconds={self.seconds}>"
+        return f"<{self.__class__.__name__} seconds={self.seconds:.5f}>"
 
     @property
     def seconds(self) -> float:
