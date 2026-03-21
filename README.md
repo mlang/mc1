@@ -7,7 +7,7 @@ The current repo is aimed at developers working on the compiler, runtime, and gr
 ## What This Repo Is Trying To Prove
 
 - Python can stay the user-facing language; no separate DSL is required.
-- SynthDefs can be represented as graphs, serialized, and compiled into efficient runtime process functions.
+- SynthDefs can be compiled into efficient runtime process functions.
 - A mixed Python/C++ stack can keep iteration speed high while moving the performance-critical DSP path into native code.
 
 ## Current State
