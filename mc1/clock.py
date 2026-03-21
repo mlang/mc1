@@ -54,11 +54,11 @@ class LogicalClock:
         self._seconds = seconds
         self._queue: list[_ScheduledRoutine] = []
         self._sequence = count()
-        self._wallclock_origin = pytime.time()
         self._idle_started_at: float | None = None
         self._routine_finished = asyncio.Event()
         self._state_changed: asyncio.Event | None = None
         self._task = None
+        self._wallclock_origin = pytime.time()
 
     def __repr__(self):
         return f"<{self.__class__.__name__} seconds={self.seconds}>"
@@ -79,7 +79,7 @@ class LogicalClock:
         routine: Routine,
         *,
         delay: float | None = None,
-        at: float | None = None,
+        at: float | None = None
     ) -> "RoutineHandle":
         if delay is not None and at is not None:
             raise ValueError("schedule() accepts at most one of relative= or at=")
