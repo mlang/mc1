@@ -38,6 +38,50 @@ def current_clock() -> "LogicalClock":
         raise RuntimeError("current_clock() is only available while a routine is running") from exc
 
 
+def merge(*routines: Routine) -> Routine:
+    routines = _coerce_routines(routines, caller="merge()")
+
+    def merged() -> Routine:
+        elapsed = 0.0
+        pending: list[tuple[Routine, float]] = [(routine, 0.0) for routine in routines]
+
+        def advance_ready() -> None:
+            nonlocal pending
+
+            while True:
+                advanced = False
+                next_pending: list[tuple[Routine, float]] = []
+
+                for routine, due in pending:
+                    if due > elapsed:
+                        next_pending.append((routine, due))
+                        continue
+
+                    advanced = True
+                    try:
+                        delta = next(routine)
+                    except StopIteration:
+                        continue
+
+                    next_pending.append((routine, elapsed + _coerce_delay(delta)))
+
+                pending = next_pending
+                if not advanced:
+                    return
+
+        while pending:
+            advance_ready()
+            if not pending:
+                return
+
+            due = min(due for _, due in pending)
+            delta = due - elapsed
+            yield delta
+            elapsed = due
+
+    return merged()
+
+
 class LogicalClock:
     __slots__ = (
         '_wallclock_origin',
@@ -76,16 +120,18 @@ class LogicalClock:
 
     def schedule(
         self,
-        routine: Routine,
-        *,
+        *routines: Routine,
         delay: float | None = None,
         at: float | None = None
     ) -> "RoutineHandle":
         if delay is not None and at is not None:
-            raise ValueError("schedule() accepts at most one of relative= or at=")
+            raise ValueError("schedule() accepts at most one of delay= or at=")
 
-        if not isgenerator(routine):
-            raise TypeError("schedule() expects a routine factory returning a generator")
+        routines = _coerce_routines(routines, caller="schedule()")
+        if len(routines) == 1:
+            routine = routines[0]
+        else:
+            routine = merge(*routines)
 
         current_seconds = self.seconds
         if self._idle_started_at is not None:
@@ -191,6 +237,8 @@ class RoutineHandle:
         self._scheduled = scheduled
 
     def cancel(self):
+        if self._scheduled not in self._clock._queue:
+            return
         self._clock._queue.remove(self._scheduled)
         if self._clock._queue:
             heapq.heapify(self._clock._queue)
@@ -208,6 +256,17 @@ class _ScheduledRoutine:
     due_seconds: float
     sequence: int
     routine: Routine = field(compare=False)
+
+
+def _coerce_routines(routines: tuple[Routine, ...], *, caller: str) -> tuple[Routine, ...]:
+    if not routines:
+        raise ValueError(f"{caller} requires at least one routine")
+
+    for routine in routines:
+        if not isgenerator(routine):
+            raise TypeError(f"{caller} expects generator routines")
+
+    return routines
 
 
 def _coerce_delay(delay: float) -> float:

@@ -51,14 +51,13 @@ def build_namespace():
         "build_namespace",
         "builtins",
         "configure_dsp",
+        "drain_scheduler",
         "init_namespace",
         "inspect",
-        "LogicalClock",
         "main",
         "parse_args",
         "run_script",
-        "shutdown_clock",
-        "sys",
+        "sys"
     }
     return {
         name: value
@@ -67,11 +66,12 @@ def build_namespace():
     }
 
 
-async def shutdown_clock(clock):
+async def drain_scheduler(clock):
     task = clock._task
     if task is None:
         return
 
+    await clock.wait_for_idle()
     if clock.stop():
         try:
             await task
@@ -111,7 +111,7 @@ async def run_script(path, script_args):
         return ns
     finally:
         sys.argv = original_argv
-        await shutdown_clock(clock)
+        await drain_scheduler(clock)
 
 
 def main(argv=None):
