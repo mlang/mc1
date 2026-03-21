@@ -36,6 +36,7 @@ native performance/compiler test entry point.
 
 import mc1._core
 from mc1._core import DSP
+from mc1.clock import *
 from mc1.dag import *
 from mc1.graphs import drone
 from mc1.timetag import DEFAULT_LATENCY, IMMEDIATE, add, after, latency, now
@@ -45,10 +46,12 @@ __all__ = (
     "DAG",
     "DSP",
     "In",
+    "LogicalClock",
     "Out",
     "Pan",
     "SinOsc",
     "Trigger",
+    "current_clock",
     "default",
     "drone",
     "DEFAULT_LATENCY",

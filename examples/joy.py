@@ -1,8 +1,6 @@
-from __future__ import annotations
+from mc1 import timetag
 
 from dataclasses import dataclass
-
-from mc1 import add, latency, now
 
 
 BPM = 72
@@ -350,29 +348,22 @@ PART_SPECS = (
         (43, 4.0), (43, 2.0), (62, 1.0), (64, 1.0), (47, 1.0), (64, 1.0), (40, 1.0), (57, 1.0),
         (47, 1.0), (48, 1.0), (50, 1.0), (57, 1.0), (66, 1.0), (55, 1.0), (55, 1.0), (64, 1.0),
         (47, 1.0), (64, 1.0), (59, 1.0), (60, 1.0), (64, 1.0), (50, 1.0), (43, 3.0),
-    )),
+    ))
 )
 
 
-def _build_parts():
-    return tuple(
-        Part(
-            name,
-            tuple(rest(beats) if midi_note is None else note(midi_note, beats) for midi_note, beats in events),
-            dict(voice_controls),
-        )
-        for name, voice_controls, events in PART_SPECS
+PARTS = tuple(
+    Part(
+        name,
+        tuple(rest(beats) if midi_note is None else note(midi_note, beats) for midi_note, beats in events),
+        dict(voice_controls),
     )
+    for name, voice_controls, events in PART_SPECS
+)
 
 
-PARTS = _build_parts()
-
-def voice(events, *, bpm, dsp_instance, start_time, synth_name="default", voice_controls):
-    if bpm <= 0:
-        raise ValueError("bpm must be > 0")
-
+def voice(events, *, bpm, latency=0.1, synth_name="default", voice_controls):
     seconds_per_beat = 60.0 / bpm
-    elapsed = 0.0
 
     for event in events:
         duration = event.beats * seconds_per_beat
@@ -382,58 +373,17 @@ def voice(events, *, bpm, dsp_instance, start_time, synth_name="default", voice_
             controls["freq"] = midi2cps(event.midi_note)
             controls["gate"] = 1
 
-            note_start = add(start_time, elapsed)
-            module_id = dsp_instance.append(note_start, synth_name, **controls)
-            dsp_instance.set(add(note_start, duration), module_id, gate=0)
-
-        elapsed += duration
-
-    return elapsed
+            module_id = dsp.append(timetag.from_unix(current_clock().time + latency), synth_name, **controls)
+            yield duration
+            dsp.set(timetag.from_unix(current_clock().time + latency), module_id, gate=0)
+        else:
+            yield duration
 
 
-def play(parts, *, bpm, dsp_instance, start_time):
-    return max(
-        (
-            voice(
-                part.events,
-                bpm=bpm,
-                dsp_instance=dsp_instance,
-                start_time=start_time,
-                voice_controls=part.voice_controls,
-            )
-            for part in parts
-        ),
-        default=0.0,
+dsp.start()
+clock.schedule(
+    *(
+        voice(part.events, bpm=BPM, voice_controls=part.voice_controls)
+        for part in PARTS
     )
-
-
-def release_tail(*parts):
-    releases = []
-    for events, voice_controls in parts:
-        default_release = float(voice_controls.get("release", 0.0))
-        releases.append(default_release)
-        for event in events:
-            if event.midi_note is None:
-                continue
-            releases.append(float(event.controls.get("release", default_release)))
-    return max(releases, default=0.0)
-
-
-def main(dsp_instance=None):
-    if dsp_instance is None:
-        dsp_instance = globals().get("dsp")
-    if dsp_instance is None:
-        raise RuntimeError("pass dsp_instance explicitly or run via: python -m mc1 examples/default_melody.py")
-
-    start_time = latency(base=now())
-    play(PARTS, bpm=BPM, dsp_instance=dsp_instance, start_time=start_time)
-
-    dsp_instance.start()
-    try:
-        dsp_instance.wait_until_idle()
-    finally:
-        dsp_instance.stop()
-
-
-if __name__ == "__main__":
-    main()
+)

@@ -10,6 +10,7 @@ NTP_EPOCH_OFFSET_SECONDS = 2_208_988_800
 _NANOSECONDS_PER_SECOND = 1_000_000_000
 _NTP_FRACTION_SCALE = 1 << 32
 _MAX_TIMETAG = 0xFFFFFFFFFFFFFFFF
+_MAX_NTP_SECONDS = _MAX_TIMETAG >> 32
 
 
 def _validate_timetag(time_tag: int) -> int:
@@ -33,6 +34,15 @@ def from_unix_ns(unix_ns: int) -> int:
     ntp_seconds = unix_seconds + NTP_EPOCH_OFFSET_SECONDS
     ntp_fraction = (remainder_ns * _NTP_FRACTION_SCALE) // _NANOSECONDS_PER_SECOND
     return (ntp_seconds << 32) | ntp_fraction
+
+
+def from_unix(unix_seconds: float) -> int:
+    unix_seconds = _validate_seconds(unix_seconds)
+    if unix_seconds < 0:
+        raise ValueError("unix_seconds must be non-negative")
+    if unix_seconds >= (_MAX_NTP_SECONDS - NTP_EPOCH_OFFSET_SECONDS + 1):
+        raise OverflowError("resulting timetag is out of range")
+    return from_unix_ns(int(unix_seconds * _NANOSECONDS_PER_SECOND))
 
 
 def now() -> int:
