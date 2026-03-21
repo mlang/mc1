@@ -59,8 +59,8 @@ private:
   uint32_t input_channels_;
   uint32_t output_channels_;
   aligned_float_buffer abus_;
-  fixed_spsc_queue<rt_command, 8192> commands_;
-  fixed_spsc_queue<rt_event, 8192> events_;
+  fixed_spsc_queue<rt_command, 1024> commands_;
+  fixed_spsc_queue<rt_event, 1024> events_;
   boost::container::static_vector<scheduled_command, 8192> scheduled_commands_{};
   boost::container::static_vector<module_instance*, 1024> modules_{};
   std::unique_ptr<audio_device> audio_device_;
