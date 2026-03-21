@@ -1,9 +1,12 @@
 import argparse
-import code
-import runpy
+import asyncio
+import builtins
+import inspect
 import sys
 
 from mc1 import *
+from mc1.async_repl import interact as async_interact
+from mc1.clock import LogicalClock
 
 dsp = None
 
@@ -43,12 +46,18 @@ def configure_dsp(args):
 def build_namespace():
     excluded = {
         "argparse",
+        "async_interact",
+        "asyncio",
         "build_namespace",
-        "code",
+        "builtins",
         "configure_dsp",
+        "init_namespace",
+        "inspect",
+        "LogicalClock",
         "main",
         "parse_args",
-        "runpy",
+        "run_script",
+        "shutdown_clock",
         "sys",
     }
     return {
@@ -58,37 +67,68 @@ def build_namespace():
     }
 
 
+async def shutdown_clock(clock):
+    task = clock._task
+    if task is None:
+        return
+
+    if clock.stop():
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+async def init_namespace():
+    ns = build_namespace()
+    clock = LogicalClock()
+    clock.start()
+    ns["clock"] = clock
+    return ns
+
+
+async def run_script(path, script_args):
+    ns = await init_namespace()
+    clock = ns["clock"]
+    original_argv = sys.argv[:]
+
+    try:
+        sys.argv = [path, *script_args]
+        ns.update(
+            __name__="__main__",
+            __file__=path,
+            __package__=None,
+            __cached__=None,
+            __spec__=None,
+        )
+        with builtins.open(path, "rb") as handle:
+            source = handle.read()
+        exec(builtins.compile(source, path, "exec"), ns)
+
+        script_main = ns.get("main")
+        if inspect.iscoroutinefunction(script_main):
+            await script_main()
+        return ns
+    finally:
+        sys.argv = original_argv
+        await shutdown_clock(clock)
+
+
 def main(argv=None):
     args = parse_args(argv)
     configure_dsp(args)
 
-    ns = build_namespace()
-
     if args.script is not None:
-        sys.argv = [args.script, *args.script_args]
-        runpy.run_path(args.script, init_globals=ns, run_name="__main__")
+        asyncio.run(run_script(args.script, args.script_args))
         return 0
 
-    try:
-        import readline
-        import rlcompleter
-
-        # Match CPython's libedit/readline TAB binding behavior.
-        if "libedit" in (readline.__doc__ or ""):
-            readline.parse_and_bind("bind ^I rl_complete")
-        else:
-            readline.parse_and_bind("tab: complete")
-        readline.set_completer(rlcompleter.Completer(ns).complete)
-    except ImportError:
-        pass
-
-    code.interact(
-        local=ns,
+    async_interact(
         banner="""MiniCollider
 
 Example:
     perft(drone)
     dsp.append(IMMEDIATE, "default", freq=440)""",
+        locals=init_namespace,
         exitmsg="",
     )
 

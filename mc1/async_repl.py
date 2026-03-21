@@ -55,7 +55,26 @@ class AsyncInteractiveConsole(code.InteractiveConsole):
             self.showtraceback()
 
 
-def interact(banner="Async REPL", locals=None):
+async def shutdown(locals):
+    if not isinstance(locals, dict):
+        return
+
+    clock = locals.get("clock")
+    if clock is None:
+        return
+
+    task = getattr(clock, "_task", None)
+    if task is None:
+        return
+
+    if clock.stop():
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+
+def interact(banner="Async REPL", locals=None, exitmsg=None):
     loop = asyncio.new_event_loop()
     def loop_thread():
         asyncio.set_event_loop(loop)
@@ -72,8 +91,9 @@ def interact(banner="Async REPL", locals=None):
 
     console = AsyncInteractiveConsole(locals=locals, loop=loop)
     try:
-        console.interact(banner=banner)
+        console.interact(banner=banner, exitmsg=exitmsg)
     finally:
+        asyncio.run_coroutine_threadsafe(shutdown(console.locals), loop).result()
         loop.call_soon_threadsafe(loop.stop)
         t.join(timeout=1)
 
