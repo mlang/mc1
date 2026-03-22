@@ -1,20 +1,3 @@
-score_event = default_event.with_(bpm=72)
-
-
-def note(midi_note, beats, **controls):
-    beats = float(beats)
-    if beats < 0:
-        raise ValueError("beats must be >= 0")
-    return score_event.with_(midi_note=int(midi_note), beats=beats, kwargs=dict(controls))
-
-
-def rest(beats):
-    beats = float(beats)
-    if beats < 0:
-        raise ValueError("beats must be >= 0")
-    return score_event.with_(midi_note=None, beats=beats, kwargs={})
-
-
 PART_SPECS = (
     ('Treble', {'amp': 0.04, 'index': 4.5, 'carrier_ratio': 1.0, 'mod_ratio': 3.0, 'attack': 0.01, 'decay': 0.18, 'sustain': 0.35, 'release': 0.2, 'done_action': 1}, (
         (None, 24.0), (71, 2.0), (72, 1.0), (74, 2.0), (74, 1.0), (72, 2.0), (71, 1.0), (69, 1.0),
@@ -329,7 +312,7 @@ PART_SPECS = (
 )
 
 
-def voice(events, *, synth_name="default", voice_controls):
+def voice(events, *, voice_controls):
     for event in events:
         if not event.is_rest:
             controls = dict(voice_controls)
@@ -337,7 +320,7 @@ def voice(events, *, synth_name="default", voice_controls):
             controls["freq"] = event.freq
             controls["gate"] = 1
 
-            synth_id = dsp.append(synth_name, **controls)
+            synth_id = dsp.append(event.instrument, **controls)
             yield event.sustain
             dsp.set(synth_id, gate=0)
             yield event.duration - event.sustain
@@ -346,15 +329,28 @@ def voice(events, *, synth_name="default", voice_controls):
 
 
 dsp.start()
-clock.schedule(
-    *(
-        voice(
-            (
-                rest(beats) if midi_note is None else note(midi_note, beats)
-                for midi_note, beats in events
-            ),
-            voice_controls=voice_controls
+with default_event(bpm=72) as score_event:
+    def note(midi_note, beats, **controls):
+        beats = float(beats)
+        if beats < 0:
+            raise ValueError("beats must be >= 0")
+        return score_event.with_(midi_note=int(midi_note), beats=beats, kwargs=dict(controls))
+
+    def rest(beats):
+        beats = float(beats)
+        if beats < 0:
+            raise ValueError("beats must be >= 0")
+        return score_event.with_(midi_note=None, beats=beats, kwargs={})
+
+    clock.schedule(
+        *(
+            voice(
+                (
+                    rest(beats) if midi_note is None else note(midi_note, beats)
+                    for midi_note, beats in events
+                ),
+                voice_controls=voice_controls
+            )
+            for _name, voice_controls, events in PART_SPECS
         )
-        for _name, voice_controls, events in PART_SPECS
     )
-)
