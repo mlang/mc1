@@ -89,6 +89,7 @@ default_event = Event(
     instrument="default",
     tempo=120.0,
     beats=1.0,
+    kwargs={},
     beat_duration=lambda e: 60.0 / e.tempo,
     duration=lambda e: e.beats * e.beat_duration,
     legato=0.8,

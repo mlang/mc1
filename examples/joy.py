@@ -1,28 +1,19 @@
-from dataclasses import dataclass
-
-
 BPM = 72
-
-
-@dataclass(frozen=True, slots=True)
-class Event:
-    midi_note: int | None
-    beats: float
-    controls: dict[str, float]
+score_event = default_event.with_(tempo=BPM)
 
 
 def note(midi_note, beats, **controls):
     beats = float(beats)
     if beats < 0:
         raise ValueError("beats must be >= 0")
-    return Event(int(midi_note), beats, dict(controls))
+    return score_event.with_(midi_note=int(midi_note), beats=beats, kwargs=dict(controls))
 
 
 def rest(beats):
     beats = float(beats)
     if beats < 0:
         raise ValueError("beats must be >= 0")
-    return Event(None, beats, {})
+    return score_event.with_(midi_note=None, beats=beats, kwargs={})
 
 
 PART_SPECS = (
@@ -340,24 +331,19 @@ PART_SPECS = (
 
 
 def voice(events, *, synth_name="default", voice_controls):
-    seconds_per_beat = 60.0 / BPM
-    legato = 0.8
-
     for event in events:
-        duration = event.beats * seconds_per_beat
-        if event.midi_note is not None:
+        if not event.is_rest:
             controls = dict(voice_controls)
-            controls.update(event.controls)
-            controls["freq"] = midi2cps(event.midi_note)
+            controls.update(dict(event.kwargs))
+            controls["freq"] = event.freq
             controls["gate"] = 1
 
             synth_id = dsp.append(synth_name, **controls)
-            sustain = duration * legato
-            yield sustain
+            yield event.sustain
             dsp.set(synth_id, gate=0)
-            yield duration - sustain
+            yield event.duration - event.sustain
         else:
-            yield duration
+            yield event.duration
 
 
 dsp.start()
