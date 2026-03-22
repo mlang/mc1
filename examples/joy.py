@@ -320,17 +320,7 @@ def voice(part_spec):
     with score_event(kwargs=dict(voice_controls)) as voice_event:
         for midi_note, beats in note_events:
             with voice_event(midi_note=midi_note, beats=beats) as event:
-                if not event.is_rest:
-                    controls = dict(event.kwargs)
-                    controls["freq"] = event.freq
-                    controls["gate"] = 1
-
-                    synth_id = dsp.append(event.instrument, **controls)
-                    yield event.sustain
-                    dsp.set(synth_id, gate=0)
-                    yield event.duration - event.sustain
-                else:
-                    yield event.duration
+                yield from event.play(dsp)
 
 
 dsp.start()
