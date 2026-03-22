@@ -42,7 +42,7 @@ def test_init_namespace_adds_running_clock():
     assert ns["dsp"] is main.dsp
     assert ns["clock"]._task is not None
 
-    asyncio.run(main.shutdown_clock(ns["clock"]))
+    asyncio.run(main.drain_scheduler(ns["clock"]))
     assert ns["clock"]._task is None
 
 
