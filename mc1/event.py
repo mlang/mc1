@@ -1,5 +1,3 @@
-from contextlib import contextmanager
-
 from .pitch import midi2cps
 
 __all__ = ("Event", "default_event")
@@ -66,20 +64,25 @@ class Event:
         self._data.update(kvs)
         return self
 
-    def with_(self, **kvs):
-        return self.__class__(self._data, **kvs)
+    # ----- copying / context manager -----
 
-    # ----- context manager via __call__ -----
-
-    @contextmanager
     def __call__(self, **overrides):
         """
         Usage:
-            with default_event(tempo=90) as faster:
+            event = default_event(bpm=90)
+
+            with default_event(bpm=90) as faster:
                 ...
+
         Produces a new Event (does not mutate the original event).
         """
-        yield self.with_(**overrides)
+        return self.__class__(self._data, **overrides)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        return False
 
     # ----- dict / attribute sugar -----
 

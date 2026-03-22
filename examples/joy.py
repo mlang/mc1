@@ -312,7 +312,7 @@ PART_SPECS = (
 )
 
 
-score_event = default_event.with_(bpm=72)
+score_event = default_event(bpm=72)
 
 
 def voice(part_spec):
