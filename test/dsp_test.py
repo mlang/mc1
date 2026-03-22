@@ -4,7 +4,9 @@ import pytest
 
 import mc1._core
 import mc1._test
-from mc1 import ADSR, DAG, DEFAULT_LATENCY, DSP, IMMEDIATE, Out, SinOsc, Trigger, add, after, default, latency, now
+import mc1.timetag
+from mc1 import ADSR, DAG, DSP, IMMEDIATE, Out, SinOsc, Trigger, default, here
+from mc1.timetag import from_unix
 
 
 def wait_for(condition, timeout=0.5, interval=0.005):
@@ -591,19 +593,23 @@ def test_dsp_stale_anchor_insert_is_dropped():
         dsp.set(IMMEDIATE, dropped, freq=220)
 
 
-def test_timetag_helpers_schedule_wallclock_ntp_values():
-    base = now()
+def test_timetag_here_schedules_current_clock_wallclock_values(monkeypatch):
+    monkeypatch.setattr(
+        mc1.timetag,
+        "current_clock",
+        lambda: type("FakeClock", (), {"time": 42.0})(),
+    )
 
-    assert after(0, base=base) == base
-    assert latency(base=base) == add(base, DEFAULT_LATENCY)
-    assert add(base, 0.05) > base
+    assert here(0) == from_unix(42.0)
+    assert here() == from_unix(42.1)
+    assert here(0.05) > here(0)
 
 
 def test_dsp_scheduled_append_remains_pending_until_due():
     dsp = DSP()
     dsp.compile(bytes(default))
 
-    scheduled = after(0.05)
+    scheduled = from_unix(time.time() + 0.05)
     module_id = dsp.append(scheduled, "default")
 
     assert dsp.module_ids == []
@@ -615,7 +621,7 @@ def test_dsp_same_timetag_commands_preserve_fifo_order():
     dsp = DSP()
     dsp.compile(bytes(default))
 
-    scheduled = after(0.05)
+    scheduled = from_unix(time.time() + 0.05)
     first = dsp.append(scheduled, "default")
     second = dsp.append(scheduled, "default")
     before_second = dsp.insert_before(scheduled, second, "default")
@@ -631,7 +637,7 @@ def test_dsp_scheduled_remove_applies_when_due():
 
     first = dsp.append(IMMEDIATE, "default")
     second = dsp.append(IMMEDIATE, "default")
-    scheduled = after(0.05)
+    scheduled = from_unix(time.time() + 0.05)
     dsp.remove(scheduled, first)
 
     assert dsp.module_ids == [first, second]
@@ -645,13 +651,15 @@ def test_dsp_scheduled_insert_after_missing_anchor_is_dropped():
 
     anchor = dsp.append(IMMEDIATE, "default")
     survivor = dsp.append(IMMEDIATE, "default")
-    remove_at = after(0.03)
-    insert_at = add(remove_at, 0.02)
+    remove_at_unix = time.time() + 0.03
+    insert_at_unix = remove_at_unix + 0.02
+    remove_at = from_unix(remove_at_unix)
+    insert_at = from_unix(insert_at_unix)
     dropped = dsp.insert_after(insert_at, anchor, "default")
     dsp.remove(remove_at, anchor)
 
     wait_for(lambda: dsp.module_ids == [survivor])
-    wait_for(lambda: now() >= insert_at and dsp.module_ids == [survivor])
+    wait_for(lambda: time.time() >= insert_at_unix and dsp.module_ids == [survivor])
 
     with pytest.raises(ValueError, match="unknown module_id"):
         dsp.set(IMMEDIATE, dropped, freq=220)
@@ -661,8 +669,8 @@ def test_dsp_wait_until_idle_returns_true_once_runtime_drains():
     dsp = DSP()
     dsp.compile(bytes(default))
 
-    note_on = after(0.02)
-    note_off = after(0.04)
+    note_on = from_unix(time.time() + 0.02)
+    note_off = from_unix(time.time() + 0.04)
     module_id = dsp.append(
         note_on,
         "default",

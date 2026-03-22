@@ -4,10 +4,13 @@ import pathlib
 import runpy
 
 import pytest
-from mc1 import add
 
 
 EXAMPLE_PATH = pathlib.Path(__file__).resolve().parents[1] / "examples" / "joy.py"
+
+
+def add(time_tag, seconds):
+    return time_tag + int(round(float(seconds) * (1 << 32)))
 
 
 class FakeDSP:

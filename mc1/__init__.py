@@ -39,7 +39,7 @@ from mc1._core import DSP
 from mc1.clock import *
 from mc1.dag import *
 from mc1.graphs import drone
-from mc1.timetag import DEFAULT_LATENCY, IMMEDIATE, add, after, latency, now
+from mc1.timetag import IMMEDIATE, here
 
 __all__ = (
     "ADSR",
@@ -54,12 +54,8 @@ __all__ = (
     "current_clock",
     "default",
     "drone",
-    "DEFAULT_LATENCY",
+    "here",
     "IMMEDIATE",
-    "add",
-    "after",
-    "latency",
-    "now",
     "perft",
 )
 

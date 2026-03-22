@@ -95,8 +95,8 @@ The current repo is already testing and relying on these backend operations:
 For time tags, the main helpers are:
 
 - `IMMEDIATE` for immediate commands
-- `after(...)`, `add(...)`, `now()`, and `latency(...)`
-- `mc1.timetag` helpers when a script needs explicit conversions
+- `here(...)` inside scheduled routines
+- `mc1.timetag.from_unix(...)` when a script needs an explicit conversion
 
 ## Async Scheduling
 
