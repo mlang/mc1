@@ -312,45 +312,26 @@ PART_SPECS = (
 )
 
 
-def voice(events, *, voice_controls):
-    for event in events:
-        if not event.is_rest:
-            controls = dict(voice_controls)
-            controls.update(dict(event.kwargs))
-            controls["freq"] = event.freq
-            controls["gate"] = 1
+score_event = default_event.with_(bpm=72)
 
-            synth_id = dsp.append(event.instrument, **controls)
-            yield event.sustain
-            dsp.set(synth_id, gate=0)
-            yield event.duration - event.sustain
-        else:
-            yield event.duration
+
+def voice(part_spec):
+    _name, voice_controls, note_events = part_spec
+    with score_event(kwargs=dict(voice_controls)) as voice_event:
+        for midi_note, beats in note_events:
+            with voice_event(midi_note=midi_note, beats=beats) as event:
+                if not event.is_rest:
+                    controls = dict(event.kwargs)
+                    controls["freq"] = event.freq
+                    controls["gate"] = 1
+
+                    synth_id = dsp.append(event.instrument, **controls)
+                    yield event.sustain
+                    dsp.set(synth_id, gate=0)
+                    yield event.duration - event.sustain
+                else:
+                    yield event.duration
 
 
 dsp.start()
-with default_event(bpm=72) as score_event:
-    def note(midi_note, beats, **controls):
-        beats = float(beats)
-        if beats < 0:
-            raise ValueError("beats must be >= 0")
-        return score_event.with_(midi_note=int(midi_note), beats=beats, kwargs=dict(controls))
-
-    def rest(beats):
-        beats = float(beats)
-        if beats < 0:
-            raise ValueError("beats must be >= 0")
-        return score_event.with_(midi_note=None, beats=beats, kwargs={})
-
-    clock.schedule(
-        *(
-            voice(
-                (
-                    rest(beats) if midi_note is None else note(midi_note, beats)
-                    for midi_note, beats in events
-                ),
-                voice_controls=voice_controls
-            )
-            for _name, voice_controls, events in PART_SPECS
-        )
-    )
+clock.schedule(*map(voice, PART_SPECS))
