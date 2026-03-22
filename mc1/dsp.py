@@ -1,0 +1,98 @@
+from __future__ import annotations
+
+import math
+from numbers import Integral
+
+import mc1._core
+from mc1.clock import current_clock
+from mc1.timetag import from_unix
+
+
+_MAX_TIMETAG = 0xFFFFFFFFFFFFFFFF
+
+
+def _validate_latency(latency: float) -> float:
+    if isinstance(latency, bool):
+        raise ValueError("latency must be a finite non-negative number")
+
+    try:
+        latency = float(latency)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("latency must be a finite non-negative number") from exc
+
+    if not math.isfinite(latency) or latency < 0:
+        raise ValueError("latency must be a finite non-negative number")
+    return latency
+
+
+def _validate_time_tag(time_tag: int) -> int:
+    if isinstance(time_tag, bool) or not isinstance(time_tag, Integral):
+        raise ValueError("time_tag must be an OSC timetag integer")
+
+    time_tag = int(time_tag)
+    if time_tag < 0:
+        raise ValueError("time_tag must be >= 0")
+    if time_tag > _MAX_TIMETAG:
+        raise ValueError("time_tag must fit in uint64")
+    return time_tag
+
+
+class _ScheduledDSP:
+    __slots__ = ("_dsp", "_time_tag")
+
+    def __init__(self, dsp: "DSP", time_tag: int) -> None:
+        self._dsp = dsp
+        self._time_tag = time_tag
+
+    def append(self, synth_name, **controls):
+        return mc1._core.DSP.append(self._dsp, self._time_tag, synth_name, **controls)
+
+    def prepend(self, synth_name, **controls):
+        return mc1._core.DSP.prepend(self._dsp, self._time_tag, synth_name, **controls)
+
+    def insert_before(self, synth_id, synth_name, **controls):
+        return mc1._core.DSP.insert_before(
+            self._dsp, self._time_tag, synth_id, synth_name, **controls
+        )
+
+    def insert_after(self, synth_id, synth_name, **controls):
+        return mc1._core.DSP.insert_after(
+            self._dsp, self._time_tag, synth_id, synth_name, **controls
+        )
+
+    def set(self, synth_id, **controls):
+        return mc1._core.DSP.set(self._dsp, self._time_tag, synth_id, **controls)
+
+    def remove(self, synth_id):
+        return mc1._core.DSP.remove(self._dsp, self._time_tag, synth_id)
+
+
+class DSP(mc1._core.DSP):
+    def __init__(self, *args, latency: float = 0.05, **kwargs) -> None:
+        latency = _validate_latency(latency)
+        super().__init__(*args, **kwargs)
+        self.latency = latency
+
+    def __getitem__(self, time_tag: int) -> _ScheduledDSP:
+        return _ScheduledDSP(self, _validate_time_tag(time_tag))
+
+    def _scheduled(self) -> _ScheduledDSP:
+        return self[from_unix(current_clock().time + self.latency)]
+
+    def append(self, synth_name, **controls):
+        return self._scheduled().append(synth_name, **controls)
+
+    def prepend(self, synth_name, **controls):
+        return self._scheduled().prepend(synth_name, **controls)
+
+    def insert_before(self, synth_id, synth_name, **controls):
+        return self._scheduled().insert_before(synth_id, synth_name, **controls)
+
+    def insert_after(self, synth_id, synth_name, **controls):
+        return self._scheduled().insert_after(synth_id, synth_name, **controls)
+
+    def set(self, synth_id, **controls):
+        return self._scheduled().set(synth_id, **controls)
+
+    def remove(self, synth_id):
+        return self._scheduled().remove(synth_id)

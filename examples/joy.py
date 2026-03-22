@@ -2,7 +2,6 @@ from dataclasses import dataclass
 
 
 BPM = 72
-LATENCY = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -352,10 +351,10 @@ def voice(events, *, synth_name="default", voice_controls):
             controls["freq"] = midi2cps(event.midi_note)
             controls["gate"] = 1
 
-            synth_id = dsp.append(here(latency=LATENCY), synth_name, **controls)
+            synth_id = dsp.append(synth_name, **controls)
             sustain = duration * legato
             yield sustain
-            dsp.set(here(latency=LATENCY), synth_id, gate=0)
+            dsp.set(synth_id, gate=0)
             yield duration - sustain
         else:
             yield duration

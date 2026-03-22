@@ -32,6 +32,7 @@ def test_configure_dsp_uses_cli_values():
     assert main.dsp.block_size == 64
     assert main.dsp.input_channels == 1
     assert main.dsp.output_channels == 2
+    assert main.dsp.latency == 0.05
 
 
 def test_init_namespace_adds_running_clock():
@@ -148,7 +149,7 @@ def test_main_uses_async_repl_for_interactive_session(monkeypatch):
 
 Example:
     perft(drone)
-    dsp.append(IMMEDIATE, "default", freq=440)""",
+    dsp[IMMEDIATE].append("default", freq=440)""",
             main.init_namespace,
             "",
         )

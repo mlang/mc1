@@ -28,16 +28,16 @@ With the native extension built, the same graph can be compiled and scheduled as
     >>> from mc1 import DSP, IMMEDIATE
     >>> dsp = DSP()
     >>> dsp.compile(graph_bytes)
-    >>> _ = dsp.append(IMMEDIATE, "beep", freq=660)
+    >>> _ = dsp[IMMEDIATE].append("beep", freq=660)
 
 Use `perft(...)` when you want to hand serialized graph bytes directly to the
 native performance/compiler test entry point.
 """
 
 import mc1._core
-from mc1._core import DSP
 from mc1.clock import *
 from mc1.dag import *
+from mc1.dsp import DSP
 from mc1.graphs import default, drone, klang_cloud, rhodey, rhodey_chorus, tube_bell
 from mc1.pitch import *
 from mc1.timetag import IMMEDIATE, here

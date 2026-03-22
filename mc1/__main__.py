@@ -127,7 +127,7 @@ def main(argv=None):
 
 Example:
     perft(drone)
-    dsp.append(IMMEDIATE, "default", freq=440)""",
+    dsp[IMMEDIATE].append("default", freq=440)""",
         locals=init_namespace,
         exitmsg="",
     )
