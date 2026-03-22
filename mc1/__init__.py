@@ -38,6 +38,7 @@ import mc1._core
 from mc1.clock import *
 from mc1.dag import *
 from mc1.dsp import DSP
+from mc1.event import *
 from mc1.graphs import default, drone, klang_cloud, rhodey, rhodey_chorus, tube_bell
 from mc1.pitch import *
 from mc1.timetag import IMMEDIATE, here
@@ -46,6 +47,7 @@ __all__ = (
     "ADSR",
     "DAG",
     "DSP",
+    "Event",
     "In",
     "LogicalClock",
     "Out",
@@ -54,6 +56,7 @@ __all__ = (
     "Trigger",
     "current_clock",
     "default",
+    "default_event",
     "drone",
     "here",
     "IMMEDIATE",
