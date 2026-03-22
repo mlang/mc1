@@ -1,5 +1,4 @@
-BPM = 72
-score_event = default_event.with_(tempo=BPM)
+score_event = default_event.with_(bpm=72)
 
 
 def note(midi_note, beats, **controls):

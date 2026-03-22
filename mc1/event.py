@@ -87,11 +87,10 @@ class Event:
 
 default_event = Event(
     instrument="default",
-    tempo=120.0,
+    bpm=120.0,
+    tempo=lambda e: 60.0 / e.bpm,
     beats=1.0,
-    kwargs={},
-    beat_duration=lambda e: 60.0 / e.tempo,
-    duration=lambda e: e.beats * e.beat_duration,
+    duration=lambda e: e.beats * e.tempo,
     legato=0.8,
     sustain=lambda e: e.duration * e.legato,
     midi_note=60,
