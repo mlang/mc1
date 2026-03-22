@@ -7,6 +7,18 @@ import mc1
 import mc1.__main__
 
 
+class FakeDSP:
+    def __init__(self):
+        self.start_calls = 0
+        self.stop_calls = 0
+
+    def start(self):
+        self.start_calls += 1
+
+    def stop(self):
+        self.stop_calls += 1
+
+
 def test_parse_args_preserves_script_args_after_script():
     main = importlib.reload(mc1.__main__)
 
@@ -136,21 +148,54 @@ def test_run_script_does_not_auto_call_sync_main(tmp_path):
 def test_main_uses_async_repl_for_interactive_session(monkeypatch):
     main = importlib.reload(mc1.__main__)
     calls = []
+    fake_dsp = FakeDSP()
+
+    def fake_configure_dsp(_args):
+        main.dsp = fake_dsp
 
     def fake_interact(*, banner, locals, exitmsg):
         calls.append((banner, locals, exitmsg))
 
+    monkeypatch.setattr(main, "configure_dsp", fake_configure_dsp)
     monkeypatch.setattr(main, "async_interact", fake_interact)
 
     assert main.main([]) == 0
+    assert fake_dsp.start_calls == 1
+    assert fake_dsp.stop_calls == 1
     assert calls == [
         (
             """MiniCollider
 
 Example:
-    perft(drone)
-    dsp[IMMEDIATE].append("default", freq=440)""",
+    clock.schedule(default_event.play(dsp))""",
             main.init_namespace,
             "",
         )
     ]
+
+
+def test_main_starts_dsp_before_running_script_and_stops_after(monkeypatch):
+    main = importlib.reload(mc1.__main__)
+    fake_dsp = FakeDSP()
+    observed = {}
+
+    def fake_configure_dsp(_args):
+        main.dsp = fake_dsp
+
+    async def fake_run_script(path, script_args):
+        observed["started_before_script"] = fake_dsp.start_calls
+        observed["path"] = path
+        observed["script_args"] = script_args
+        return {}
+
+    monkeypatch.setattr(main, "configure_dsp", fake_configure_dsp)
+    monkeypatch.setattr(main, "run_script", fake_run_script)
+
+    assert main.main(["demo.py", "--flag", "value"]) == 0
+    assert observed == {
+        "started_before_script": 1,
+        "path": "demo.py",
+        "script_args": ["--flag", "value"],
+    }
+    assert fake_dsp.start_calls == 1
+    assert fake_dsp.stop_calls == 1

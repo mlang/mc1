@@ -117,22 +117,25 @@ async def run_script(path, script_args):
 def main(argv=None):
     args = parse_args(argv)
     configure_dsp(args)
+    dsp.start()
 
-    if args.script is not None:
-        asyncio.run(run_script(args.script, args.script_args))
-        return 0
+    try:
+        if args.script is not None:
+            asyncio.run(run_script(args.script, args.script_args))
+            return 0
 
-    async_interact(
-        banner="""MiniCollider
+        async_interact(
+            banner="""MiniCollider
 
 Example:
-    perft(drone)
-    dsp[IMMEDIATE].append("default", freq=440)""",
-        locals=init_namespace,
-        exitmsg="",
-    )
+    clock.schedule(default_event.play(dsp))""",
+            locals=init_namespace,
+            exitmsg="",
+        )
 
-    return 0
+        return 0
+    finally:
+        dsp.stop()
 
 
 if __name__ == "__main__":
