@@ -60,7 +60,7 @@ public:
     std::vector<ControlDesc> control_descs;
   };
 
-  class Module;
+  class Synth;
 
   class CompiledSynth {
   public:
@@ -124,10 +124,10 @@ public:
     const std::vector<ControlDesc>& control_descs() const
     { return control_descs_; }
 
-    Module instantiate() const;
+    Synth instantiate() const;
   };
 
-  class Module {
+  class Synth {
   private:
     std::shared_ptr<gcc_jit_result> owner_;
     process_fn_t process_{};
@@ -138,7 +138,7 @@ public:
     uint32_t pending_done_action_{};
 
   public:
-    Module(
+    Synth(
       std::shared_ptr<gcc_jit_result> owner,
       init_fn_t init,
       process_fn_t process,
@@ -155,10 +155,10 @@ public:
       if (init) init(state_.data());
     }
 
-    Module(Module const&) = default;
-    Module& operator=(Module const&) = default;
-    Module(Module&&) noexcept = default;
-    Module& operator=(Module&&) noexcept = default;
+    Synth(Synth const&) = default;
+    Synth& operator=(Synth const&) = default;
+    Synth(Synth&&) noexcept = default;
+    Synth& operator=(Synth&&) noexcept = default;
 
     float get_control(size_t index) const
     {
@@ -271,9 +271,9 @@ public:
   }
 };
 
-inline Result::Module Result::CompiledSynth::instantiate() const
+inline Result::Synth Result::CompiledSynth::instantiate() const
 {
-  return Module{
+  return Synth{
     owner_,
     init_,
     process_,

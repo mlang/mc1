@@ -1,15 +1,27 @@
 # mc1
 
-`mc1` is a proof-of-concept re-architecture of SuperCollider with Python as the host language and `gccjit` as the compiler backend for DSP kernels.
+`mc1` is a proof-of-concept for writing synth graphs and musical structure in Python, then pushing the DSP hot path all the way down to native code.
 
-The repo is aimed at developers iterating on the graph model, compiler, runtime, and host execution model. It is useful for evaluating ideas, not a stable end-user package.
+The interesting part is not just "Python instead of a DSL." `@DAG` turns ordinary Python functions into graph functions, operator overloading lets graph code read naturally, those graphs serialize into a compact IR, and the native layer compiles them with `gccjit` into CPU DSP kernels that run in a real-time audio runtime. On the host side, generator routines yield logical time and translate musical structure into timestamped runtime actions such as `dsp.append(...)` and `dsp.set(...)`.
+
+The repo is aimed at developers iterating on the graph model, compiler, runtime, and host execution model. It is useful for evaluating ideas, not a stable end-user package, but the core path is already real enough to make the design concrete.
+
+## Core Ideas
+
+- Graphs are built from ordinary Python expressions instead of a separate language.
+- `@DAG` functions act as reusable graph abstractions with named controls derived from Python parameters.
+- Operator overloading keeps graph code close to the way audio signal flow is usually sketched on paper.
+- Serialized graphs are compiled to native DSP kernels rather than interpreted node-by-node in Python.
+- Time lives on the host as a logical clock, so routines can yield durations and stay musically readable.
+- Sound is controlled through timestamped runtime actions, which makes score logic and DSP execution meet at a clean boundary.
 
 ## What This Repo Is Trying To Prove
 
-- Python can stay the user-facing language; no separate DSL is required.
-- Graphs built in Python can be serialized and compiled into efficient native DSP kernels.
-- A mixed Python/C++ stack can keep iteration speed high while moving the DSP hot path into native code.
-- Host-side scheduling and runtime control can stay lightweight enough to prototype musical structure directly in Python.
+- Python can stay the user-facing language without collapsing into a stringly, second-class "host API."
+- Graph functions built in Python can be serialized and compiled into efficient native DSP kernels.
+- A mixed Python/C++ stack can keep iteration speed high while still treating the runtime as a first-class target.
+- Host-side scheduling can express musical structure directly in Python data and generator routines.
+- Timing, graph compilation, and runtime control can fit together without inventing a separate score language.
 
 ## Current State
 
@@ -56,9 +68,11 @@ In script mode, the host executes the target script inside that same namespace. 
 
 When a script returns, the host waits for the logical clock queue to drain before exiting. A script can schedule work and return without adding explicit shutdown code just to keep its routines alive.
 
+That split is central to the design: graph functions describe what a synth is, while host routines describe when synth instances appear, change, and disappear.
+
 ## `examples/joy.py`
 
-`examples/joy.py` is the current working backend example.
+`examples/joy.py` is the current working backend example, and it is the best guide to the repo's intended feel.
 
 It is not a standalone importable library example. It is a host script meant to be run with:
 
@@ -69,14 +83,15 @@ uv run python -m mc1 examples/joy.py
 The script models a score as Python data:
 
 - `Event` values encode note or rest durations in beats plus optional per-note controls.
-- `Part` values combine an event sequence with a fixed voice-level control set.
-- `voice(...)` is a generator routine that converts beats to seconds, schedules note-on commands with `dsp.append(...)`, yields the event duration to the logical clock, then sends note-off with `dsp.set(..., gate=0)`.
+- Each voice keeps a fixed control set for timbre while individual events supply pitch and note-level variation.
+- `voice(...)` is a generator routine that converts beats to seconds, schedules note-on commands with `dsp.append(...)`, yields the sustain and release portions of the note to the logical clock, then sends note-off with `dsp.set(..., gate=0)`.
 
-This makes `joy.py` a useful reference for the current backend shape:
+That makes `joy.py` more than an example song. It demonstrates the design boundary the repo is aiming for:
 
 - musical structure stays in plain Python data and generators
-- absolute timing is provided by the host clock
-- synth instances are controlled through runtime commands rather than through a separate language layer
+- graph code stays reusable and separate from the score
+- logical time is provided by the host clock
+- synth instances are controlled through timestamped runtime commands rather than through a separate language layer
 
 ## Runtime Surface Being Exercised
 
@@ -112,7 +127,7 @@ Inside a running routine, `current_clock()` exposes the active logical clock. Th
 
 ## Python Graph Building
 
-Graphs are built directly with Python expressions. Arithmetic operators create graph nodes, so normal control flow and helpers like `sum` compose naturally.
+Graphs are built directly with Python expressions. Arithmetic operators create graph nodes, so normal control flow and helpers like `sum` compose naturally. A `@DAG` function is not just a convenience wrapper; it is the reusable graph-level abstraction that the runtime later sees as a compiled synth definition.
 
 ```python
 from mc1 import DAG, Out, Pan, SinOsc

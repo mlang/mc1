@@ -110,14 +110,14 @@ double perft(pybind11::bytes b)
 
   auto r = compile(dag, SR, BS);
   auto compiled_synth = r[dag.name];
-  auto module = compiled_synth.instantiate();
+  auto synth = compiled_synth.instantiate();
 
   // Two-channel audiobus: channel-major layout [ch0 block][ch1 block]
   aligned_float_buffer abus(2 * BS);
 
   for (int iter = 0; iter < 10; ++iter) {
     abus.fill(0.0f);
-    module.process(abus.data());
+    synth.process(abus.data());
 
     std::println("process call {}", iter);
     std::println("i\tch0\tch1");
@@ -134,7 +134,7 @@ double perft(pybind11::bytes b)
   auto t0 = std::chrono::steady_clock::now();
   for (size_t i = 0; i < nblocks; ++i) {
     abus.fill(0.0f);
-    module.process(abus.data());
+    synth.process(abus.data());
   }
   auto t1 = std::chrono::steady_clock::now();
 
@@ -150,9 +150,9 @@ class DSP
   uint32_t output_channels_;
   runtime runtime_;
   std::unordered_map<std::string, Result::CompiledSynth> compiled_synths_by_name_;
-  std::unordered_map<uint32_t, std::unique_ptr<module_instance>> modules_by_id_;
+  std::unordered_map<uint32_t, std::unique_ptr<synth_instance>> synths_by_id_;
   std::unordered_map<uint32_t, bool> pending_idle_status_by_request_id_;
-  uint32_t next_module_id_ = 1;
+  uint32_t next_synth_id_ = 1;
   uint32_t next_request_id_ = 1;
 
   static uint32_t validate_positive(long value, const char* name)
@@ -261,11 +261,11 @@ class DSP
     }
   }
 
-  module_instance& get_module_instance(uint32_t module_id)
+  synth_instance& get_synth_instance(uint32_t synth_id)
   {
-    auto it = modules_by_id_.find(module_id);
-    if (it == modules_by_id_.end()) {
-      throw pybind11::value_error(std::format("unknown module_id {}", module_id));
+    auto it = synths_by_id_.find(synth_id);
+    if (it == synths_by_id_.end()) {
+      throw pybind11::value_error(std::format("unknown synth_id {}", synth_id));
     }
     return *it->second;
   }
@@ -275,8 +275,8 @@ class DSP
     rt_event event;
     while (runtime_.try_pop_event(event)) {
       std::visit(overloaded{
-        [this](const module_retired_event& retired) {
-          modules_by_id_.erase(retired.module_id);
+        [this](const synth_retired_event& retired) {
+          synths_by_id_.erase(retired.synth_id);
         },
         [this](const idle_status_event& idle_status) {
           pending_idle_status_by_request_id_.insert_or_assign(idle_status.request_id, idle_status.idle);
@@ -295,11 +295,11 @@ class DSP
     return idle;
   }
 
-  uint32_t create_module(
+  uint32_t create_synth(
       uint64_t time_tag,
       std::string_view synth_name,
-      module_insert_mode insert_mode,
-      uint32_t anchor_module_id,
+      synth_insert_mode insert_mode,
+      uint32_t anchor_synth_id,
       const char* action,
       pybind11::kwargs controls)
   {
@@ -310,7 +310,7 @@ class DSP
 
     auto& compiled_synth = compiled_synth_it->second;
 
-    auto module = compiled_synth.instantiate();
+    auto synth = compiled_synth.instantiate();
     for (auto item : controls) {
       std::string control_name;
       try {
@@ -330,32 +330,32 @@ class DSP
       }
 
       auto values = parse_control_values(item.second, synth_name, control_name, slot->width);
-      module.set_control_values(slot->index, values);
+      synth.set_control_values(slot->index, values);
     }
 
-    auto module_id = next_module_id_++;
-    auto instance = std::make_unique<module_instance>(module_instance{
-      .module_id = module_id,
+    auto synth_id = next_synth_id_++;
+    auto instance = std::make_unique<synth_instance>(synth_instance{
+      .synth_id = synth_id,
       .synth_name = std::string(synth_name),
       .compiled_synth = compiled_synth,
-      .module = std::move(module),
+      .synth = std::move(synth),
     });
 
     auto* instance_ptr = instance.get();
-    modules_by_id_.insert_or_assign(module_id, std::move(instance));
+    synths_by_id_.insert_or_assign(synth_id, std::move(instance));
     try {
       enqueue_command(
           time_tag,
-          start_module{
-            .module_id = module_id,
-            .module = instance_ptr,
+          start_synth{
+            .synth_id = synth_id,
+            .synth = instance_ptr,
             .insert_mode = insert_mode,
-            .anchor_module_id = anchor_module_id,
+            .anchor_synth_id = anchor_synth_id,
           },
           action);
-      return module_id;
+      return synth_id;
     } catch (...) {
-      modules_by_id_.erase(module_id);
+      synths_by_id_.erase(synth_id);
       throw;
     }
   }
@@ -393,10 +393,10 @@ public:
   uint32_t append(pybind11::handle time_tag, std::string_view synth_name, pybind11::kwargs controls)
   {
     drain_runtime_events();
-    return create_module(
+    return create_synth(
         validate_time_tag(time_tag, "time_tag"),
         synth_name,
-        module_insert_mode::append,
+        synth_insert_mode::append,
         0,
         "append failed",
         controls);
@@ -405,10 +405,10 @@ public:
   uint32_t prepend(pybind11::handle time_tag, std::string_view synth_name, pybind11::kwargs controls)
   {
     drain_runtime_events();
-    return create_module(
+    return create_synth(
         validate_time_tag(time_tag, "time_tag"),
         synth_name,
-        module_insert_mode::prepend,
+        synth_insert_mode::prepend,
         0,
         "prepend failed",
         controls);
@@ -416,51 +416,51 @@ public:
 
   uint32_t insert_before(
       pybind11::handle time_tag,
-      long before_module_id,
+      long before_synth_id,
       std::string_view synth_name,
       pybind11::kwargs controls)
   {
     drain_runtime_events();
 
-    auto validated_module_id = validate_non_negative(before_module_id, "before_module_id");
-    get_module_instance(validated_module_id);
+    auto validated_synth_id = validate_non_negative(before_synth_id, "before_synth_id");
+    get_synth_instance(validated_synth_id);
 
-    return create_module(
+    return create_synth(
         validate_time_tag(time_tag, "time_tag"),
         synth_name,
-        module_insert_mode::before,
-        validated_module_id,
+        synth_insert_mode::before,
+        validated_synth_id,
         "insert_before failed",
         controls);
   }
 
   uint32_t insert_after(
       pybind11::handle time_tag,
-      long after_module_id,
+      long after_synth_id,
       std::string_view synth_name,
       pybind11::kwargs controls)
   {
     drain_runtime_events();
 
-    auto validated_module_id = validate_non_negative(after_module_id, "after_module_id");
-    get_module_instance(validated_module_id);
+    auto validated_synth_id = validate_non_negative(after_synth_id, "after_synth_id");
+    get_synth_instance(validated_synth_id);
 
-    return create_module(
+    return create_synth(
         validate_time_tag(time_tag, "time_tag"),
         synth_name,
-        module_insert_mode::after,
-        validated_module_id,
+        synth_insert_mode::after,
+        validated_synth_id,
         "insert_after failed",
         controls);
   }
 
-  void set(pybind11::handle time_tag, long module_id, pybind11::kwargs controls)
+  void set(pybind11::handle time_tag, long synth_id, pybind11::kwargs controls)
   {
     drain_runtime_events();
 
     auto validated_time_tag = validate_time_tag(time_tag, "time_tag");
-    auto validated_module_id = validate_non_negative(module_id, "module_id");
-    auto& instance = get_module_instance(validated_module_id);
+    auto validated_synth_id = validate_non_negative(synth_id, "synth_id");
+    auto& instance = get_synth_instance(validated_synth_id);
 
     for (auto item : controls) {
       std::string control_name;
@@ -490,7 +490,7 @@ public:
         enqueue_command(
             validated_time_tag,
             set_control_value{
-              .module_id = validated_module_id,
+              .synth_id = validated_synth_id,
               .control_index = static_cast<uint32_t>(slot->index + offset),
               .value = values[offset],
             },
@@ -499,15 +499,15 @@ public:
     }
   }
 
-  void remove(pybind11::handle time_tag, long module_id)
+  void remove(pybind11::handle time_tag, long synth_id)
   {
     drain_runtime_events();
 
     auto validated_time_tag = validate_time_tag(time_tag, "time_tag");
-    auto validated_module_id = validate_non_negative(module_id, "module_id");
-    get_module_instance(validated_module_id);
+    auto validated_synth_id = validate_non_negative(synth_id, "synth_id");
+    get_synth_instance(validated_synth_id);
 
-    enqueue_command(validated_time_tag, stop_module{validated_module_id}, "remove failed");
+    enqueue_command(validated_time_tag, stop_synth{validated_synth_id}, "remove failed");
   }
 
   void start()
@@ -568,15 +568,15 @@ public:
     return true;
   }
 
-  std::vector<uint32_t> module_ids()
+  std::vector<uint32_t> synth_ids()
   {
     drain_runtime_events();
 
     if (runtime_.started()) {
-      throw pybind11::value_error("module_ids is only available while DSP is stopped");
+      throw pybind11::value_error("synth_ids is only available while DSP is stopped");
     }
 
-    auto ids = runtime_.module_ids();
+    auto ids = runtime_.synth_ids();
     drain_runtime_events();
     return ids;
   }
@@ -616,14 +616,14 @@ PYBIND11_MODULE(_core, m, py::mod_gil_not_used())
   .def_property_readonly("block_size", &DSP::block_size)
   .def_property_readonly("input_channels", &DSP::input_channels)
   .def_property_readonly("output_channels", &DSP::output_channels)
-  .def_property_readonly("module_ids", &DSP::module_ids)
+  .def_property_readonly("synth_ids", &DSP::synth_ids)
   .def("compile", &DSP::compile_graph, py::arg("dag_bytes"))
   .def("append", &DSP::append, py::arg("time_tag"), py::arg("synth_name"))
   .def("prepend", &DSP::prepend, py::arg("time_tag"), py::arg("synth_name"))
-  .def("insert_before", &DSP::insert_before, py::arg("time_tag"), py::arg("before_module_id"), py::arg("synth_name"))
-  .def("insert_after", &DSP::insert_after, py::arg("time_tag"), py::arg("after_module_id"), py::arg("synth_name"))
-  .def("set", &DSP::set, py::arg("time_tag"), py::arg("module_id"))
-  .def("remove", &DSP::remove, py::arg("time_tag"), py::arg("module_id"))
+  .def("insert_before", &DSP::insert_before, py::arg("time_tag"), py::arg("before_synth_id"), py::arg("synth_name"))
+  .def("insert_after", &DSP::insert_after, py::arg("time_tag"), py::arg("after_synth_id"), py::arg("synth_name"))
+  .def("set", &DSP::set, py::arg("time_tag"), py::arg("synth_id"))
+  .def("remove", &DSP::remove, py::arg("time_tag"), py::arg("synth_id"))
   .def("start", &DSP::start)
   .def("stop", &DSP::stop)
   .def("wait_until_idle", &DSP::wait_until_idle, py::arg("timeout") = py::none())

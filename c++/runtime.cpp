@@ -87,10 +87,10 @@ bool runtime::try_pop_event(rt_event& event) noexcept
 bool runtime::push_event(const rt_event& event) noexcept
 { return events_.push(event); }
 
-bool runtime::retire_module(uint32_t module_id) noexcept
+bool runtime::retire_synth(uint32_t synth_id) noexcept
 {
   return push_event(rt_event{
-    .payload = rt_event_payload{module_retired_event{.module_id = module_id}},
+    .payload = rt_event_payload{synth_retired_event{.synth_id = synth_id}},
   });
 }
 
@@ -138,86 +138,86 @@ bool runtime::started() const noexcept
 bool runtime::idle() noexcept
 {
   collect_commands();
-  return commands_.empty() && scheduled_commands_.empty() && modules_.empty();
+  return commands_.empty() && scheduled_commands_.empty() && synths_.empty();
 }
 
-std::vector<uint32_t> runtime::module_ids()
+std::vector<uint32_t> runtime::synth_ids()
 {
-  return module_ids(current_time_tag());
+  return synth_ids(current_time_tag());
 }
 
-std::vector<uint32_t> runtime::module_ids(uint64_t now_time_tag)
+std::vector<uint32_t> runtime::synth_ids(uint64_t now_time_tag)
 {
   consume_due_commands(now_time_tag);
 
-  return modules_
-    | std::views::transform([](module_instance* module) { return module->module_id; })
+  return synths_
+    | std::views::transform([](synth_instance* synth) { return synth->synth_id; })
     | std::ranges::to<std::vector>();
 }
 
-module_instance* runtime::find_module(uint32_t module_id) noexcept
+synth_instance* runtime::find_synth(uint32_t synth_id) noexcept
 {
-  auto it = std::find_if(modules_.begin(), modules_.end(), [module_id](module_instance* module) {
-    return module != nullptr && module->module_id == module_id;
+  auto it = std::find_if(synths_.begin(), synths_.end(), [synth_id](synth_instance* synth) {
+    return synth != nullptr && synth->synth_id == synth_id;
   });
-  return it == modules_.end() ? nullptr : *it;
+  return it == synths_.end() ? nullptr : *it;
 }
 
 void runtime::apply_command(const rt_command& command) noexcept
 {
   std::visit(overloaded{
-    [this](const start_module& payload) noexcept {
-      if (find_module(payload.module_id) != nullptr) {
-        retire_module(payload.module_id);
+    [this](const start_synth& payload) noexcept {
+      if (find_synth(payload.synth_id) != nullptr) {
+        retire_synth(payload.synth_id);
         return;
       }
-      if (modules_.size() >= modules_.capacity()) {
-        retire_module(payload.module_id);
+      if (synths_.size() >= synths_.capacity()) {
+        retire_synth(payload.synth_id);
         return;
       }
 
-      auto insert_at = modules_.end();
+      auto insert_at = synths_.end();
       switch (payload.insert_mode) {
-      case module_insert_mode::append:
-        insert_at = modules_.end();
+      case synth_insert_mode::append:
+        insert_at = synths_.end();
         break;
-      case module_insert_mode::prepend:
-        insert_at = modules_.begin();
+      case synth_insert_mode::prepend:
+        insert_at = synths_.begin();
         break;
-      case module_insert_mode::before:
-      case module_insert_mode::after: {
+      case synth_insert_mode::before:
+      case synth_insert_mode::after: {
         auto anchor = std::find_if(
-            modules_.begin(),
-            modules_.end(),
-            [&payload](module_instance* module) {
-              return module != nullptr && module->module_id == payload.anchor_module_id;
+            synths_.begin(),
+            synths_.end(),
+            [&payload](synth_instance* synth) {
+              return synth != nullptr && synth->synth_id == payload.anchor_synth_id;
             });
-        if (anchor == modules_.end()) {
-          retire_module(payload.module_id);
+        if (anchor == synths_.end()) {
+          retire_synth(payload.synth_id);
           return;
         }
-        insert_at = payload.insert_mode == module_insert_mode::before ? anchor : std::next(anchor);
+        insert_at = payload.insert_mode == synth_insert_mode::before ? anchor : std::next(anchor);
         break;
       }
       }
 
-      modules_.insert(insert_at, payload.module);
+      synths_.insert(insert_at, payload.synth);
     },
-    [this](const stop_module& payload) noexcept {
-      auto it = std::find_if(modules_.begin(), modules_.end(), [&payload](module_instance* module) {
-        return module != nullptr && module->module_id == payload.module_id;
+    [this](const stop_synth& payload) noexcept {
+      auto it = std::find_if(synths_.begin(), synths_.end(), [&payload](synth_instance* synth) {
+        return synth != nullptr && synth->synth_id == payload.synth_id;
       });
-      if (it == modules_.end()) return;
+      if (it == synths_.end()) return;
 
-      auto* module = *it;
-      if (!retire_module(module->module_id)) return;
+      auto* synth = *it;
+      if (!retire_synth(synth->synth_id)) return;
 
-      modules_.erase(it);
+      synths_.erase(it);
     },
     [this](const set_control_value& payload) noexcept {
-      auto* module = find_module(payload.module_id);
-      if (module == nullptr) return;
-      module->module.set_control(payload.control_index, payload.value);
+      auto* synth = find_synth(payload.synth_id);
+      if (synth == nullptr) return;
+      synth->synth.set_control(payload.control_index, payload.value);
     },
     [this](const query_idle_status& payload) noexcept {
       push_event(rt_event{
@@ -248,12 +248,12 @@ void runtime::render_block(float* output, const float* input, size_t frame_offse
     }
   }
 
-  for (size_t index = 0; index < modules_.size();) {
-    auto* module = modules_[index];
-    module->module.process(abus_.data());
+  for (size_t index = 0; index < synths_.size();) {
+    auto* synth = synths_[index];
+    synth->synth.process(abus_.data());
 
-    if (module->module.should_remove() && retire_module(module->module_id)) {
-      modules_.erase(modules_.begin() + static_cast<std::ptrdiff_t>(index));
+    if (synth->synth.should_remove() && retire_synth(synth->synth_id)) {
+      synths_.erase(synths_.begin() + static_cast<std::ptrdiff_t>(index));
       continue;
     }
 

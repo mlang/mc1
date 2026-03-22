@@ -23,7 +23,7 @@ Simple example:
     >>> len(graph_bytes) > 0
     True
 
-With the native extension built, the same graph can be compiled and played:
+With the native extension built, the same graph can be compiled and scheduled as a synth:
 
     >>> from mc1 import DSP, IMMEDIATE
     >>> dsp = DSP()
@@ -38,7 +38,8 @@ import mc1._core
 from mc1._core import DSP
 from mc1.clock import *
 from mc1.dag import *
-from mc1.graphs import drone
+from mc1.graphs import default, drone, klang_cloud, rhodey, rhodey_chorus, tube_bell
+from mc1.pitch import *
 from mc1.timetag import IMMEDIATE, here
 
 __all__ = (
@@ -56,38 +57,13 @@ __all__ = (
     "drone",
     "here",
     "IMMEDIATE",
+    "klang_cloud",
+    "midi2cps",
     "perft",
+    "rhodey",
+    "rhodey_chorus",
+    "tube_bell",
 )
-
-@DAG
-def default(
-    freq=440,
-    amp=0.2,
-    index=5.0,
-    carrier_ratio=1.0,
-    mod_ratio=3.0,
-    gate=1,
-    attack=0.01,
-    decay=0.60,
-    sustain=0.45,
-    release=0.35,
-    mod_attack=0.0,
-    mod_decay=0.20,
-    mod_sustain=0.18,
-    mod_release=0.15,
-    done_action=0,
-):
-    """A compact FM voice used as the package's default synth graph.
-
-    The graph exposes pitch, amplitude, FM index/ratios, and separate carrier
-    and modulation envelopes. It is a good reference for how a non-trivial
-    `@DAG` graph is assembled from Python expressions.
-    """
-    amp_env = ADSR.ar(gate, attack, decay, sustain, release, done_action)
-    mod_env = ADSR.ar(gate, mod_attack, mod_decay, mod_sustain, mod_release)
-    mod = SinOsc.ar(freq * mod_ratio, 0) * (freq * index * mod_env)
-    carrier = SinOsc.ar(freq * carrier_ratio + mod, 0)
-    Out.ar(0, Pan(carrier * amp * amp_env))
 
 
 def perft(dag):

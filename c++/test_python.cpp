@@ -107,7 +107,7 @@ pybind11::dict validate_control_step(pybind11::handle step)
 
 void apply_controls(
     const Result::CompiledSynth& compiled_synth,
-    Result::Module& module,
+    Result::Synth& synth,
     pybind11::handle step)
 {
   auto controls = validate_control_step(step);
@@ -117,14 +117,14 @@ void apply_controls(
     if (!slot) {
       throw pybind11::value_error("unknown control '" + control_name + "'");
     }
-    module.set_control_values(slot->index, parse_control_values(item.second, control_name, slot->width));
+    synth.set_control_values(slot->index, parse_control_values(item.second, control_name, slot->width));
   }
 }
 
 void enqueue_controls(
     runtime& runtime,
     const Result::CompiledSynth& compiled_synth,
-    uint32_t module_id,
+    uint32_t synth_id,
     pybind11::handle step,
     uint64_t time_tag = osc_immediate_time_tag)
 {
@@ -140,7 +140,7 @@ void enqueue_controls(
       rt_command command{
         .time_tag = time_tag,
         .payload = rt_payload{set_control_value{
-          .module_id = module_id,
+          .synth_id = synth_id,
           .control_index = static_cast<uint32_t>(slot->index + offset),
           .value = values[offset],
         }},
@@ -195,15 +195,15 @@ pybind11::dict render_control_blocks(
       validate_positive_arg(sample_rate, "sample_rate"),
       validated_block_size);
   auto compiled_synth = result[dag.name];
-  auto module = compiled_synth.instantiate();
+  auto synth = compiled_synth.instantiate();
 
   aligned_float_buffer abus(validated_output_channels * validated_block_size);
   pybind11::list rendered_blocks;
   pybind11::list done_actions;
   for (auto step : control_steps) {
-    apply_controls(compiled_synth, module, step);
+    apply_controls(compiled_synth, synth, step);
     abus.fill(0.0f);
-    auto done_action = module.process(abus.data());
+    auto done_action = synth.process(abus.data());
 
     pybind11::list rendered_block;
     for (float sample : abus) {
@@ -236,13 +236,13 @@ pybind11::list render_blocks(
       validate_positive_arg(sample_rate, "sample_rate"),
       validated_block_size);
   auto compiled_synth = result[dag.name];
-  auto module = compiled_synth.instantiate();
+  auto synth = compiled_synth.instantiate();
 
   aligned_float_buffer abus(validated_output_channels * validated_block_size);
   pybind11::list rendered_blocks;
   for (size_t i = 0; i < validated_blocks; ++i) {
     abus.fill(0.0f);
-    module.process(abus.data());
+    synth.process(abus.data());
 
     pybind11::list rendered_block;
     for (float sample : abus) {
@@ -263,7 +263,7 @@ std::uintptr_t aligned_abus_modulo(
   return reinterpret_cast<std::uintptr_t>(abus.data()) % audio_buffer_alignment;
 }
 
-pybind11::list runtime_module_ids_per_block(
+pybind11::list runtime_synth_ids_per_block(
     pybind11::bytes b,
     pybind11::list control_steps,
     long sample_rate = 44100,
@@ -280,21 +280,21 @@ pybind11::list runtime_module_ids_per_block(
 
   runtime rt(validated_sample_rate, validated_block_size, 0, validated_output_channels);
 
-  auto instance = std::make_unique<module_instance>(module_instance{
-    .module_id = 1,
+  auto instance = std::make_unique<synth_instance>(synth_instance{
+    .synth_id = 1,
     .synth_name = dag.name,
     .compiled_synth = compiled_synth,
-    .module = compiled_synth.instantiate(),
+    .synth = compiled_synth.instantiate(),
   });
   auto* instance_ptr = instance.get();
 
   rt_command start{
     .time_tag = osc_immediate_time_tag,
-    .payload = rt_payload{start_module{
-      .module_id = instance_ptr->module_id,
-      .module = instance_ptr,
-      .insert_mode = module_insert_mode::append,
-      .anchor_module_id = 0,
+    .payload = rt_payload{start_synth{
+      .synth_id = instance_ptr->synth_id,
+      .synth = instance_ptr,
+      .insert_mode = synth_insert_mode::append,
+      .anchor_synth_id = 0,
     }},
   };
   if (!rt.try_enqueue(start)) {
@@ -302,28 +302,28 @@ pybind11::list runtime_module_ids_per_block(
   }
 
   std::vector<float> output(static_cast<size_t>(validated_output_channels) * validated_block_size, 0.0f);
-  pybind11::list blocks_module_ids;
+  pybind11::list blocks_synth_ids;
   for (auto step : control_steps) {
-    enqueue_controls(rt, compiled_synth, instance_ptr->module_id, step);
+    enqueue_controls(rt, compiled_synth, instance_ptr->synth_id, step);
     std::fill(output.begin(), output.end(), 0.0f);
     rt.process(output.data(), nullptr, static_cast<uint32_t>(validated_block_size));
 
     pybind11::list ids;
-    for (auto module_id : rt.module_ids()) {
-      ids.append(module_id);
+    for (auto synth_id : rt.synth_ids()) {
+      ids.append(synth_id);
     }
-    blocks_module_ids.append(std::move(ids));
+    blocks_synth_ids.append(std::move(ids));
 
     rt_event event;
     while (rt.try_pop_event(event)) {}
   }
 
-  return blocks_module_ids;
+  return blocks_synth_ids;
 }
 
 pybind11::list runtime_render_blocks(
     pybind11::bytes b,
-    long module_count,
+    long synth_count,
     long blocks,
     long sample_rate = 44100,
     long block_size = 32,
@@ -331,7 +331,7 @@ pybind11::list runtime_render_blocks(
 {
   auto dag = parse_dag_or_throw(b);
 
-  auto validated_module_count = static_cast<size_t>(validate_positive_arg(module_count, "module_count"));
+  auto validated_synth_count = static_cast<size_t>(validate_positive_arg(synth_count, "synth_count"));
   auto validated_blocks = static_cast<size_t>(validate_positive_arg(blocks, "blocks"));
   auto validated_sample_rate = validate_positive_arg(sample_rate, "sample_rate");
   auto validated_block_size = static_cast<size_t>(validate_positive_arg(block_size, "block_size"));
@@ -340,26 +340,26 @@ pybind11::list runtime_render_blocks(
   auto compiled_synth = result[dag.name];
 
   runtime rt(validated_sample_rate, validated_block_size, 0, validated_output_channels);
-  std::vector<std::unique_ptr<module_instance>> instances;
-  instances.reserve(validated_module_count);
+  std::vector<std::unique_ptr<synth_instance>> instances;
+  instances.reserve(validated_synth_count);
 
-  for (size_t index = 0; index < validated_module_count; ++index) {
-    auto instance = std::make_unique<module_instance>(module_instance{
-      .module_id = static_cast<uint32_t>(index + 1),
+  for (size_t index = 0; index < validated_synth_count; ++index) {
+    auto instance = std::make_unique<synth_instance>(synth_instance{
+      .synth_id = static_cast<uint32_t>(index + 1),
       .synth_name = dag.name,
       .compiled_synth = compiled_synth,
-      .module = compiled_synth.instantiate(),
+      .synth = compiled_synth.instantiate(),
     });
     auto* instance_ptr = instance.get();
     instances.push_back(std::move(instance));
 
     rt_command start{
       .time_tag = osc_immediate_time_tag,
-      .payload = rt_payload{start_module{
-        .module_id = instance_ptr->module_id,
-        .module = instance_ptr,
-        .insert_mode = module_insert_mode::append,
-        .anchor_module_id = 0,
+      .payload = rt_payload{start_synth{
+        .synth_id = instance_ptr->synth_id,
+        .synth = instance_ptr,
+        .insert_mode = synth_insert_mode::append,
+        .anchor_synth_id = 0,
       }},
     };
     if (!rt.try_enqueue(start)) {
@@ -408,7 +408,7 @@ PYBIND11_MODULE(_test, m, py::mod_gil_not_used())
       py::arg("sample_rate") = 44100,
       py::arg("block_size") = 32,
       py::arg("output_channels") = 2);
-  m.def("_runtime_module_ids_per_block", &runtime_module_ids_per_block,
+  m.def("_runtime_synth_ids_per_block", &runtime_synth_ids_per_block,
       py::arg("dag_bytes"),
       py::arg("control_steps"),
       py::arg("sample_rate") = 44100,
@@ -416,7 +416,7 @@ PYBIND11_MODULE(_test, m, py::mod_gil_not_used())
       py::arg("output_channels") = 2);
   m.def("_runtime_render_blocks", &runtime_render_blocks,
       py::arg("dag_bytes"),
-      py::arg("module_count"),
+      py::arg("synth_count"),
       py::arg("blocks"),
       py::arg("sample_rate") = 44100,
       py::arg("block_size") = 32,

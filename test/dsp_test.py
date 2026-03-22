@@ -5,7 +5,22 @@ import pytest
 import mc1._core
 import mc1._test
 import mc1.timetag
-from mc1 import ADSR, DAG, DSP, IMMEDIATE, Out, SinOsc, Trigger, default, here
+from mc1.graphs import default as graph_default
+from mc1 import (
+    ADSR,
+    DAG,
+    DSP,
+    IMMEDIATE,
+    Out,
+    SinOsc,
+    Trigger,
+    default,
+    here,
+    klang_cloud,
+    rhodey,
+    rhodey_chorus,
+    tube_bell,
+)
 from mc1.timetag import from_unix
 
 
@@ -16,6 +31,9 @@ def wait_for(condition, timeout=0.5, interval=0.005):
             return
         time.sleep(interval)
     assert condition()
+
+
+SHOWCASE_GRAPHS = (klang_cloud, tube_bell, rhodey, rhodey_chorus)
 
 
 def test_dsp_defaults():
@@ -79,6 +97,24 @@ def test_dsp_compile_and_append():
     dsp.compile(bytes(default))
     dsp.append(IMMEDIATE, "default")
     dsp.append(IMMEDIATE, "default", freq=220)
+
+
+def test_default_is_reexported_from_graphs():
+    assert graph_default is default
+
+
+def test_dsp_compile_and_append_showcase_graphs():
+    dsp = DSP()
+
+    for graph in SHOWCASE_GRAPHS:
+        dsp.compile(bytes(graph))
+
+    for graph in SHOWCASE_GRAPHS:
+        dsp.append(IMMEDIATE, graph.name)
+
+
+def test_rhodey_chorus_graph_is_larger_than_single_voice():
+    assert len(rhodey_chorus.operations) > len(rhodey.operations)
 
 
 def test_dsp_start_and_stop():
@@ -203,25 +239,25 @@ def test_dsp_append_rejects_multi_width_control_wrong_length():
         dsp.append(IMMEDIATE, "_multi_control", freq=[220])
 
 
-def test_dsp_remove_added_module():
+def test_dsp_remove_added_synth():
     dsp = DSP()
     dsp.compile(bytes(default))
-    module_id = dsp.append(IMMEDIATE, "default")
-    dsp.remove(IMMEDIATE, module_id)
+    synth_id = dsp.append(IMMEDIATE, "default")
+    dsp.remove(IMMEDIATE, synth_id)
 
 
-def test_dsp_set_added_module_control():
+def test_dsp_set_added_synth_control():
     dsp = DSP()
     dsp.compile(bytes(default))
-    module_id = dsp.append(IMMEDIATE, "default")
-    dsp.set(IMMEDIATE, module_id, freq=220)
+    synth_id = dsp.append(IMMEDIATE, "default")
+    dsp.set(IMMEDIATE, synth_id, freq=220)
 
 
 def test_dsp_set_accepts_multi_width_control_sequence():
     dsp = DSP()
     dsp.compile(bytes(_multi_control))
-    module_id = dsp.append(IMMEDIATE, "_multi_control")
-    dsp.set(IMMEDIATE, module_id, freq=[220, 330])
+    synth_id = dsp.append(IMMEDIATE, "_multi_control")
+    dsp.set(IMMEDIATE, synth_id, freq=[220, 330])
 
 
 def test_dsp_append_rejects_sequence_value_for_trigger_control():
@@ -234,44 +270,44 @@ def test_dsp_append_rejects_sequence_value_for_trigger_control():
 def test_dsp_set_rejects_sequence_value_for_trigger_control():
     dsp = DSP()
     dsp.compile(bytes(_trigger_control))
-    module_id = dsp.append(IMMEDIATE, "_trigger_control")
+    synth_id = dsp.append(IMMEDIATE, "_trigger_control")
     with pytest.raises(ValueError, match="must be a number"):
-        dsp.set(IMMEDIATE, module_id, trig=[1, 0])
+        dsp.set(IMMEDIATE, synth_id, trig=[1, 0])
 
 
 def test_dsp_set_unknown_control_raises():
     dsp = DSP()
     dsp.compile(bytes(default))
-    module_id = dsp.append(IMMEDIATE, "default")
+    synth_id = dsp.append(IMMEDIATE, "default")
     with pytest.raises(ValueError, match="unknown control"):
-        dsp.set(IMMEDIATE, module_id, unknown=1.0)
+        dsp.set(IMMEDIATE, synth_id, unknown=1.0)
 
 
 def test_dsp_set_rejects_non_numeric_scalar_control():
     dsp = DSP()
     dsp.compile(bytes(default))
-    module_id = dsp.append(IMMEDIATE, "default")
+    synth_id = dsp.append(IMMEDIATE, "default")
     with pytest.raises(ValueError, match="must be a number"):
-        dsp.set(IMMEDIATE, module_id, freq="nope")
+        dsp.set(IMMEDIATE, synth_id, freq="nope")
 
 
 def test_dsp_set_rejects_multi_width_control_wrong_length():
     dsp = DSP()
     dsp.compile(bytes(_multi_control))
-    module_id = dsp.append(IMMEDIATE, "_multi_control")
+    synth_id = dsp.append(IMMEDIATE, "_multi_control")
     with pytest.raises(ValueError, match="expects 2 values"):
-        dsp.set(IMMEDIATE, module_id, freq=[220])
+        dsp.set(IMMEDIATE, synth_id, freq=[220])
 
 
-def test_dsp_remove_unknown_module_id_raises():
+def test_dsp_remove_unknown_synth_id_raises():
     dsp = DSP()
-    with pytest.raises(ValueError, match="unknown module_id"):
+    with pytest.raises(ValueError, match="unknown synth_id"):
         dsp.remove(IMMEDIATE, 1)
 
 
-def test_dsp_set_unknown_module_id_raises():
+def test_dsp_set_unknown_synth_id_raises():
     dsp = DSP()
-    with pytest.raises(ValueError, match="unknown module_id"):
+    with pytest.raises(ValueError, match="unknown synth_id"):
         dsp.set(IMMEDIATE, 1, freq=220)
 
 
@@ -279,7 +315,7 @@ def test_dsp_add_is_not_available():
     assert not hasattr(DSP, "add")
 
 
-def test_dsp_module_ids_reflect_runtime_order():
+def test_dsp_synth_ids_reflect_runtime_order():
     dsp = DSP()
     dsp.compile(bytes(default))
     first = dsp.append(IMMEDIATE, "default")
@@ -288,7 +324,7 @@ def test_dsp_module_ids_reflect_runtime_order():
     before_second = dsp.insert_before(IMMEDIATE, second, "default")
     after_head = dsp.insert_after(IMMEDIATE, head, "default")
 
-    assert dsp.module_ids == [head, after_head, first, before_second, second]
+    assert dsp.synth_ids == [head, after_head, first, before_second, second]
 
 
 def test_dsp_remove_preserves_survivor_order():
@@ -299,29 +335,29 @@ def test_dsp_remove_preserves_survivor_order():
     third = dsp.append(IMMEDIATE, "default")
     fourth = dsp.append(IMMEDIATE, "default")
 
-    assert dsp.module_ids == [first, second, third, fourth]
+    assert dsp.synth_ids == [first, second, third, fourth]
 
     dsp.remove(IMMEDIATE, second)
-    assert dsp.module_ids == [first, third, fourth]
+    assert dsp.synth_ids == [first, third, fourth]
 
     dsp.remove(IMMEDIATE, fourth)
-    assert dsp.module_ids == [first, third]
+    assert dsp.synth_ids == [first, third]
 
     dsp.remove(IMMEDIATE, first)
-    assert dsp.module_ids == [third]
+    assert dsp.synth_ids == [third]
 
 
-def test_dsp_insert_before_unknown_module_id_raises():
+def test_dsp_insert_before_unknown_synth_id_raises():
     dsp = DSP()
     dsp.compile(bytes(default))
-    with pytest.raises(ValueError, match="unknown module_id"):
+    with pytest.raises(ValueError, match="unknown synth_id"):
         dsp.insert_before(IMMEDIATE, 1, "default")
 
 
-def test_dsp_insert_after_unknown_module_id_raises():
+def test_dsp_insert_after_unknown_synth_id_raises():
     dsp = DSP()
     dsp.compile(bytes(default))
-    with pytest.raises(ValueError, match="unknown module_id"):
+    with pytest.raises(ValueError, match="unknown synth_id"):
         dsp.insert_after(IMMEDIATE, 1, "default")
 
 
@@ -505,10 +541,10 @@ def test_multiple_out_nodes_mix_on_same_bus():
     assert rendered[0] == pytest.approx([0.75, 0.75, 0.75, 0.75])
 
 
-def test_runtime_mixes_multiple_modules_on_same_bus():
+def test_runtime_mixes_multiple_synths_on_same_bus():
     rendered = mc1._test._runtime_render_blocks(
         bytes(_constant_quarter),
-        module_count=2,
+        synth_count=2,
         blocks=1,
         sample_rate=8,
         block_size=4,
@@ -518,8 +554,8 @@ def test_runtime_mixes_multiple_modules_on_same_bus():
     assert rendered[0] == pytest.approx([0.5, 0.5, 0.5, 0.5])
 
 
-def test_adsr_done_action_removes_module_from_runtime():
-    module_ids = mc1._test._runtime_module_ids_per_block(
+def test_adsr_done_action_removes_synth_from_runtime():
+    synth_ids = mc1._test._runtime_synth_ids_per_block(
         bytes(_adsr_env),
         [
             {"gate": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0, "done_action": 1},
@@ -531,11 +567,11 @@ def test_adsr_done_action_removes_module_from_runtime():
         output_channels=1,
     )
 
-    assert module_ids == [[1], [], []]
+    assert synth_ids == [[1], [], []]
 
 
-def test_adsr_done_action_zero_keeps_module_in_runtime():
-    module_ids = mc1._test._runtime_module_ids_per_block(
+def test_adsr_done_action_zero_keeps_synth_in_runtime():
+    synth_ids = mc1._test._runtime_synth_ids_per_block(
         bytes(_adsr_env),
         [
             {"gate": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0, "done_action": 0},
@@ -547,7 +583,7 @@ def test_adsr_done_action_zero_keeps_module_in_runtime():
         output_channels=1,
     )
 
-    assert module_ids == [[1], [1], [1]]
+    assert synth_ids == [[1], [1], [1]]
 
 
 def test_default_mod_env_decays_timbre_faster_than_loudness():
@@ -587,9 +623,9 @@ def test_dsp_stale_anchor_insert_is_dropped():
     dsp.remove(IMMEDIATE, anchor)
     dropped = dsp.insert_after(IMMEDIATE, anchor, "default")
 
-    assert dsp.module_ids == [survivor]
+    assert dsp.synth_ids == [survivor]
 
-    with pytest.raises(ValueError, match="unknown module_id"):
+    with pytest.raises(ValueError, match="unknown synth_id"):
         dsp.set(IMMEDIATE, dropped, freq=220)
 
 
@@ -610,11 +646,11 @@ def test_dsp_scheduled_append_remains_pending_until_due():
     dsp.compile(bytes(default))
 
     scheduled = from_unix(time.time() + 0.05)
-    module_id = dsp.append(scheduled, "default")
+    synth_id = dsp.append(scheduled, "default")
 
-    assert dsp.module_ids == []
+    assert dsp.synth_ids == []
 
-    wait_for(lambda: dsp.module_ids == [module_id])
+    wait_for(lambda: dsp.synth_ids == [synth_id])
 
 
 def test_dsp_same_timetag_commands_preserve_fifo_order():
@@ -626,9 +662,9 @@ def test_dsp_same_timetag_commands_preserve_fifo_order():
     second = dsp.append(scheduled, "default")
     before_second = dsp.insert_before(scheduled, second, "default")
 
-    assert dsp.module_ids == []
+    assert dsp.synth_ids == []
 
-    wait_for(lambda: dsp.module_ids == [first, before_second, second])
+    wait_for(lambda: dsp.synth_ids == [first, before_second, second])
 
 
 def test_dsp_scheduled_remove_applies_when_due():
@@ -640,9 +676,9 @@ def test_dsp_scheduled_remove_applies_when_due():
     scheduled = from_unix(time.time() + 0.05)
     dsp.remove(scheduled, first)
 
-    assert dsp.module_ids == [first, second]
+    assert dsp.synth_ids == [first, second]
 
-    wait_for(lambda: dsp.module_ids == [second])
+    wait_for(lambda: dsp.synth_ids == [second])
 
 
 def test_dsp_scheduled_insert_after_missing_anchor_is_dropped():
@@ -658,10 +694,10 @@ def test_dsp_scheduled_insert_after_missing_anchor_is_dropped():
     dropped = dsp.insert_after(insert_at, anchor, "default")
     dsp.remove(remove_at, anchor)
 
-    wait_for(lambda: dsp.module_ids == [survivor])
-    wait_for(lambda: time.time() >= insert_at_unix and dsp.module_ids == [survivor])
+    wait_for(lambda: dsp.synth_ids == [survivor])
+    wait_for(lambda: time.time() >= insert_at_unix and dsp.synth_ids == [survivor])
 
-    with pytest.raises(ValueError, match="unknown module_id"):
+    with pytest.raises(ValueError, match="unknown synth_id"):
         dsp.set(IMMEDIATE, dropped, freq=220)
 
 
@@ -671,7 +707,7 @@ def test_dsp_wait_until_idle_returns_true_once_runtime_drains():
 
     note_on = from_unix(time.time() + 0.02)
     note_off = from_unix(time.time() + 0.04)
-    module_id = dsp.append(
+    synth_id = dsp.append(
         note_on,
         "default",
         attack=0,
@@ -680,7 +716,7 @@ def test_dsp_wait_until_idle_returns_true_once_runtime_drains():
         release=0,
         done_action=1,
     )
-    dsp.set(note_off, module_id, gate=0)
+    dsp.set(note_off, synth_id, gate=0)
 
     dsp.start()
     try:

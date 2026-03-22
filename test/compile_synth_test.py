@@ -6,7 +6,7 @@ import difflib
 import pathlib
 import subprocess
 import sys
-from mc1 import ADSR, DAG, Out, SinOsc, default
+from mc1 import ADSR, DAG, Out, SinOsc, default, klang_cloud, rhodey, rhodey_chorus, tube_bell
 from mc1.dag import EQ
 
 
@@ -53,6 +53,7 @@ def internal_eq(level=0.0, threshold=0.5):
 
 
 expected_path = pathlib.Path(__file__).with_name("compile_synth.expected.txt")
+SHOWCASE_GRAPHS = (klang_cloud, tube_bell, rhodey, rhodey_chorus)
 
 def test_compile_synth_golden():
     actual = compile(default)
@@ -95,6 +96,12 @@ def test_compile_internal_eq_opcode_succeeds():
     actual = compile(internal_eq)
 
     assert "internal_eq_process" in actual
+
+
+def test_compile_showcase_graphs():
+    for graph in SHOWCASE_GRAPHS:
+        actual = compile(graph)
+        assert f"{graph.name}_process" in actual
 
 
 if __name__ == "__main__":

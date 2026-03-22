@@ -3,6 +3,7 @@ import importlib
 import sys
 import textwrap
 
+import mc1
 import mc1.__main__
 
 
@@ -46,6 +47,11 @@ def test_init_namespace_adds_running_clock():
     assert ns["clock"]._task is None
 
 
+def test_mc1_exports_midi2cps():
+    assert "midi2cps" in mc1.__all__
+    assert mc1.midi2cps(69) == 440.0
+
+
 def test_run_script_executes_async_main_and_restores_sys_argv(tmp_path):
     main = importlib.reload(mc1.__main__)
     main.configure_dsp(main.parse_args([]))
@@ -81,6 +87,25 @@ def test_run_script_executes_async_main_and_restores_sys_argv(tmp_path):
     assert script_ns["ran"] is True
     assert script_ns["saw_dsp"] is True
     assert script_ns["saw_running_clock"] is True
+    assert script_ns["clock"]._task is None
+
+
+def test_run_script_exposes_midi2cps_from_mc1_namespace(tmp_path):
+    main = importlib.reload(mc1.__main__)
+    main.configure_dsp(main.parse_args([]))
+
+    script = tmp_path / "pitch_script.py"
+    script.write_text(
+        textwrap.dedent(
+            """
+            saw_midi2cps = midi2cps(69)
+            """
+        )
+    )
+
+    script_ns = asyncio.run(main.run_script(str(script), []))
+
+    assert script_ns["saw_midi2cps"] == 440.0
     assert script_ns["clock"]._task is None
 
 

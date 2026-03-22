@@ -1,7 +1,7 @@
 [project]
 name = "mc1"
 version = "0.1.0"
-description = "Add your description here"
+description = "Natural Python audio graphs compiled to native DSP and performed in real time."
 readme = "README.md"
 authors = [
     { name = "Mario Lang", email = "mlangblind.guru" }

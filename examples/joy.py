@@ -2,6 +2,7 @@ from dataclasses import dataclass
 
 
 BPM = 72
+LATENCY = 0.05
 
 
 @dataclass(frozen=True, slots=True)
@@ -9,17 +10,6 @@ class Event:
     midi_note: int | None
     beats: float
     controls: dict[str, float]
-
-
-@dataclass(frozen=True, slots=True)
-class Part:
-    name: str
-    events: tuple[Event, ...]
-    voice_controls: dict[str, float]
-
-
-def midi2cps(note):
-    return 440.0 * 2 ** ((note - 69) / 12)
 
 
 def note(midi_note, beats, **controls):
@@ -350,18 +340,8 @@ PART_SPECS = (
 )
 
 
-PARTS = tuple(
-    Part(
-        name,
-        tuple(rest(beats) if midi_note is None else note(midi_note, beats) for midi_note, beats in events),
-        dict(voice_controls),
-    )
-    for name, voice_controls, events in PART_SPECS
-)
-
-
-def voice(events, *, bpm, latency=0.1, synth_name="default", voice_controls):
-    seconds_per_beat = 60.0 / bpm
+def voice(events, *, synth_name="default", voice_controls):
+    seconds_per_beat = 60.0 / BPM
     legato = 0.8
 
     for event in events:
@@ -372,10 +352,10 @@ def voice(events, *, bpm, latency=0.1, synth_name="default", voice_controls):
             controls["freq"] = midi2cps(event.midi_note)
             controls["gate"] = 1
 
-            module_id = dsp.append(here(latency=latency), synth_name, **controls)
+            synth_id = dsp.append(here(latency=LATENCY), synth_name, **controls)
             sustain = duration * legato
             yield sustain
-            dsp.set(here(latency=latency), module_id, gate=0)
+            dsp.set(here(latency=LATENCY), synth_id, gate=0)
             yield duration - sustain
         else:
             yield duration
@@ -384,7 +364,13 @@ def voice(events, *, bpm, latency=0.1, synth_name="default", voice_controls):
 dsp.start()
 clock.schedule(
     *(
-        voice(part.events, bpm=BPM, voice_controls=part.voice_controls)
-        for part in PARTS
+        voice(
+            (
+                rest(beats) if midi_note is None else note(midi_note, beats)
+                for midi_note, beats in events
+            ),
+            voice_controls=voice_controls
+        )
+        for _name, voice_controls, events in PART_SPECS
     )
 )
