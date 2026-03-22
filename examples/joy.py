@@ -376,7 +376,7 @@ def voice(events, *, bpm, latency=0.1, synth_name="default", voice_controls):
             sustain = duration * legato
             yield sustain
             dsp.set(here(latency=latency), module_id, gate=0)
-            yield (duration - sustain)
+            yield duration - sustain
         else:
             yield duration
 
