@@ -287,28 +287,3 @@ def _coerce_offset(value: float, *, name: str) -> float:
     if not isfinite(value):
         raise ValueError(f"{name} must be finite")
     return value
-
-
-async def main() -> None:
-    clock = LogicalClock()
-    r = clock.schedule(doit(), at=1.0)
-    clock.start()
-    await r
-    await clock.wait_for_idle()
-    clock.stop()
-
-
-def doit() -> Routine:
-    print(current_clock().time)
-    yield 0.5
-    print(current_clock().time)
-    yield 0.5
-    print(current_clock().time)
-    yield 0.5
-    print(current_clock().time)
-    yield 0.5
-    print(current_clock().time)
-
-
-if __name__ == "__main__":
-    asyncio.run(main())

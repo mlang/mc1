@@ -3,6 +3,8 @@ from __future__ import annotations
 import math
 from numbers import Integral
 
+from .dag import DAG
+
 import mc1._core
 from mc1.clock import current_clock
 from mc1.timetag import from_unix
@@ -72,6 +74,11 @@ class DSP(mc1._core.DSP):
         latency = _validate_latency(latency)
         super().__init__(*args, **kwargs)
         self.latency = latency
+
+    def compile(self, func):
+        dag = DAG(func) if not isinstance(func, DAG) else func
+        super().compile(bytes(dag))
+        return dag
 
     def __getitem__(self, time_tag: int) -> _ScheduledDSP:
         return _ScheduledDSP(self, _validate_time_tag(time_tag))

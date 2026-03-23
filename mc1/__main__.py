@@ -11,14 +11,6 @@ from mc1.clock import LogicalClock
 dsp = None
 
 
-def compile(func):
-    dag = DAG(func) if not isinstance(func, DAG) else func
-    if dsp is None:
-        raise RuntimeError("DSP is not initialized")
-    dsp.compile(bytes(dag))
-    return dag
-
-
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(prog="python -m mc1")
     parser.add_argument("-b", "--block-size", dest="block_size", type=int)
@@ -40,7 +32,7 @@ def configure_dsp(args):
             dsp_kwargs[name] = value
 
     dsp = DSP(**dsp_kwargs)
-    compile(default)
+    dsp.compile(default)
 
 
 def build_namespace():

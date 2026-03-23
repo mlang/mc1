@@ -1,6 +1,6 @@
 # mc1
 
-`mc1` is a proof-of-concept for writing synth graphs and musical structure in Python, then pushing the DSP hot path all the way down to native code.
+`mc1` is a reimagination of the SuperCollider architecture using Python as the host language and `gccjit` to compile signal graphs to native code.
 
 The interesting part is not just "Python instead of a DSL." `@DAG` turns ordinary Python functions into graph functions, operator overloading lets graph code read naturally, those graphs serialize into a compact IR, and the native layer compiles them with `gccjit` into CPU DSP kernels that run in a real-time audio runtime. On the host side, generator routines yield logical time and translate musical structure into timestamped runtime actions such as `dsp.append(...)` and `dsp.set(...)`.
 
@@ -11,7 +11,7 @@ The repo is aimed at developers iterating on the graph model, compiler, runtime,
 - Graphs are built from ordinary Python expressions instead of a separate language.
 - `@DAG` functions act as reusable graph abstractions with named controls derived from Python parameters.
 - Operator overloading keeps graph code close to the way audio signal flow is usually sketched on paper.
-- Serialized graphs are compiled to native DSP kernels rather than interpreted node-by-node in Python.
+- Serialized graphs are compiled to native DSP kernels.
 - Time lives on the host as a logical clock, so routines can yield durations and stay musically readable.
 - Sound is controlled through timestamped runtime actions, which makes score logic and DSP execution meet at a clean boundary.
 
@@ -64,7 +64,7 @@ In interactive mode, it exposes a namespace that includes:
 - `clock` for scheduling routines
 - graph helpers and timing helpers from `mc1`
 
-In script mode, the host executes the target script inside that same namespace. This is the intended model for backend examples such as `examples/joy.py`.
+In script mode, the host executes the target script inside that same namespace.
 
 When a script returns, the host waits for the logical clock queue to drain before exiting. A script can schedule work and return without adding explicit shutdown code just to keep its routines alive.
 
@@ -72,7 +72,7 @@ That split is central to the design: graph functions describe what a synth is, w
 
 ## `examples/joy.py`
 
-`examples/joy.py` is the current working backend example, and it is the best guide to the repo's intended feel.
+`examples/joy.py` is the current working example, and it is the best guide to the repo's intended feel.
 
 It is not a standalone importable library example. It is a host script meant to be run with:
 
@@ -149,7 +149,7 @@ from mc1 import DSP, IMMEDIATE
 
 dsp = DSP()
 dsp.compile(bytes(harmonics))
-dsp.append(IMMEDIATE, "harmonics", freq=220)
+dsp[IMMEDIATE].apend("harmonics", freq=220)
 ```
 
 Multi-channel expansion is also driven from ordinary Python values before serialization.
