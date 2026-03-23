@@ -1,3 +1,5 @@
+from functools import partial
+
 from .pitch import midi2cps
 
 __all__ = ("Event", "default_event")
@@ -5,22 +7,19 @@ __all__ = ("Event", "default_event")
 _sentinel = object()
 
 
-def _default_play(event):
-    def play(dsp):
-        if event.is_rest:
-            yield event.duration
-            return
+def _default_play(event, dsp):
+    if event.is_rest:
+        yield event.duration
+        return
 
-        controls = dict(event.raw("kwargs", {}))
-        controls["freq"] = event.freq
-        controls["gate"] = 1
+    controls = dict(event.raw("kwargs", {}))
+    controls["freq"] = event.freq
+    controls["gate"] = 1
 
-        synth_id = dsp.append(event.instrument, **controls)
-        yield event.sustain
-        dsp.set(synth_id, gate=0)
-        yield event.duration - event.sustain
-
-    return play
+    synth_id = dsp.append(event.instrument, **controls)
+    yield event.sustain
+    dsp.set(synth_id, gate=0)
+    yield event.duration - event.sustain
 
 
 class Event:
@@ -117,5 +116,5 @@ default_event = Event(
     midi_note=60,
     freq=lambda e: None if e.midi_note is None else midi2cps(e.midi_note),
     is_rest=lambda e: e.midi_note is None,
-    play=_default_play,
+    play=lambda e: partial(_default_play, e),
 )
