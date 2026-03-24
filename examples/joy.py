@@ -323,5 +323,4 @@ def voice(part_spec):
                 yield from event.play(dsp)
 
 
-dsp.start()
 clock.schedule(*map(voice, PART_SPECS))
