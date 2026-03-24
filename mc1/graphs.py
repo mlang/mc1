@@ -33,15 +33,15 @@ def default(
     carrier_ratio=1.0,
     mod_ratio=3.0,
     gate=1,
-    attack=0.01,
-    decay=0.60,
-    sustain=0.45,
-    release=0.35,
+    env_attack=0.01,
+    env_decay=0.60,
+    env_sustain=0.45,
+    env_release=0.35,
     mod_attack=0.0,
     mod_decay=0.20,
     mod_sustain=0.18,
     mod_release=0.15,
-    done_action=0,
+    done_action=1
 ):
     """A compact FM voice used as the package's default synth graph.
 
@@ -49,7 +49,7 @@ def default(
     and modulation envelopes. It is a good reference for how a non-trivial
     `@DAG` graph is assembled from Python expressions.
     """
-    amp_env = ADSR.ar(gate, attack, decay, sustain, release, done_action)
+    amp_env = ADSR.ar(gate, env_attack, env_decay, env_sustain, env_release, done_action)
     mod_env = ADSR.ar(gate, mod_attack, mod_decay, mod_sustain, mod_release)
     mod = SinOsc.ar(freq * mod_ratio, 0) * (freq * index * mod_env)
     carrier = SinOsc.ar(freq * carrier_ratio + mod, 0)

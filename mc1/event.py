@@ -1,5 +1,6 @@
 from functools import partial
 
+from .graphs import default as default_instrument
 from .pitch import midi2cps
 
 __all__ = ("Event", "default_event")
@@ -12,13 +13,10 @@ def _default_play(event, dsp):
         yield event.duration
         return
 
-    controls = dict(event.raw("kwargs", {}))
-    controls["freq"] = event.freq
-    controls["gate"] = 1
-
-    synth_id = dsp.append(event.instrument, **controls)
+    synth_id = dsp.append(event.instrument.name, **event.controls)
     yield event.sustain
-    dsp.set(synth_id, gate=0)
+    if "gate" in map(lambda x: x[0], event.instrument.controlNames):
+        dsp.set(synth_id, gate=0)
     yield event.duration - event.sustain
 
 
@@ -26,7 +24,10 @@ class Event:
     __slots__ = ("_data", "_stack")
 
     def __init__(self, mapping=None, **kvs):
-        self._data = dict(mapping or {})
+        if isinstance(mapping, Event):
+            self._data = dict(mapping._data)
+        else:
+            self._data = dict(mapping or {})
         self._data.update(kvs)
         self._stack = []
 
@@ -106,7 +107,7 @@ class Event:
 
 
 default_event = Event(
-    instrument="default",
+    instrument=default_instrument,
     bpm=120.0,
     tempo=lambda e: 60.0 / e.bpm,
     beats=1.0,
@@ -115,6 +116,9 @@ default_event = Event(
     sustain=lambda e: e.duration * e.legato,
     midi_note=60,
     freq=lambda e: None if e.midi_note is None else midi2cps(e.midi_note),
+    gate=1,
+    controls=lambda e: {name: e[name] for name, _, _ in e.instrument.controlNames
+                        if name in e._data.keys()},
     is_rest=lambda e: e.midi_note is None,
     play=lambda e: partial(_default_play, e),
 )

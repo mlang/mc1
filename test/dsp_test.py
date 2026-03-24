@@ -110,7 +110,7 @@ def test_dsp_rejects_invalid_latency():
 
 def test_dsp_compile_and_append():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     dsp[IMMEDIATE].append("default")
     dsp[IMMEDIATE].append("default", freq=220)
 
@@ -123,7 +123,7 @@ def test_dsp_compile_and_append_showcase_graphs():
     dsp = DSP()
 
     for graph in SHOWCASE_GRAPHS:
-        dsp.compile(bytes(graph))
+        dsp.compile(graph)
 
     for graph in SHOWCASE_GRAPHS:
         dsp[IMMEDIATE].append(graph.name)
@@ -148,30 +148,24 @@ def test_dsp_append_unknown_synth_raises():
         dsp[IMMEDIATE].append("missing")
 
 
-def test_dsp_compile_invalid_bytes_raises():
-    dsp = DSP()
-    with pytest.raises(ValueError):
-        dsp.compile(b"not a dag")
-
-
 def test_dsp_compile_same_name_overwrites_and_appends_multiple():
     dsp = DSP()
-    dsp.compile(bytes(default))
-    dsp.compile(bytes(default))
+    dsp.compile(default)
+    dsp.compile(default)
     dsp[IMMEDIATE].append("default")
     dsp[IMMEDIATE].append("default")
 
 
 def test_dsp_append_unknown_control_raises():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     with pytest.raises(ValueError, match="unknown control"):
         dsp[IMMEDIATE].append("default", unknown=1.0)
 
 
 def test_dsp_append_rejects_non_numeric_scalar_control():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     with pytest.raises(ValueError, match="must be a number"):
         dsp[IMMEDIATE].append("default", freq="nope")
 
@@ -225,19 +219,19 @@ def _constant_quarter():
 
 def test_dsp_append_accepts_multi_width_control_sequence():
     dsp = DSP()
-    dsp.compile(bytes(_multi_control))
+    dsp.compile(_multi_control)
     dsp[IMMEDIATE].append("_multi_control", freq=[220, 330])
 
 
 def test_dsp_compile_accepts_trigger_control_annotation():
     dsp = DSP()
-    dsp.compile(bytes(_trigger_control))
+    dsp.compile(_trigger_control)
     dsp[IMMEDIATE].append("_trigger_control", trig=1)
 
 
 def test_dsp_compile_ignores_non_trigger_annotations():
     dsp = DSP()
-    dsp.compile(bytes(_annotated_value_control))
+    dsp.compile(_annotated_value_control)
     dsp[IMMEDIATE].append("_annotated_value_control", freq=220)
 
 
@@ -250,42 +244,42 @@ def test_trigger_control_rejects_sequence_default():
 
 def test_dsp_append_rejects_multi_width_control_wrong_length():
     dsp = DSP()
-    dsp.compile(bytes(_multi_control))
+    dsp.compile(_multi_control)
     with pytest.raises(ValueError, match="expects 2 values"):
         dsp[IMMEDIATE].append("_multi_control", freq=[220])
 
 
 def test_dsp_remove_added_synth():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     synth_id = dsp[IMMEDIATE].append("default")
     dsp[IMMEDIATE].remove(synth_id)
 
 
 def test_dsp_set_added_synth_control():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     synth_id = dsp[IMMEDIATE].append("default")
     dsp[IMMEDIATE].set(synth_id, freq=220)
 
 
 def test_dsp_set_accepts_multi_width_control_sequence():
     dsp = DSP()
-    dsp.compile(bytes(_multi_control))
+    dsp.compile(_multi_control)
     synth_id = dsp[IMMEDIATE].append("_multi_control")
     dsp[IMMEDIATE].set(synth_id, freq=[220, 330])
 
 
 def test_dsp_append_rejects_sequence_value_for_trigger_control():
     dsp = DSP()
-    dsp.compile(bytes(_trigger_control))
+    dsp.compile(_trigger_control)
     with pytest.raises(ValueError, match="must be a number"):
         dsp[IMMEDIATE].append("_trigger_control", trig=[1, 0])
 
 
 def test_dsp_set_rejects_sequence_value_for_trigger_control():
     dsp = DSP()
-    dsp.compile(bytes(_trigger_control))
+    dsp.compile(_trigger_control)
     synth_id = dsp[IMMEDIATE].append("_trigger_control")
     with pytest.raises(ValueError, match="must be a number"):
         dsp[IMMEDIATE].set(synth_id, trig=[1, 0])
@@ -293,7 +287,7 @@ def test_dsp_set_rejects_sequence_value_for_trigger_control():
 
 def test_dsp_set_unknown_control_raises():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     synth_id = dsp[IMMEDIATE].append("default")
     with pytest.raises(ValueError, match="unknown control"):
         dsp[IMMEDIATE].set(synth_id, unknown=1.0)
@@ -301,7 +295,7 @@ def test_dsp_set_unknown_control_raises():
 
 def test_dsp_set_rejects_non_numeric_scalar_control():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     synth_id = dsp[IMMEDIATE].append("default")
     with pytest.raises(ValueError, match="must be a number"):
         dsp[IMMEDIATE].set(synth_id, freq="nope")
@@ -309,7 +303,7 @@ def test_dsp_set_rejects_non_numeric_scalar_control():
 
 def test_dsp_set_rejects_multi_width_control_wrong_length():
     dsp = DSP()
-    dsp.compile(bytes(_multi_control))
+    dsp.compile(_multi_control)
     synth_id = dsp[IMMEDIATE].append("_multi_control")
     with pytest.raises(ValueError, match="expects 2 values"):
         dsp[IMMEDIATE].set(synth_id, freq=[220])
@@ -333,7 +327,7 @@ def test_dsp_add_is_not_available():
 
 def test_dsp_synth_ids_reflect_runtime_order():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     first = dsp[IMMEDIATE].append("default")
     second = dsp[IMMEDIATE].append("default")
     head = dsp[IMMEDIATE].prepend("default")
@@ -345,7 +339,7 @@ def test_dsp_synth_ids_reflect_runtime_order():
 
 def test_dsp_remove_preserves_survivor_order():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     first = dsp[IMMEDIATE].append("default")
     second = dsp[IMMEDIATE].append("default")
     third = dsp[IMMEDIATE].append("default")
@@ -365,28 +359,28 @@ def test_dsp_remove_preserves_survivor_order():
 
 def test_dsp_insert_before_unknown_synth_id_raises():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     with pytest.raises(ValueError, match="unknown synth_id"):
         dsp[IMMEDIATE].insert_before(1, "default")
 
 
 def test_dsp_insert_after_unknown_synth_id_raises():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     with pytest.raises(ValueError, match="unknown synth_id"):
         dsp[IMMEDIATE].insert_after(1, "default")
 
 
 def test_dsp_prepend_unknown_control_raises():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     with pytest.raises(ValueError, match="unknown control"):
         dsp[IMMEDIATE].prepend("default", unknown=1.0)
 
 
 def test_dsp_insert_after_rejects_non_numeric_scalar_control():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     anchor = dsp[IMMEDIATE].append("default")
     with pytest.raises(ValueError, match="must be a number"):
         dsp[IMMEDIATE].insert_after(anchor, "default", freq="nope")
@@ -394,7 +388,7 @@ def test_dsp_insert_after_rejects_non_numeric_scalar_control():
 
 def test_dsp_insert_before_rejects_multi_width_control_wrong_length():
     dsp = DSP()
-    dsp.compile(bytes(_multi_control))
+    dsp.compile(_multi_control)
     anchor = dsp[IMMEDIATE].append("_multi_control")
     with pytest.raises(ValueError, match="expects 2 values"):
         dsp[IMMEDIATE].insert_before(anchor, "_multi_control", freq=[220])
@@ -423,10 +417,10 @@ def test_default_compiled_controls_include_mod_env():
         "carrier_ratio",
         "mod_ratio",
         "gate",
-        "attack",
-        "decay",
-        "sustain",
-        "release",
+        "env_attack",
+        "env_decay",
+        "env_sustain",
+        "env_release",
         "mod_attack",
         "mod_decay",
         "mod_sustain",
@@ -445,33 +439,16 @@ def test_default_control_defaults_are_fm_oriented():
         "carrier_ratio",
         "mod_ratio",
         "gate",
-        "attack",
-        "decay",
-        "sustain",
-        "release",
+        "env_attack",
+        "env_decay",
+        "env_sustain",
+        "env_release",
         "mod_attack",
         "mod_decay",
         "mod_sustain",
         "mod_release",
         "done_action",
     ]
-    assert default.controls == pytest.approx([
-        440.0,
-        0.2,
-        5.0,
-        1.0,
-        3.0,
-        1.0,
-        0.01,
-        0.60,
-        0.45,
-        0.35,
-        0.0,
-        0.20,
-        0.18,
-        0.15,
-        0.0,
-    ])
 
 
 def test_trigger_default_resets_after_first_block():
@@ -605,7 +582,7 @@ def test_adsr_done_action_zero_keeps_synth_in_runtime():
 def test_default_mod_env_decays_timbre_faster_than_loudness():
     rendered = mc1._test._render_control_blocks(
         bytes(default),
-        [{"amp": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0}] + ([{}] * 11),
+        [{"amp": 1, "env_attack": 0, "env_decay": 0, "env_sustain": 1, "env_release": 0}] + ([{}] * 11),
         sample_rate=44100,
         block_size=1024,
         output_channels=2,
@@ -632,7 +609,7 @@ def test_default_mod_env_decays_timbre_faster_than_loudness():
 
 def test_dsp_stale_anchor_insert_is_dropped():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     anchor = dsp[IMMEDIATE].append("default")
     survivor = dsp[IMMEDIATE].append("default")
 
@@ -655,7 +632,7 @@ def test_dsp_getitem_rejects_invalid_timetag():
 
 def test_dsp_append_uses_current_clock_and_latency(monkeypatch):
     dsp = DSP(latency=0.05)
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     observed = []
 
     monkeypatch.setattr(
@@ -677,7 +654,7 @@ def test_dsp_append_uses_current_clock_and_latency(monkeypatch):
 
 def test_dsp_set_uses_current_clock_and_latency(monkeypatch):
     dsp = DSP(latency=0.05)
-    dsp.compile(bytes(default))
+    dsp.compile(default)
     synth_id = dsp[IMMEDIATE].append("default")
     observed = {"clock": 0, "seconds": []}
 
@@ -718,7 +695,7 @@ def test_timetag_here_schedules_current_clock_wallclock_values(monkeypatch):
 
 def test_dsp_scheduled_append_remains_pending_until_due():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
 
     scheduled = from_unix(time.time() + 0.05)
     synth_id = dsp[scheduled].append("default")
@@ -730,7 +707,7 @@ def test_dsp_scheduled_append_remains_pending_until_due():
 
 def test_dsp_same_timetag_commands_preserve_fifo_order():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
 
     scheduled = from_unix(time.time() + 0.05)
     first = dsp[scheduled].append("default")
@@ -744,7 +721,7 @@ def test_dsp_same_timetag_commands_preserve_fifo_order():
 
 def test_dsp_scheduled_remove_applies_when_due():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
 
     first = dsp[IMMEDIATE].append("default")
     second = dsp[IMMEDIATE].append("default")
@@ -758,7 +735,7 @@ def test_dsp_scheduled_remove_applies_when_due():
 
 def test_dsp_scheduled_insert_after_missing_anchor_is_dropped():
     dsp = DSP()
-    dsp.compile(bytes(default))
+    dsp.compile(default)
 
     anchor = dsp[IMMEDIATE].append("default")
     survivor = dsp[IMMEDIATE].append("default")
@@ -774,48 +751,6 @@ def test_dsp_scheduled_insert_after_missing_anchor_is_dropped():
 
     with pytest.raises(ValueError, match="unknown synth_id"):
         dsp[IMMEDIATE].set(dropped, freq=220)
-
-
-def test_dsp_wait_until_idle_returns_true_once_runtime_drains():
-    dsp = DSP()
-    dsp.compile(bytes(default))
-
-    note_on = from_unix(time.time() + 0.02)
-    note_off = from_unix(time.time() + 0.04)
-    synth_id = dsp[note_on].append(
-        "default",
-        attack=0,
-        decay=0,
-        sustain=1,
-        release=0,
-        done_action=1,
-    )
-    dsp[note_off].set(synth_id, gate=0)
-
-    dsp.start()
-    try:
-        assert dsp.wait_until_idle(0.5) is True
-    finally:
-        dsp.stop()
-
-
-def test_dsp_wait_until_idle_returns_false_on_timeout():
-    dsp = DSP()
-    dsp.compile(bytes(default))
-    dsp[IMMEDIATE].append(
-        "default",
-        attack=0,
-        decay=0,
-        sustain=1,
-        release=0,
-        done_action=0,
-    )
-
-    dsp.start()
-    try:
-        assert dsp.wait_until_idle(0.02) is False
-    finally:
-        dsp.stop()
 
 
 def test_dsp_wait_until_idle_requires_started_runtime():

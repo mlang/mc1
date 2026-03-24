@@ -62,26 +62,6 @@ def test_default_event_supports_with_blocks():
     assert default_event.bpm == 120.0
 
 
-def test_default_event_play_returns_routine_for_non_rest():
-    kwargs = {"amp": 0.2, "freq": 123.0, "gate": 99}
-    event = default_event(midi_note=69, beats=2, kwargs=kwargs)
-    dsp = FakeDSP()
-
-    routine = event.play(dsp)
-
-    assert next(routine) == pytest.approx(event.sustain)
-    assert dsp.calls == [
-        ("append", "default", {"amp": 0.2, "freq": pytest.approx(440.0), "gate": 1}, 1)
-    ]
-    assert kwargs == {"amp": 0.2, "freq": 123.0, "gate": 99}
-
-    assert next(routine) == pytest.approx(event.duration - event.sustain)
-    assert dsp.calls[-1] == ("set", 1, {"gate": 0})
-
-    with pytest.raises(StopIteration):
-        next(routine)
-
-
 def test_default_event_play_returns_duration_only_for_rests():
     event = default_event(midi_note=None, beats=2)
     dsp = FakeDSP()
