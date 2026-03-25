@@ -107,12 +107,6 @@ The current repo is already testing and relying on these backend operations:
 - `dsp.start()` / `dsp.stop()`
 - `dsp.wait_until_idle(...)`
 
-For time tags, the main helpers are:
-
-- `IMMEDIATE` for immediate commands
-- `here(...)` inside scheduled routines
-- `mc1.timetag.from_unix(...)` when a script needs an explicit conversion
-
 ## Async Scheduling
 
 The host clock is `asyncio`-backed. In the REPL, top-level `await` is enabled, so scheduled routines can be awaited directly from the prompt.

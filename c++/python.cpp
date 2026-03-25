@@ -22,6 +22,7 @@
 #include "runtime.hpp"
 
 #include <pybind11/pybind11.h>
+#include <pybind11/chrono.h>
 #include <pybind11/stl.h>
 
 namespace mc1 {
@@ -221,12 +222,11 @@ class DSP
     return values;
   }
 
-  template<typename Payload>
-  void enqueue_command(double time, Payload payload, const char* action)
+  void enqueue_command(std::chrono::duration<double> when, rt_payload payload, const char* action)
   {
     rt_command command{
-      .time = time,
-      .payload = rt_payload{payload},
+      .time = when.count(),
+      .payload = payload,
     };
     if (!runtime_.try_enqueue(command)) {
       throw std::runtime_error(std::string(action) + ": rt command queue overflow");
@@ -278,13 +278,13 @@ class DSP
     return idle;
   }
 
-  uint32_t create_synth(
-      double time,
-      std::string_view synth_name,
-      synth_insert_mode insert_mode,
-      uint32_t anchor_synth_id,
-      const char* action,
-      pybind11::kwargs controls)
+  uint32_t create_synth(std::chrono::duration<double> when,
+    std::string_view synth_name,
+    synth_insert_mode insert_mode,
+    uint32_t anchor_synth_id,
+    const char* action,
+    pybind11::kwargs controls
+  )
   {
     auto compiled_synth_it = compiled_synths_by_name_.find(std::string(synth_name));
     if (compiled_synth_it == compiled_synths_by_name_.end()) {
@@ -327,7 +327,7 @@ class DSP
     auto* instance_ptr = instance.get();
     synths_by_id_.insert_or_assign(synth_id, std::move(instance));
     try {
-      enqueue_command(time,
+      enqueue_command(when,
         start_synth{
           .synth_id = synth_id,
           .synth = instance_ptr,
@@ -372,71 +372,59 @@ public:
     }
   }
 
-  uint32_t append(double time, std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t append(std::chrono::duration<double> when, std::string_view synth_name, pybind11::kwargs controls)
   {
     drain_runtime_events();
-    return create_synth(
-        time,
-        synth_name,
-        synth_insert_mode::append,
-        0,
-        "append failed",
-        controls);
+    return create_synth(when,
+      synth_name, synth_insert_mode::append, 0, "append failed", controls
+    );
   }
 
-  uint32_t prepend(double time, std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t prepend(std::chrono::duration<double> when, std::string_view synth_name, pybind11::kwargs controls)
   {
     drain_runtime_events();
-    return create_synth(
-        time,
-        synth_name,
-        synth_insert_mode::prepend,
-        0,
-        "prepend failed",
-        controls);
+    return create_synth(when,
+      synth_name, synth_insert_mode::prepend, 0, "prepend failed", controls
+    );
   }
 
-  uint32_t insert_before(
-      double time,
-      long before_synth_id,
-      std::string_view synth_name,
-      pybind11::kwargs controls)
+  uint32_t insert_before(std::chrono::duration<double> when,
+    long before_synth_id, std::string_view synth_name,
+    pybind11::kwargs controls
+  )
   {
     drain_runtime_events();
 
     auto validated_synth_id = validate_non_negative(before_synth_id, "before_synth_id");
     get_synth_instance(validated_synth_id);
 
-    return create_synth(
-        time,
-        synth_name,
-        synth_insert_mode::before,
-        validated_synth_id,
-        "insert_before failed",
-        controls);
+    return create_synth(when,
+      synth_name, synth_insert_mode::before, validated_synth_id,
+      "insert_before failed",
+      controls
+    );
   }
 
-  uint32_t insert_after(
-      double time,
-      long after_synth_id,
-      std::string_view synth_name,
-      pybind11::kwargs controls)
+  uint32_t insert_after(std::chrono::duration<double> when,
+    long after_synth_id, std::string_view synth_name,
+    pybind11::kwargs controls
+  )
   {
     drain_runtime_events();
 
     auto validated_synth_id = validate_non_negative(after_synth_id, "after_synth_id");
     get_synth_instance(validated_synth_id);
 
-    return create_synth(
-        time,
-        synth_name,
-        synth_insert_mode::after,
-        validated_synth_id,
-        "insert_after failed",
-        controls);
+    return create_synth(when,
+      synth_name, synth_insert_mode::after, validated_synth_id,
+      "insert_after failed",
+      controls
+    );
   }
 
-  void set(double time, long synth_id, pybind11::kwargs controls)
+  void set(std::chrono::duration<double> when,
+    long synth_id, pybind11::kwargs controls
+  )
   {
     drain_runtime_events();
 
@@ -468,26 +456,26 @@ public:
           slot->width);
 
       for (size_t offset = 0; offset < values.size(); ++offset) {
-        enqueue_command(
-            time,
-            set_control_value{
-              .synth_id = validated_synth_id,
-              .control_index = static_cast<uint32_t>(slot->index + offset),
-              .value = values[offset],
-            },
-            "set failed");
+        enqueue_command(when,
+          set_control_value{
+            .synth_id = validated_synth_id,
+            .control_index = static_cast<uint32_t>(slot->index + offset),
+            .value = values[offset],
+          },
+          "set failed"
+        );
       }
     }
   }
 
-  void remove(double time, long synth_id)
+  void remove(std::chrono::duration<double> when, long synth_id)
   {
     drain_runtime_events();
 
     auto validated_synth_id = validate_non_negative(synth_id, "synth_id");
     get_synth_instance(validated_synth_id);
 
-    enqueue_command(time, stop_synth{validated_synth_id}, "remove failed");
+    enqueue_command(when, stop_synth{validated_synth_id}, "remove failed");
   }
 
   void start()

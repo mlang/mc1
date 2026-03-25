@@ -9,7 +9,7 @@ import mc1._core
 from mc1.clock import current_clock
 
 
-_MAX_TIMETAG = 0xFFFFFFFFFFFFFFFF
+IMMEDIATE = 0
 
 
 def _validate_latency(latency: float) -> float:
@@ -27,40 +27,39 @@ def _validate_latency(latency: float) -> float:
 
 
 class _ScheduledDSP:
-    __slots__ = ("_dsp", "_time_tag")
+    __slots__ = ("_dsp", "_when")
 
-    def __init__(self, dsp: "DSP", time_tag: float) -> None:
+    def __init__(self, dsp: "DSP", when: float) -> None:
         self._dsp = dsp
-        self._time_tag = time_tag
+        self._when = float(when)
 
     def append(self, synth_name, **controls):
-        return mc1._core.DSP.append(self._dsp, self._time_tag, synth_name, **controls)
+        return mc1._core.DSP.append(self._dsp, self._when, synth_name, **controls)
 
     def prepend(self, synth_name, **controls):
-        return mc1._core.DSP.prepend(self._dsp, self._time_tag, synth_name, **controls)
+        return mc1._core.DSP.prepend(self._dsp, self._when, synth_name, **controls)
 
     def insert_before(self, synth_id, synth_name, **controls):
         return mc1._core.DSP.insert_before(
-            self._dsp, self._time_tag, synth_id, synth_name, **controls
+            self._dsp, self._when, synth_id, synth_name, **controls
         )
 
     def insert_after(self, synth_id, synth_name, **controls):
         return mc1._core.DSP.insert_after(
-            self._dsp, self._time_tag, synth_id, synth_name, **controls
+            self._dsp, self._when, synth_id, synth_name, **controls
         )
 
     def set(self, synth_id, **controls):
-        return mc1._core.DSP.set(self._dsp, self._time_tag, synth_id, **controls)
+        return mc1._core.DSP.set(self._dsp, self._when, synth_id, **controls)
 
     def remove(self, synth_id):
-        return mc1._core.DSP.remove(self._dsp, self._time_tag, synth_id)
+        return mc1._core.DSP.remove(self._dsp, self._when, synth_id)
 
 
 class DSP(mc1._core.DSP):
     def __init__(self, *args, latency: float = 0.05, **kwargs) -> None:
-        latency = _validate_latency(latency)
         super().__init__(*args, **kwargs)
-        self.latency = latency
+        self.latency = _validate_latency(latency)
 
     def compile(self, func):
         dag = DAG(func) if not isinstance(func, DAG) else func

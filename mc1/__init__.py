@@ -37,11 +37,10 @@ native performance/compiler test entry point.
 import mc1._core
 from mc1.clock import *
 from mc1.dag import *
-from mc1.dsp import DSP
+from mc1.dsp import *
 from mc1.event import *
 from mc1.graphs import default, drone, klang_cloud, rhodey, rhodey_chorus, tube_bell
 from mc1.pitch import *
-from mc1.timetag import IMMEDIATE
 
 __all__ = (
     "ADSR",

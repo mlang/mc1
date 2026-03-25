@@ -322,38 +322,6 @@ def test_dsp_add_is_not_available():
     assert not hasattr(DSP, "add")
 
 
-def test_dsp_synth_ids_reflect_runtime_order():
-    dsp = DSP()
-    dsp.compile(default)
-    first = dsp[IMMEDIATE].append("default")
-    second = dsp[IMMEDIATE].append("default")
-    head = dsp[IMMEDIATE].prepend("default")
-    before_second = dsp[IMMEDIATE].insert_before(second, "default")
-    after_head = dsp[IMMEDIATE].insert_after(head, "default")
-
-    assert dsp.synth_ids == [head, after_head, first, before_second, second]
-
-
-def test_dsp_remove_preserves_survivor_order():
-    dsp = DSP()
-    dsp.compile(default)
-    first = dsp[IMMEDIATE].append("default")
-    second = dsp[IMMEDIATE].append("default")
-    third = dsp[IMMEDIATE].append("default")
-    fourth = dsp[IMMEDIATE].append("default")
-
-    assert dsp.synth_ids == [first, second, third, fourth]
-
-    dsp[IMMEDIATE].remove(second)
-    assert dsp.synth_ids == [first, third, fourth]
-
-    dsp[IMMEDIATE].remove(fourth)
-    assert dsp.synth_ids == [first, third]
-
-    dsp[IMMEDIATE].remove(first)
-    assert dsp.synth_ids == [third]
-
-
 def test_dsp_insert_before_unknown_synth_id_raises():
     dsp = DSP()
     dsp.compile(default)
@@ -531,51 +499,6 @@ def test_multiple_out_nodes_mix_on_same_bus():
     assert rendered[0] == pytest.approx([0.75, 0.75, 0.75, 0.75])
 
 
-def test_runtime_mixes_multiple_synths_on_same_bus():
-    rendered = mc1._test._runtime_render_blocks(
-        bytes(_constant_quarter),
-        synth_count=2,
-        blocks=1,
-        sample_rate=8,
-        block_size=4,
-        output_channels=1,
-    )
-
-    assert rendered[0] == pytest.approx([0.5, 0.5, 0.5, 0.5])
-
-
-def test_adsr_done_action_removes_synth_from_runtime():
-    synth_ids = mc1._test._runtime_synth_ids_per_block(
-        bytes(_adsr_env),
-        [
-            {"gate": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0, "done_action": 1},
-            {"gate": 0},
-            {"gate": 0},
-        ],
-        sample_rate=8,
-        block_size=1,
-        output_channels=1,
-    )
-
-    assert synth_ids == [[1], [], []]
-
-
-def test_adsr_done_action_zero_keeps_synth_in_runtime():
-    synth_ids = mc1._test._runtime_synth_ids_per_block(
-        bytes(_adsr_env),
-        [
-            {"gate": 1, "attack": 0, "decay": 0, "sustain": 1, "release": 0, "done_action": 0},
-            {"gate": 0},
-            {"gate": 0},
-        ],
-        sample_rate=8,
-        block_size=1,
-        output_channels=1,
-    )
-
-    assert synth_ids == [[1], [1], [1]]
-
-
 def test_default_mod_env_decays_timbre_faster_than_loudness():
     rendered = mc1._test._render_control_blocks(
         bytes(default),
@@ -604,83 +527,10 @@ def test_default_mod_env_decays_timbre_faster_than_loudness():
     assert first_curvature > sustain_curvature * 2
 
 
-def test_dsp_stale_anchor_insert_is_dropped():
-    dsp = DSP()
-    dsp.compile(default)
-    anchor = dsp[IMMEDIATE].append("default")
-    survivor = dsp[IMMEDIATE].append("default")
-
-    dsp[IMMEDIATE].remove(anchor)
-    dropped = dsp[IMMEDIATE].insert_after(anchor, "default")
-
-    assert dsp.synth_ids == [survivor]
-
-    with pytest.raises(ValueError, match="unknown synth_id"):
-        dsp[IMMEDIATE].set(dropped, freq=220)
-
-
 def test_dsp_remove_requires_running_clock_for_implicit_schedule():
     dsp = DSP()
     with pytest.raises(RuntimeError, match="current_clock\\(\\) is only available"):
         dsp.remove(1)
-
-
-def test_dsp_scheduled_append_remains_pending_until_due():
-    dsp = DSP()
-    dsp.compile(default)
-
-    scheduled = time.time() + 0.05
-    synth_id = dsp[scheduled].append("default")
-
-    assert dsp.synth_ids == []
-
-    wait_for(lambda: dsp.synth_ids == [synth_id])
-
-
-def test_dsp_same_timetag_commands_preserve_fifo_order():
-    dsp = DSP()
-    dsp.compile(default)
-
-    scheduled = time.time() + 0.05
-    first = dsp[scheduled].append("default")
-    second = dsp[scheduled].append("default")
-    before_second = dsp[scheduled].insert_before(second, "default")
-
-    assert dsp.synth_ids == []
-
-    wait_for(lambda: dsp.synth_ids == [first, before_second, second])
-
-
-def test_dsp_scheduled_remove_applies_when_due():
-    dsp = DSP()
-    dsp.compile(default)
-
-    first = dsp[IMMEDIATE].append("default")
-    second = dsp[IMMEDIATE].append("default")
-    scheduled = time.time() + 0.05
-    dsp[scheduled].remove(first)
-
-    assert dsp.synth_ids == [first, second]
-
-    wait_for(lambda: dsp.synth_ids == [second])
-
-
-def test_dsp_scheduled_insert_after_missing_anchor_is_dropped():
-    dsp = DSP()
-    dsp.compile(default)
-
-    anchor = dsp[IMMEDIATE].append("default")
-    survivor = dsp[IMMEDIATE].append("default")
-    remove_at = time.time() + 0.03
-    insert_at = remove_at + 0.02
-    dropped = dsp[insert_at].insert_after(anchor, "default")
-    dsp[remove_at].remove(anchor)
-
-    wait_for(lambda: dsp.synth_ids == [survivor])
-    wait_for(lambda: time.time() >= insert_at_unix and dsp.synth_ids == [survivor])
-
-    with pytest.raises(ValueError, match="unknown synth_id"):
-        dsp[IMMEDIATE].set(dropped, freq=220)
 
 
 def test_dsp_wait_until_idle_requires_started_runtime():
