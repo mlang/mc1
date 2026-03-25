@@ -1,19 +1,18 @@
 #pragma once
 
+#include <chrono>
 #include <cstdint>
 #include <type_traits>
 #include <variant>
 
 namespace mc1 {
 
+using duration = std::chrono::duration<double>;
+using time_point = std::chrono::utc_time<duration>;
+
 struct synth_instance;
 
-enum class synth_insert_mode : uint8_t {
-  append,
-  prepend,
-  before,
-  after,
-};
+enum class synth_insert_mode : uint8_t { append, prepend, before, after };
 
 struct start_synth final {
   uint32_t synth_id{};
@@ -44,7 +43,7 @@ using rt_payload = std::variant<
 >;
 
 struct rt_command final {
-  double time{};
+  time_point when{};
   rt_payload payload{};
 };
 

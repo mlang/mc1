@@ -21,11 +21,6 @@ struct overloaded : Ts... {
 template<typename... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-inline double current_time_tag() noexcept
-{
-  return std::chrono::duration<double>{std::chrono::system_clock::now().time_since_epoch()}.count();
-}
-
 void ma_trampoline(
     ma_device* device,
     void* output,
@@ -78,19 +73,19 @@ void runtime::collect_commands() noexcept
   rt_command cmd;
   while (scheduled_commands_.size() < scheduled_commands_.capacity() && commands_.pop(cmd)) {
     auto insert_at = std::ranges::upper_bound(
-      scheduled_commands_, cmd.time, std::ranges::less{}, &rt_command::time
+      scheduled_commands_, cmd.when, std::ranges::less{}, &rt_command::when
     );
     scheduled_commands_.insert(insert_at, cmd);
   }
 }
 
-void runtime::consume_due_commands(double now) noexcept
+void runtime::consume_due_commands(time_point now) noexcept
 {
   collect_commands();
 
   while (!scheduled_commands_.empty()) {
     auto scheduled = scheduled_commands_.front();
-    if (scheduled.time < now) break;
+    if (scheduled.when > now) break;
 
     scheduled_commands_.erase(scheduled_commands_.begin());
     apply_command(scheduled);
@@ -114,10 +109,10 @@ bool runtime::idle() noexcept
 
 std::vector<uint32_t> runtime::synth_ids()
 {
-  return synth_ids(current_time_tag());
+  return synth_ids(std::chrono::utc_clock::now());
 }
 
-std::vector<uint32_t> runtime::synth_ids(double now)
+std::vector<uint32_t> runtime::synth_ids(time_point now)
 {
   consume_due_commands(now);
 
@@ -243,20 +238,19 @@ void runtime::render_block(float* output, const float* input, size_t frame_offse
 
 void runtime::process(float* output, const float* input, uint32_t frame_count)
 {
-  process(output, input, frame_count, 0);
+  process(output, input, frame_count, std::chrono::utc_clock::now());
 }
 
-void runtime::process(float* output, const float* input, uint32_t frame_count, double now)
+void runtime::process(float* output, const float* input, uint32_t frame_count, time_point now)
 {
   assert(frame_count % block_size_ == 0);
 
   const size_t total_frames = static_cast<size_t>(frame_count);
 
-  if (now == 0.0) now = current_time_tag();
-  auto delta = double(block_size_) / audio_device_->sample_rate();
+  const auto block_duration = duration(block_size_) / audio_device_->sample_rate();
   for (size_t frame_offset = 0; frame_offset < total_frames; frame_offset += block_size_) {
     consume_due_commands(now);
-    now += delta;
+    now += block_duration;
     render_block(output, input, frame_offset);
   }
 }

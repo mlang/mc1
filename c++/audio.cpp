@@ -1,17 +1,16 @@
-#include <stdexcept>
-#include <string>
-
 #define MINIAUDIO_IMPLEMENTATION
 #include "audio.hpp"
+
+#include <format>
+#include <stdexcept>
+#include <string>
 
 namespace mc1 {
 
 namespace {
 
 std::string error_message(const char* action, ma_result result)
-{
-  return std::string(action) + " failed: " + ma_result_description(result);
-}
+{ return std::format("{} failed: {}", action, ma_result_description(result)); }
 
 ma_device_type get_device_type(uint32_t input_channels, uint32_t output_channels)
 {
@@ -93,9 +92,7 @@ void audio_device::start()
 
 void audio_device::stop() noexcept
 {
-  if (!started_) {
-    return;
-  }
+  if (!started_) return;
 
   ma_result result = ma_device_stop(&device_);
   if (result == MA_SUCCESS) {
@@ -104,8 +101,6 @@ void audio_device::stop() noexcept
 }
 
 bool audio_device::started() const noexcept
-{
-  return started_;
-}
+{ return started_; }
 
 } // namespace mc1

@@ -46,10 +46,10 @@ public:
   void stop() noexcept;
   bool started() const noexcept;
   std::vector<uint32_t> synth_ids();
-  std::vector<uint32_t> synth_ids(double now);
+  std::vector<uint32_t> synth_ids(time_point now);
 
   void process(float* output, const float* input, uint32_t frame_count);
-  void process(float* output, const float* input, uint32_t frame_count, double now);
+  void process(float* output, const float* input, uint32_t frame_count, time_point now);
 
 private:
   size_t block_size_;
@@ -65,7 +65,7 @@ private:
   bool push_event(const rt_event& event) noexcept;
   bool retire_synth(uint32_t synth_id) noexcept;
   void collect_commands() noexcept;
-  void consume_due_commands(double now) noexcept;
+  void consume_due_commands(time_point now) noexcept;
   bool idle() noexcept;
   synth_instance* find_synth(uint32_t synth_id) noexcept;
   void apply_command(const rt_command& command) noexcept;

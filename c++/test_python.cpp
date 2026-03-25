@@ -124,7 +124,8 @@ void enqueue_controls(
     const Result::CompiledSynth& compiled_synth,
     uint32_t synth_id,
     pybind11::handle step,
-    double time = 0.0)
+    time_point when
+)
 {
   auto controls = validate_control_step(step);
   for (auto item : controls) {
@@ -136,12 +137,12 @@ void enqueue_controls(
     auto values = parse_control_values(item.second, control_name, slot->width);
     for (size_t offset = 0; offset < values.size(); ++offset) {
       rt_command command{
-        .time = time,
-        .payload = rt_payload{set_control_value{
+        .when = when,
+        .payload = set_control_value{
           .synth_id = synth_id,
           .control_index = static_cast<uint32_t>(slot->index + offset),
           .value = values[offset],
-        }},
+        },
       };
       if (!runtime.try_enqueue(command)) {
         throw pybind11::value_error("rt command queue overflow");
@@ -287,13 +288,13 @@ pybind11::list runtime_synth_ids_per_block(
   auto* instance_ptr = instance.get();
 
   rt_command start{
-    .time = 0.0,
-    .payload = rt_payload{start_synth{
+    .when = std::chrono::utc_clock::now(),
+    .payload = start_synth{
       .synth_id = instance_ptr->synth_id,
       .synth = instance_ptr,
       .insert_mode = synth_insert_mode::append,
       .anchor_synth_id = 0,
-    }},
+    },
   };
   if (!rt.try_enqueue(start)) {
     throw pybind11::value_error("rt command queue overflow");
@@ -302,9 +303,9 @@ pybind11::list runtime_synth_ids_per_block(
   std::vector<float> output(static_cast<size_t>(validated_output_channels) * validated_block_size, 0.0f);
   pybind11::list blocks_synth_ids;
   for (auto step : control_steps) {
-    enqueue_controls(rt, compiled_synth, instance_ptr->synth_id, step);
+    enqueue_controls(rt, compiled_synth, instance_ptr->synth_id, step, std::chrono::utc_clock::now());
     std::fill(output.begin(), output.end(), 0.0f);
-    rt.process(output.data(), nullptr, static_cast<uint32_t>(validated_block_size));
+    rt.process(output.data(), nullptr, validated_block_size);
 
     pybind11::list ids;
     for (auto synth_id : rt.synth_ids()) {
@@ -352,7 +353,7 @@ pybind11::list runtime_render_blocks(
     instances.push_back(std::move(instance));
 
     rt_command start{
-      .time = 0.0,
+      .when = std::chrono::utc_clock::now(),
       .payload = rt_payload{start_synth{
         .synth_id = instance_ptr->synth_id,
         .synth = instance_ptr,

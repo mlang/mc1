@@ -1,6 +1,14 @@
+#include "audio_buffer.hpp"
+#include "compiler.hpp"
+#include "dag.hpp"
+#include "runtime.hpp"
+
+#include <pybind11/pybind11.h>
+#include <pybind11/chrono.h>
+#include <pybind11/stl.h>
+
 #include <algorithm>
 #include <cassert>
-#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <format>
@@ -15,15 +23,6 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
-
-#include "audio_buffer.hpp"
-#include "compiler.hpp"
-#include "dag.hpp"
-#include "runtime.hpp"
-
-#include <pybind11/pybind11.h>
-#include <pybind11/chrono.h>
-#include <pybind11/stl.h>
 
 namespace mc1 {
 
@@ -222,12 +221,9 @@ class DSP
     return values;
   }
 
-  void enqueue_command(std::chrono::duration<double> when, rt_payload payload, const char* action)
+  void enqueue_command(time_point when, rt_payload payload, const char* action)
   {
-    rt_command command{
-      .time = when.count(),
-      .payload = payload,
-    };
+    rt_command command{.when = when, .payload = payload};
     if (!runtime_.try_enqueue(command)) {
       throw std::runtime_error(std::string(action) + ": rt command queue overflow");
     }
@@ -236,8 +232,8 @@ class DSP
   void enqueue_idle_query(uint32_t request_id)
   {
     rt_command command{
-      .time = 0.0,
-      .payload = rt_payload{query_idle_status{.request_id = request_id}},
+      .when = std::chrono::utc_clock::now(),
+      .payload = query_idle_status{.request_id = request_id},
     };
     if (!runtime_.try_enqueue(command)) {
       throw std::runtime_error("wait_until_idle failed: rt command queue overflow");
@@ -278,7 +274,7 @@ class DSP
     return idle;
   }
 
-  uint32_t create_synth(std::chrono::duration<double> when,
+  uint32_t create_synth(time_point when,
     std::string_view synth_name,
     synth_insert_mode insert_mode,
     uint32_t anchor_synth_id,
@@ -334,7 +330,8 @@ class DSP
           .insert_mode = insert_mode,
           .anchor_synth_id = anchor_synth_id,
         },
-        action);
+        action
+      );
       return synth_id;
     } catch (...) {
       synths_by_id_.erase(synth_id);
@@ -372,7 +369,7 @@ public:
     }
   }
 
-  uint32_t append(std::chrono::duration<double> when, std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t append(time_point when, std::string_view synth_name, pybind11::kwargs controls)
   {
     drain_runtime_events();
     return create_synth(when,
@@ -380,7 +377,7 @@ public:
     );
   }
 
-  uint32_t prepend(std::chrono::duration<double> when, std::string_view synth_name, pybind11::kwargs controls)
+  uint32_t prepend(time_point when, std::string_view synth_name, pybind11::kwargs controls)
   {
     drain_runtime_events();
     return create_synth(when,
@@ -388,7 +385,7 @@ public:
     );
   }
 
-  uint32_t insert_before(std::chrono::duration<double> when,
+  uint32_t insert_before(time_point when,
     long before_synth_id, std::string_view synth_name,
     pybind11::kwargs controls
   )
@@ -405,7 +402,7 @@ public:
     );
   }
 
-  uint32_t insert_after(std::chrono::duration<double> when,
+  uint32_t insert_after(time_point when,
     long after_synth_id, std::string_view synth_name,
     pybind11::kwargs controls
   )
@@ -422,9 +419,7 @@ public:
     );
   }
 
-  void set(std::chrono::duration<double> when,
-    long synth_id, pybind11::kwargs controls
-  )
+  void set(time_point when, long synth_id, pybind11::kwargs controls)
   {
     drain_runtime_events();
 
@@ -432,15 +427,7 @@ public:
     auto& instance = get_synth_instance(validated_synth_id);
 
     for (auto item : controls) {
-      std::string control_name;
-      try {
-        control_name = pybind11::cast<std::string>(item.first);
-      } catch (const pybind11::cast_error&) {
-        throw pybind11::value_error(std::format(
-            "control names for synth '{}' must be strings",
-            instance.synth_name));
-      }
-
+      auto control_name = pybind11::cast<std::string>(item.first);
       auto slot = instance.compiled_synth.control_slot(control_name);
       if (!slot) {
         throw pybind11::value_error(std::format(
@@ -450,10 +437,8 @@ public:
       }
 
       auto values = parse_control_values(
-          item.second,
-          instance.synth_name,
-          control_name,
-          slot->width);
+        item.second, instance.synth_name, control_name, slot->width
+      );
 
       for (size_t offset = 0; offset < values.size(); ++offset) {
         enqueue_command(when,
@@ -468,7 +453,7 @@ public:
     }
   }
 
-  void remove(std::chrono::duration<double> when, long synth_id)
+  void remove(time_point when, long synth_id)
   {
     drain_runtime_events();
 
@@ -482,9 +467,7 @@ public:
   { runtime_.start(); }
 
   void stop() noexcept
-  {
-    runtime_.stop();
-  }
+  { runtime_.stop(); }
 
   bool wait_until_idle(pybind11::handle timeout)
   {
