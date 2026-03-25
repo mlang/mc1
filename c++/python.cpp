@@ -66,18 +66,6 @@ uint32_t validate_non_negative_arg(long value, const char* name)
   return static_cast<uint32_t>(value);
 }
 
-uint64_t validate_time_tag_arg(pybind11::handle value, const char* name)
-{
-  if (pybind11::isinstance<pybind11::bool_>(value) || !pybind11::isinstance<pybind11::int_>(value)) {
-    throw pybind11::value_error(std::string(name) + " must be an OSC timetag integer");
-  }
-  try {
-    return pybind11::cast<uint64_t>(value);
-  } catch (const pybind11::cast_error&) {
-    throw pybind11::value_error(std::string(name) + " must fit in uint64");
-  }
-}
-
 std::optional<double> validate_timeout_arg(pybind11::handle value, const char* name)
 {
   if (value.is_none()) return std::nullopt;
@@ -163,11 +151,6 @@ class DSP
   static uint32_t validate_non_negative(long value, const char* name)
   {
     return validate_non_negative_arg(value, name);
-  }
-
-  static uint64_t validate_time_tag(pybind11::handle value, const char* name)
-  {
-    return validate_time_tag_arg(value, name);
   }
 
   static std::optional<double> validate_timeout(pybind11::handle value, const char* name)

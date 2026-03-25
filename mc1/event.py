@@ -118,7 +118,7 @@ default_event = Event(
     freq=lambda e: None if e.midi_note is None else midi2cps(e.midi_note),
     gate=1,
     controls=lambda e: {name: e[name] for name, _, _ in e.instrument.controlNames
-                        if name in e._data.keys()},
+                        if e.raw(name, None) is not None},
     is_rest=lambda e: e.midi_note is None,
     play=lambda e: partial(_default_play, e),
 )

@@ -26,16 +26,6 @@ def _validate_latency(latency: float) -> float:
     return latency
 
 
-def _validate_time_tag(time_tag: float) -> float:
-    if isinstance(time_tag, bool) or not isinstance(time_tag, Integral):
-        raise ValueError("time_tag must be an OSC timetag integer")
-
-    time_tag = float(time_tag)
-    if time_tag < 0:
-        raise ValueError("time_tag must be >= 0")
-    return time_tag
-
-
 class _ScheduledDSP:
     __slots__ = ("_dsp", "_time_tag")
 
@@ -77,8 +67,8 @@ class DSP(mc1._core.DSP):
         super().compile(bytes(dag))
         return dag
 
-    def __getitem__(self, time_tag: float) -> _ScheduledDSP:
-        return _ScheduledDSP(self, _validate_time_tag(time_tag))
+    def __getitem__(self, when: float) -> _ScheduledDSP:
+        return _ScheduledDSP(self, when)
 
     def _scheduled(self) -> _ScheduledDSP:
         return self[current_clock().time + self.latency]
