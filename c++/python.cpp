@@ -66,7 +66,7 @@ uint32_t validate_non_negative_arg(long value, const char* name)
   return static_cast<uint32_t>(value);
 }
 
-std::optional<double> validate_timeout_arg(pybind11::handle value, const char* name)
+std::optional<duration> validate_timeout_arg(pybind11::handle value, const char* name)
 {
   if (value.is_none()) return std::nullopt;
 
@@ -82,7 +82,7 @@ std::optional<double> validate_timeout_arg(pybind11::handle value, const char* n
     if (!std::isfinite(timeout)) {
       throw pybind11::value_error(std::string(name) + " must be finite");
     }
-    return timeout;
+    return duration{timeout};
   } catch (const pybind11::cast_error&) {
     throw pybind11::value_error(std::string(name) + " must be None or a non-negative number");
   }
@@ -153,7 +153,7 @@ class DSP
     return validate_non_negative_arg(value, name);
   }
 
-  static std::optional<double> validate_timeout(pybind11::handle value, const char* name)
+  static std::optional<duration> validate_timeout(pybind11::handle value, const char* name)
   {
     return validate_timeout_arg(value, name);
   }
@@ -477,13 +477,10 @@ public:
       throw pybind11::value_error("wait_until_idle is only available while DSP is started");
     }
 
-    auto validated_timeout = validate_timeout(timeout, "timeout");
-    auto deadline = validated_timeout
-      ? std::optional<std::chrono::steady_clock::time_point>{
-          std::chrono::steady_clock::now() +
-            std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                std::chrono::duration<double>(*validated_timeout))}
-      : std::nullopt;
+    auto deadline = validate_timeout(timeout, "timeout").transform([](auto delta) {
+      using clock = std::chrono::steady_clock;
+      return clock::now() + std::chrono::duration_cast<clock::duration>(delta);
+    });
 
     auto request_id = next_request_id_++;
     auto query_pending = false;
