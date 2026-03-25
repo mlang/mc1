@@ -19,8 +19,6 @@ namespace mc1 {
 
 namespace {
 
-constexpr uint64_t osc_immediate_time_tag = 1;
-
 DAG parse_dag_or_throw(pybind11::bytes bytes_object)
 {
   auto bytes = std::as_bytes(std::span(std::string_view(bytes_object)));
@@ -126,7 +124,7 @@ void enqueue_controls(
     const Result::CompiledSynth& compiled_synth,
     uint32_t synth_id,
     pybind11::handle step,
-    uint64_t time_tag = osc_immediate_time_tag)
+    double time = 0.0)
 {
   auto controls = validate_control_step(step);
   for (auto item : controls) {
@@ -138,7 +136,7 @@ void enqueue_controls(
     auto values = parse_control_values(item.second, control_name, slot->width);
     for (size_t offset = 0; offset < values.size(); ++offset) {
       rt_command command{
-        .time_tag = time_tag,
+        .time = time,
         .payload = rt_payload{set_control_value{
           .synth_id = synth_id,
           .control_index = static_cast<uint32_t>(slot->index + offset),
@@ -289,7 +287,7 @@ pybind11::list runtime_synth_ids_per_block(
   auto* instance_ptr = instance.get();
 
   rt_command start{
-    .time_tag = osc_immediate_time_tag,
+    .time = 0.0,
     .payload = rt_payload{start_synth{
       .synth_id = instance_ptr->synth_id,
       .synth = instance_ptr,
@@ -354,7 +352,7 @@ pybind11::list runtime_render_blocks(
     instances.push_back(std::move(instance));
 
     rt_command start{
-      .time_tag = osc_immediate_time_tag,
+      .time = 0.0,
       .payload = rt_payload{start_synth{
         .synth_id = instance_ptr->synth_id,
         .synth = instance_ptr,

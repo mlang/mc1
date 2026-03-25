@@ -44,7 +44,7 @@ using rt_payload = std::variant<
 >;
 
 struct rt_command final {
-  uint64_t time_tag{};
+  double time{};
   rt_payload payload{};
 };
 

@@ -18,6 +18,8 @@ namespace mc1 {
 template<typename T, size_t Capacity>
 using fixed_spsc_queue = boost::lockfree::spsc_queue<T, boost::lockfree::capacity<Capacity>>;
 
+using boost::container::static_vector;
+
 class audio_device;
 
 struct synth_instance final {
@@ -25,11 +27,6 @@ struct synth_instance final {
   std::string synth_name;
   Result::CompiledSynth compiled_synth;
   Result::Synth synth;
-};
-
-struct scheduled_command final {
-  uint64_t sequence{};
-  rt_command command{};
 };
 
 class runtime final
@@ -49,10 +46,10 @@ public:
   void stop() noexcept;
   bool started() const noexcept;
   std::vector<uint32_t> synth_ids();
-  std::vector<uint32_t> synth_ids(uint64_t now_time_tag);
+  std::vector<uint32_t> synth_ids(double now);
 
   void process(float* output, const float* input, uint32_t frame_count);
-  void process(float* output, const float* input, uint32_t frame_count, uint64_t now_time_tag);
+  void process(float* output, const float* input, uint32_t frame_count, double now);
 
 private:
   size_t block_size_;
@@ -61,15 +58,14 @@ private:
   aligned_float_buffer abus_;
   fixed_spsc_queue<rt_command, 1024> commands_;
   fixed_spsc_queue<rt_event, 1024> events_;
-  boost::container::static_vector<scheduled_command, 8192> scheduled_commands_{};
-  boost::container::static_vector<synth_instance*, 1024> synths_{};
+  static_vector<rt_command, 8192> scheduled_commands_{};
+  static_vector<synth_instance*, 1024> synths_{};
   std::unique_ptr<audio_device> audio_device_;
-  uint64_t next_sequence_ = 0;
 
   bool push_event(const rt_event& event) noexcept;
   bool retire_synth(uint32_t synth_id) noexcept;
   void collect_commands() noexcept;
-  void consume_due_commands(uint64_t now_time_tag) noexcept;
+  void consume_due_commands(double now) noexcept;
   bool idle() noexcept;
   synth_instance* find_synth(uint32_t synth_id) noexcept;
   void apply_command(const rt_command& command) noexcept;

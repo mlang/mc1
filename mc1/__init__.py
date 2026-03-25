@@ -41,7 +41,7 @@ from mc1.dsp import DSP
 from mc1.event import *
 from mc1.graphs import default, drone, klang_cloud, rhodey, rhodey_chorus, tube_bell
 from mc1.pitch import *
-from mc1.timetag import IMMEDIATE, here
+from mc1.timetag import IMMEDIATE
 
 __all__ = (
     "ADSR",
@@ -58,7 +58,6 @@ __all__ = (
     "default",
     "default_event",
     "drone",
-    "here",
     "IMMEDIATE",
     "klang_cloud",
     "midi2cps",

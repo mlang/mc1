@@ -28,6 +28,8 @@ public:
   void stop() noexcept;
   bool started() const noexcept;
 
+  uint32_t sample_rate() const { return device_.sampleRate; }
+
 private:
   ma_device device_{};
   bool started_ = false;

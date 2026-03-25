@@ -6,6 +6,7 @@
 #include <cassert>
 #include <chrono>
 #include <iterator>
+#include <ranges>
 #include <variant>
 
 namespace mc1 {
@@ -20,31 +21,9 @@ struct overloaded : Ts... {
 template<typename... Ts>
 overloaded(Ts...) -> overloaded<Ts...>;
 
-constexpr uint64_t osc_immediate_time_tag = 1;
-constexpr uint64_t ntp_epoch_offset_seconds = 2'208'988'800ULL;
-constexpr uint64_t nanoseconds_per_second = 1'000'000'000ULL;
-constexpr uint64_t ntp_fraction_scale = 1ULL << 32;
-
-uint64_t unix_nanoseconds_to_ntp_time_tag(uint64_t unix_nanoseconds) noexcept
+inline double current_time_tag() noexcept
 {
-  const uint64_t unix_seconds = unix_nanoseconds / nanoseconds_per_second;
-  const uint64_t remainder_nanoseconds = unix_nanoseconds % nanoseconds_per_second;
-  const uint64_t ntp_seconds = unix_seconds + ntp_epoch_offset_seconds;
-  const uint64_t ntp_fraction = (remainder_nanoseconds * ntp_fraction_scale) / nanoseconds_per_second;
-  return (ntp_seconds << 32) | ntp_fraction;
-}
-
-uint64_t current_time_tag() noexcept
-{
-  const auto now = std::chrono::system_clock::now().time_since_epoch();
-  const auto unix_nanoseconds = static_cast<uint64_t>(
-      std::chrono::duration_cast<std::chrono::nanoseconds>(now).count());
-  return unix_nanoseconds_to_ntp_time_tag(unix_nanoseconds);
-}
-
-bool is_due_time_tag(uint64_t command_time_tag, uint64_t now_time_tag) noexcept
-{
-  return command_time_tag == osc_immediate_time_tag || command_time_tag <= now_time_tag;
+  return std::chrono::duration<double>{std::chrono::system_clock::now().time_since_epoch()}.count();
 }
 
 void ma_trampoline(
@@ -98,31 +77,23 @@ void runtime::collect_commands() noexcept
 {
   rt_command cmd;
   while (scheduled_commands_.size() < scheduled_commands_.capacity() && commands_.pop(cmd)) {
-    auto insert_at = std::upper_bound(
-        scheduled_commands_.begin(),
-        scheduled_commands_.end(),
-        cmd.time_tag,
-        [](uint64_t time_tag, const scheduled_command& scheduled) {
-          return time_tag < scheduled.command.time_tag;
-        });
-    scheduled_commands_.insert(insert_at, scheduled_command{
-      .sequence = next_sequence_++,
-      .command = cmd,
-    });
+    auto insert_at = std::ranges::upper_bound(
+      scheduled_commands_, cmd.time, std::ranges::less{}, &rt_command::time
+    );
+    scheduled_commands_.insert(insert_at, cmd);
   }
 }
 
-void runtime::consume_due_commands(uint64_t now_time_tag) noexcept
+void runtime::consume_due_commands(double now) noexcept
 {
   collect_commands();
 
   while (!scheduled_commands_.empty()) {
-    auto& scheduled = scheduled_commands_.front();
-    if (!is_due_time_tag(scheduled.command.time_tag, now_time_tag)) break;
+    auto scheduled = scheduled_commands_.front();
+    if (scheduled.time < now) break;
 
-    auto command = scheduled.command;
     scheduled_commands_.erase(scheduled_commands_.begin());
-    apply_command(command);
+    apply_command(scheduled);
   }
 }
 
@@ -146,9 +117,9 @@ std::vector<uint32_t> runtime::synth_ids()
   return synth_ids(current_time_tag());
 }
 
-std::vector<uint32_t> runtime::synth_ids(uint64_t now_time_tag)
+std::vector<uint32_t> runtime::synth_ids(double now)
 {
-  consume_due_commands(now_time_tag);
+  consume_due_commands(now);
 
   return synths_
     | std::views::transform([](synth_instance* synth) { return synth->synth_id; })
@@ -275,14 +246,17 @@ void runtime::process(float* output, const float* input, uint32_t frame_count)
   process(output, input, frame_count, 0);
 }
 
-void runtime::process(float* output, const float* input, uint32_t frame_count, uint64_t now_time_tag)
+void runtime::process(float* output, const float* input, uint32_t frame_count, double now)
 {
   assert(frame_count % block_size_ == 0);
 
   const size_t total_frames = static_cast<size_t>(frame_count);
 
+  if (now == 0.0) now = current_time_tag();
+  auto delta = double(block_size_) / audio_device_->sample_rate();
   for (size_t frame_offset = 0; frame_offset < total_frames; frame_offset += block_size_) {
-    consume_due_commands(now_time_tag == 0 ? current_time_tag() : now_time_tag);
+    consume_due_commands(now);
+    now += delta;
     render_block(output, input, frame_offset);
   }
 }

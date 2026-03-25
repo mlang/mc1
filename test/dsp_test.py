@@ -5,7 +5,6 @@ import pytest
 import mc1._core
 import mc1.dsp
 import mc1._test
-import mc1.timetag
 from mc1.graphs import default as graph_default
 from mc1 import (
     ADSR,
@@ -16,13 +15,11 @@ from mc1 import (
     SinOsc,
     Trigger,
     default,
-    here,
     klang_cloud,
     rhodey,
     rhodey_chorus,
     tube_bell,
 )
-from mc1.timetag import from_unix
 
 
 def wait_for(condition, timeout=0.5, interval=0.005):
@@ -622,82 +619,17 @@ def test_dsp_stale_anchor_insert_is_dropped():
         dsp[IMMEDIATE].set(dropped, freq=220)
 
 
-def test_dsp_getitem_rejects_invalid_timetag():
-    dsp = DSP()
-    with pytest.raises(ValueError, match="time_tag must be an OSC timetag integer"):
-        dsp[1.5]
-    with pytest.raises(ValueError, match="time_tag must be an OSC timetag integer"):
-        dsp[True]
-
-
-def test_dsp_append_uses_current_clock_and_latency(monkeypatch):
-    dsp = DSP(latency=0.05)
-    dsp.compile(default)
-    observed = []
-
-    monkeypatch.setattr(
-        mc1.dsp,
-        "current_clock",
-        lambda: type("FakeClock", (), {"time": 42.0})(),
-    )
-    monkeypatch.setattr(
-        mc1.dsp,
-        "from_unix",
-        lambda seconds: observed.append(seconds) or IMMEDIATE,
-    )
-
-    synth_id = dsp.append("default")
-
-    assert observed == pytest.approx([42.05])
-    wait_for(lambda: dsp.synth_ids == [synth_id])
-
-
-def test_dsp_set_uses_current_clock_and_latency(monkeypatch):
-    dsp = DSP(latency=0.05)
-    dsp.compile(default)
-    synth_id = dsp[IMMEDIATE].append("default")
-    observed = {"clock": 0, "seconds": []}
-
-    def fake_current_clock():
-        observed["clock"] += 1
-        return type("FakeClock", (), {"time": 42.0})()
-
-    monkeypatch.setattr(mc1.dsp, "current_clock", fake_current_clock)
-    monkeypatch.setattr(
-        mc1.dsp,
-        "from_unix",
-        lambda seconds: observed["seconds"].append(seconds) or IMMEDIATE,
-    )
-
-    dsp.set(synth_id, freq=220)
-
-    assert observed["clock"] == 1
-    assert observed["seconds"] == pytest.approx([42.05])
-
-
 def test_dsp_remove_requires_running_clock_for_implicit_schedule():
     dsp = DSP()
     with pytest.raises(RuntimeError, match="current_clock\\(\\) is only available"):
         dsp.remove(1)
 
 
-def test_timetag_here_schedules_current_clock_wallclock_values(monkeypatch):
-    monkeypatch.setattr(
-        mc1.timetag,
-        "current_clock",
-        lambda: type("FakeClock", (), {"time": 42.0})(),
-    )
-
-    assert here(0) == from_unix(42.0)
-    assert here() == from_unix(42.1)
-    assert here(0.05) > here(0)
-
-
 def test_dsp_scheduled_append_remains_pending_until_due():
     dsp = DSP()
     dsp.compile(default)
 
-    scheduled = from_unix(time.time() + 0.05)
+    scheduled = time.time() + 0.05
     synth_id = dsp[scheduled].append("default")
 
     assert dsp.synth_ids == []
@@ -709,7 +641,7 @@ def test_dsp_same_timetag_commands_preserve_fifo_order():
     dsp = DSP()
     dsp.compile(default)
 
-    scheduled = from_unix(time.time() + 0.05)
+    scheduled = time.time() + 0.05
     first = dsp[scheduled].append("default")
     second = dsp[scheduled].append("default")
     before_second = dsp[scheduled].insert_before(second, "default")
@@ -725,7 +657,7 @@ def test_dsp_scheduled_remove_applies_when_due():
 
     first = dsp[IMMEDIATE].append("default")
     second = dsp[IMMEDIATE].append("default")
-    scheduled = from_unix(time.time() + 0.05)
+    scheduled = time.time() + 0.05
     dsp[scheduled].remove(first)
 
     assert dsp.synth_ids == [first, second]
@@ -739,10 +671,8 @@ def test_dsp_scheduled_insert_after_missing_anchor_is_dropped():
 
     anchor = dsp[IMMEDIATE].append("default")
     survivor = dsp[IMMEDIATE].append("default")
-    remove_at_unix = time.time() + 0.03
-    insert_at_unix = remove_at_unix + 0.02
-    remove_at = from_unix(remove_at_unix)
-    insert_at = from_unix(insert_at_unix)
+    remove_at = time.time() + 0.03
+    insert_at = remove_at + 0.02
     dropped = dsp[insert_at].insert_after(anchor, "default")
     dsp[remove_at].remove(anchor)
 

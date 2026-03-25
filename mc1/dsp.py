@@ -7,7 +7,6 @@ from .dag import DAG
 
 import mc1._core
 from mc1.clock import current_clock
-from mc1.timetag import from_unix
 
 
 _MAX_TIMETAG = 0xFFFFFFFFFFFFFFFF
@@ -27,22 +26,20 @@ def _validate_latency(latency: float) -> float:
     return latency
 
 
-def _validate_time_tag(time_tag: int) -> int:
+def _validate_time_tag(time_tag: float) -> float:
     if isinstance(time_tag, bool) or not isinstance(time_tag, Integral):
         raise ValueError("time_tag must be an OSC timetag integer")
 
-    time_tag = int(time_tag)
+    time_tag = float(time_tag)
     if time_tag < 0:
         raise ValueError("time_tag must be >= 0")
-    if time_tag > _MAX_TIMETAG:
-        raise ValueError("time_tag must fit in uint64")
     return time_tag
 
 
 class _ScheduledDSP:
     __slots__ = ("_dsp", "_time_tag")
 
-    def __init__(self, dsp: "DSP", time_tag: int) -> None:
+    def __init__(self, dsp: "DSP", time_tag: float) -> None:
         self._dsp = dsp
         self._time_tag = time_tag
 
@@ -80,11 +77,11 @@ class DSP(mc1._core.DSP):
         super().compile(bytes(dag))
         return dag
 
-    def __getitem__(self, time_tag: int) -> _ScheduledDSP:
+    def __getitem__(self, time_tag: float) -> _ScheduledDSP:
         return _ScheduledDSP(self, _validate_time_tag(time_tag))
 
     def _scheduled(self) -> _ScheduledDSP:
-        return self[from_unix(current_clock().time + self.latency)]
+        return self[current_clock().time + self.latency]
 
     def append(self, synth_name, **controls):
         return self._scheduled().append(synth_name, **controls)
