@@ -260,7 +260,7 @@ class DSP
         [this](const idle_status_event& idle_status) {
           pending_idle_status_by_request_id_.insert_or_assign(idle_status.request_id, idle_status.idle);
         },
-      }, event.payload);
+      }, event);
     }
   }
 

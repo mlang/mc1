@@ -1,21 +1,25 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 
-#include <miniaudio.h>
 
 namespace mc1 {
 
 class audio_device final
 {
+  struct implementation;
+  std::unique_ptr<implementation> impl;
+
 public:
   audio_device(
-      uint32_t input_channels,
-      uint32_t output_channels,
-      ma_device_data_proc callback,
-      void* callback_data,
-      uint32_t sample_rate = 44100,
-      uint32_t period_frames = 32);
+    uint32_t input_channels,
+    uint32_t output_channels,
+    void(*callback)(float *, const float *, uint32_t, void*),
+    void* callback_data,
+    uint32_t sample_rate = 44100,
+    uint32_t period_frames = 32
+  );
 
   ~audio_device();
 
@@ -28,11 +32,7 @@ public:
   void stop() noexcept;
   bool started() const noexcept;
 
-  uint32_t sample_rate() const { return device_.sampleRate; }
-
-private:
-  ma_device device_{};
-  bool started_ = false;
+  uint32_t sample_rate() const;
 };
 
 } // namespace mc1

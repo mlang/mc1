@@ -1,7 +1,5 @@
 #include "runtime.hpp"
 
-#include "audio.hpp"
-
 #include <algorithm>
 #include <cassert>
 #include <chrono>
@@ -18,36 +16,25 @@ struct overloaded : Ts... {
   using Ts::operator()...;
 };
 
-template<typename... Ts>
-overloaded(Ts...) -> overloaded<Ts...>;
-
-void ma_trampoline(
-    ma_device* device,
-    void* output,
-    const void* input,
-    ma_uint32 frame_count)
-{
-  static_cast<runtime*>(device->pUserData)->process(static_cast<float *>(output), static_cast<const float *>(input), frame_count);
-}
+void trampoline(
+  float *output, const float * input,
+  uint32_t frame_count, void *data
+)
+{ static_cast<runtime*>(data)->process(output, input, frame_count); }
 
 } // namespace
 
 runtime::runtime(
-    uint32_t sample_rate,
-    size_t block_size,
-    uint32_t input_channels,
-    uint32_t output_channels)
+  uint32_t sample_rate,
+  size_t block_size,
+  uint32_t input_channels,
+  uint32_t output_channels)
 : block_size_{block_size}
-, input_channels_{input_channels}
-, output_channels_{output_channels}
-, abus_(static_cast<size_t>(input_channels + output_channels) * block_size)
-, audio_device_{std::make_unique<audio_device>(
-      input_channels_,
-      output_channels_,
-      &ma_trampoline,
-      this,
-      sample_rate,
-      static_cast<uint32_t>(block_size_))}
+, input_channels_{input_channels}, output_channels_{output_channels}
+, abus_(block_size * (input_channels + output_channels))
+, audio_device_{input_channels_, output_channels_,
+    &trampoline, this, sample_rate, block_size_
+  }
 {}
 
 runtime::~runtime() = default;
@@ -62,20 +49,18 @@ bool runtime::push_event(const rt_event& event) noexcept
 { return events_.push(event); }
 
 bool runtime::retire_synth(uint32_t synth_id) noexcept
-{
-  return push_event(rt_event{
-    .payload = rt_event_payload{synth_retired_event{.synth_id = synth_id}},
-  });
-}
+{ return push_event(synth_retired_event{.synth_id = synth_id}); }
 
 void runtime::collect_commands() noexcept
 {
   rt_command cmd;
-  while (scheduled_commands_.size() < scheduled_commands_.capacity() && commands_.pop(cmd)) {
-    auto insert_at = std::ranges::upper_bound(
+  auto schedule_not_full = [this]{
+    return scheduled_commands_.size() < scheduled_commands_.capacity();
+  };
+  while (schedule_not_full() && commands_.pop(cmd)) {
+    scheduled_commands_.insert(std::ranges::upper_bound(
       scheduled_commands_, cmd.when, std::ranges::less{}, &rt_command::when
-    );
-    scheduled_commands_.insert(insert_at, cmd);
+    ), cmd);
   }
 }
 
@@ -93,13 +78,13 @@ void runtime::consume_due_commands(time_point now) noexcept
 }
 
 void runtime::start()
-{ audio_device_->start(); }
+{ audio_device_.start(); }
 
 void runtime::stop() noexcept
-{ audio_device_->stop(); }
+{ audio_device_.stop(); }
 
 bool runtime::started() const noexcept
-{ return audio_device_->started(); }
+{ return audio_device_.started(); }
 
 bool runtime::idle() noexcept
 {
@@ -186,11 +171,9 @@ void runtime::apply_command(const rt_command& command) noexcept
       synth->synth.set_control(payload.control_index, payload.value);
     },
     [this](const query_idle_status& payload) noexcept {
-      push_event(rt_event{
-        .payload = rt_event_payload{idle_status_event{
-          .request_id = payload.request_id,
-          .idle = idle(),
-        }},
+      push_event(idle_status_event{
+        .request_id = payload.request_id,
+        .idle = idle(),
       });
     },
   }, command.payload);
@@ -247,10 +230,10 @@ void runtime::process(float* output, const float* input, uint32_t frame_count, t
 
   const size_t total_frames = static_cast<size_t>(frame_count);
 
-  const auto block_duration = duration(block_size_) / audio_device_->sample_rate();
+  const auto block_duration = duration(block_size_) / audio_device_.sample_rate();
   for (size_t frame_offset = 0; frame_offset < total_frames; frame_offset += block_size_) {
-    consume_due_commands(now);
     now += block_duration;
+    consume_due_commands(now);
     render_block(output, input, frame_offset);
   }
 }

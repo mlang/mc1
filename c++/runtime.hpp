@@ -1,5 +1,6 @@
 #pragma once
 
+#include "audio_device.hpp"
 #include "audio_buffer.hpp"
 #include "compiler.hpp"
 #include "rt_command.hpp"
@@ -8,7 +9,6 @@
 #include <boost/lockfree/spsc_queue.hpp>
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <type_traits>
 #include <vector>
@@ -20,8 +20,6 @@ using fixed_spsc_queue = boost::lockfree::spsc_queue<T, boost::lockfree::capacit
 
 using boost::container::static_vector;
 
-class audio_device;
-
 struct synth_instance final {
   uint32_t synth_id{};
   std::string synth_name;
@@ -31,12 +29,23 @@ struct synth_instance final {
 
 class runtime final
 {
+  size_t block_size_;
+  uint32_t input_channels_;
+  uint32_t output_channels_;
+  aligned_float_buffer abus_;
+  fixed_spsc_queue<rt_command, 1024> commands_;
+  fixed_spsc_queue<rt_event, 1024> events_;
+  static_vector<rt_command, 8192> scheduled_commands_{};
+  static_vector<synth_instance*, 1024> synths_{};
+  audio_device audio_device_;
+
 public:
   runtime(
-      uint32_t sample_rate,
-      size_t block_size,
-      uint32_t input_channels,
-      uint32_t output_channels);
+    uint32_t sample_rate,
+    size_t block_size,
+    uint32_t input_channels,
+    uint32_t output_channels
+  );
   ~runtime();
 
   bool try_enqueue(const rt_command& command) noexcept;
@@ -52,16 +61,6 @@ public:
   void process(float* output, const float* input, uint32_t frame_count, time_point now);
 
 private:
-  size_t block_size_;
-  uint32_t input_channels_;
-  uint32_t output_channels_;
-  aligned_float_buffer abus_;
-  fixed_spsc_queue<rt_command, 1024> commands_;
-  fixed_spsc_queue<rt_event, 1024> events_;
-  static_vector<rt_command, 8192> scheduled_commands_{};
-  static_vector<synth_instance*, 1024> synths_{};
-  std::unique_ptr<audio_device> audio_device_;
-
   bool push_event(const rt_event& event) noexcept;
   bool retire_synth(uint32_t synth_id) noexcept;
   void collect_commands() noexcept;

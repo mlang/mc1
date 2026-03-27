@@ -18,16 +18,17 @@ enum class control_kind : uint8_t {
 };
 
 struct DAG final {
+  std::string name;
+  std::vector<float> constants;
+  std::vector<float> controls;
+
   struct ControlName {
     std::string name;
     size_t index;
     control_kind kind{control_kind::value};
   };
-
-  std::string name;
-  std::vector<float> constants;
-  std::vector<float> controls;
   std::vector<ControlName> controlNames;
+
   struct op {
     std::string name;
     char rate;

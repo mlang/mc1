@@ -56,14 +56,10 @@ struct idle_status_event final {
   bool idle{};
 };
 
-using rt_event_payload = std::variant<
+using rt_event = std::variant<
   synth_retired_event,
   idle_status_event
 >;
-
-struct rt_event final {
-  rt_event_payload payload{};
-};
 
 static_assert(std::is_trivially_copyable_v<start_synth>);
 static_assert(std::is_trivially_copyable_v<stop_synth>);
@@ -76,9 +72,6 @@ static_assert(std::is_trivially_copyable_v<rt_command>);
 static_assert(std::is_trivially_destructible_v<rt_command>);
 static_assert(std::is_trivially_copyable_v<synth_retired_event>);
 static_assert(std::is_trivially_copyable_v<idle_status_event>);
-static_assert(std::is_trivially_copyable_v<rt_event_payload>);
-static_assert(std::is_trivially_destructible_v<rt_event_payload>);
-static_assert(std::is_standard_layout_v<rt_event_payload>);
 static_assert(std::is_trivially_copyable_v<rt_event>);
 static_assert(std::is_trivially_destructible_v<rt_event>);
 
