@@ -12,10 +12,7 @@
 
 namespace mlang {
 
-enum class parse_error {
-  truncated,
-  invalid_data,
-};
+enum class parse_error { truncated, invalid_data };
 
 inline constexpr std::string_view to_string(parse_error error) noexcept
 {

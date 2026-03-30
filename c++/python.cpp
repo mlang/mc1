@@ -42,7 +42,7 @@ DAG parse_dag_or_throw(pybind11::bytes bytes_object)
   auto dag = DAG::parse(bytes);
   if (!dag) {
     throw pybind11::value_error(
-      std::string("invalid DAG bytes: ") + std::string(mlang::to_string(dag.error()))
+      std::format("invalid DAG bytes: {}", mlang::to_string(dag.error()))
     );
   }
   return std::move(*dag);

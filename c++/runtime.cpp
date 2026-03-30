@@ -93,9 +93,7 @@ bool runtime::idle() noexcept
 }
 
 std::vector<uint32_t> runtime::synth_ids()
-{
-  return synth_ids(std::chrono::utc_clock::now());
-}
+{ return synth_ids(std::chrono::utc_clock::now()); }
 
 std::vector<uint32_t> runtime::synth_ids(time_point now)
 {

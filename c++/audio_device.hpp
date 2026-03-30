@@ -12,13 +12,11 @@ class audio_device final
   std::unique_ptr<implementation> impl;
 
 public:
+  using callback_type = void(float *, const float *, uint32_t, void*);
   audio_device(
-    uint32_t input_channels,
-    uint32_t output_channels,
-    void(*callback)(float *, const float *, uint32_t, void*),
-    void* callback_data,
-    uint32_t sample_rate = 44100,
-    uint32_t period_frames = 32
+    uint32_t input_channels, uint32_t output_channels,
+    callback_type *callback, void* callback_data,
+    uint32_t sample_rate = 44100, uint32_t period_frames = 32
   );
 
   ~audio_device();

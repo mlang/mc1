@@ -538,9 +538,3 @@ class _WrapDefaults:
 
     def __call__(self):
         return self.func(*self.args, **self.kwargs)
-
-
-@DAG
-def foo(freq=440, amp=0.1):
-    sig = SinOsc.ar([freq, freq+1], 0)
-    (SinOsc.ar(sig + freq, 0)[0] + SinOsc.ar(sig + freq, 0)[1]) * amp

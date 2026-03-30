@@ -11,20 +11,18 @@ namespace mc1 {
 
 namespace {
 
-using callback_type = void(float *, const float *, uint32_t, void *);
-
 struct callback_info
 {
-  callback_type *callback;
-  void          *data;
+  audio_device::callback_type *callback;
+  void                        *data;
 };
 
 }
 
 struct audio_device::implementation final {
   callback_info callback;
-  ma_device device{};
-  bool started = false;
+  ma_device     device{};
+  bool          started = false;
 };
 
 namespace {
@@ -61,12 +59,9 @@ void ma_trampoline(
 } // namespace
 
 audio_device::audio_device(
-  uint32_t input_channels,
-  uint32_t output_channels,
-  void(*callback)(float*, const float*, uint32_t, void*),
-  void* callback_data,
-  uint32_t sample_rate,
-  uint32_t period_frames
+  uint32_t input_channels, uint32_t output_channels,
+  callback_type *callback, void* callback_data,
+  uint32_t sample_rate, uint32_t period_frames
 )
 : impl{std::make_unique<implementation>(
     implementation{

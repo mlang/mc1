@@ -72,9 +72,7 @@ struct Context
 
   // Fancy helpers
   template<class T> gccjit::type type()
-  {
-    return mlang::gccjit::get_type<T>(gcc);
-  }
+  { return mlang::gccjit::get_type<T>(gcc); }
 
   template<class T> gccjit::type type(int n)
   { return gcc.new_array_type(type<T>(), n); }
@@ -92,19 +90,10 @@ struct Context
   }
 
   std::string graph_symbol(std::string_view base) const
-  {
-    return std::format("{}_{}", graph.name, base);
-  }
+  { return std::format("{}_{}", graph.name, base); }
 
-  template<class T> gccjit::rvalue zero()
-  {
-    return gcc.zero(type<T>());
-  }
-
-  template<class T> gccjit::rvalue one()
-  {
-    return gcc.one(type<T>());
-  }
+  template<class T> gccjit::rvalue zero() { return gcc.zero(type<T>()); }
+  template<class T> gccjit::rvalue one() { return gcc.one(type<T>()); }
 
   gccjit::rvalue new_float(double value)
   {
@@ -122,34 +111,22 @@ struct Context
   }
 
   gccjit::rvalue block_size_value()
-  {
-    return new_size_t(block_size);
-  }
+  { return new_size_t(block_size); }
 
   gccjit::rvalue sample_rate_value()
-  {
-    return new_float(static_cast<float>(sample_rate));
-  }
+  { return new_float(static_cast<float>(sample_rate)); }
 
   gccjit::rvalue int_from_bool(gccjit::rvalue value)
-  {
-    return gcc.new_cast(value, type<int>());
-  }
+  { return gcc.new_cast(value, type<int>()); }
 
   gccjit::rvalue float_from_bool(gccjit::rvalue value)
-  {
-    return gcc.new_cast(int_from_bool(value), type<float>());
-  }
+  { return gcc.new_cast(int_from_bool(value), type<float>()); }
 
   gccjit::rvalue u32_from_bool(gccjit::rvalue value)
-  {
-    return gcc.new_cast(int_from_bool(value), type<uint32_t>());
-  }
+  { return gcc.new_cast(int_from_bool(value), type<uint32_t>()); }
 
   gccjit::rvalue planar_channel_offset(size_t channel)
-  {
-    return new_size_t(block_size * channel);
-  }
+  { return new_size_t(block_size * channel); }
 
   gccjit::lvalue planar_sample(gccjit::rvalue buffer, gccjit::rvalue index, size_t channel = 0)
   {
@@ -178,19 +155,13 @@ struct Context
   }
 
   gccjit::type restrict_float_ptr_type()
-  {
-    return type<float*>().get_restrict();
-  }
+  { return type<float*>().get_restrict(); }
 
   gccjit::rvalue sample_at(char rate, gccjit::param p_arg, gccjit::lvalue lv_i)
-  {
-    return rate == 'a' ? p_arg[lv_i] : p_arg;
-  }
+  { return rate == 'a' ? p_arg[lv_i] : p_arg; }
 
   gccjit::rvalue non_negative(gccjit::rvalue value)
-  {
-    return value * (one<float>() - float_from_bool(value < zero<float>()));
-  }
+  { return value * (one<float>() - float_from_bool(value < zero<float>())); }
 
   gccjit::rvalue clamp_unit(gccjit::rvalue value)
   {
@@ -206,27 +177,6 @@ struct Context
       accum,
       u32_from_bool(done_value == one<float>())
     ));
-  }
-
-  std::optional<gccjit::type> optional_struct_type(
-    std::string_view name,
-    std::vector<gccjit::field> fields
-  )
-  {
-    if (fields.empty()) return std::nullopt;
-    return gcc.new_struct_type(std::string(name), fields);
-  }
-
-  std::optional<gccjit::lvalue> state_field(
-    gccjit::param raw_state,
-    std::optional<gccjit::type> graph_state,
-    std::optional<gccjit::field> field
-  )
-  {
-    if (!graph_state || !field) return std::nullopt;
-
-    auto p_graph_state = gcc.new_cast(raw_state, graph_state->get_pointer());
-    return p_graph_state.dereference().access_field(*field);
   }
 
   gccjit::rvalue wrap_tau(gccjit::rvalue phase)
@@ -1402,15 +1352,16 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     }
   }
 
-  auto state_struct = state_field_list.empty()
-    ? std::optional<gccjit::type>{}
-    : ctx.optional_struct_type(ctx.graph_symbol("state"), state_field_list);
+  auto state_struct = ctx.gcc.new_struct_type(ctx.graph_symbol("state"), state_field_list);
 
-  auto make_node_state = [&](gccjit::param p_state, size_t i) -> std::optional<gccjit::lvalue>
+  auto dereference_node_state = [&](gccjit::param p_state, size_t i) -> std::optional<gccjit::lvalue>
   {
-    return ctx.state_field(p_state, state_struct, state_fields[i]);
+    return state_fields[i].transform([&](gccjit::field field) {
+      return ctx.gcc.new_cast(p_state, state_struct.get_pointer()).dereference_field(field);
+    });
   };
 
+  // void init(void *state)
   auto init_args = std::vector{
     ctx.gcc.new_param(t_void_ptr.get_restrict(), "state"),
   };
@@ -1421,7 +1372,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     auto entry = init.new_block("entry");
     auto p_state = init.get_param(0);
     for (size_t i = 0; i < nodes.size(); i++) {
-      nodes[i]->emit_init(entry, make_node_state(p_state, i));
+      nodes[i]->emit_init(entry, dereference_node_state(p_state, i));
     }
     entry.end_with_return();
   }
@@ -1441,7 +1392,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
     auto done_action = process.new_local(t_u32, "done_action");
     entry.add_assignment(done_action, ctx.zero<uint32_t>());
     for (size_t i = 0; i < nodes.size(); i++) {
-      nodes[i]->emit_proc(process, entry, make_node_state(p_state, i), done_action);
+      nodes[i]->emit_proc(process, entry, dereference_node_state(p_state, i), done_action);
     }
     entry.end_with_return(done_action);
   }
@@ -1449,11 +1400,7 @@ Result compile(const DAG &g, unsigned int sample_rate, size_t block_size)
   auto state_size = ctx.gcc.new_global(
     GCC_JIT_GLOBAL_EXPORTED, t_size_t, ctx.graph_symbol("state_size")
   );
-  if (!state_struct) {
-    state_size.set_initializer_rvalue(ctx.zero<size_t>());
-  } else {
-    state_size.set_initializer_rvalue(mlang::gccjit::new_sizeof(*state_struct));
-  }
+  state_size.set_initializer_rvalue(mlang::gccjit::new_sizeof(state_struct));
 
   auto control_descs = std::vector<Result::ControlDesc>{};
   if (!g.controlNames.empty()) {
