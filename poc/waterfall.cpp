@@ -158,6 +158,8 @@ public:
   : in(n), out(n / 2 + 1)
   , plan{fftwf_plan_dft_r2c_1d(n, in.data(), out.data(), FFTW_ESTIMATE)}
   {}
+  FFT(FFT const &) = delete;
+  FFT &operator=(FFT const &) = delete;
   ~FFT() { fftwf_destroy_plan(plan); }
 
   std::span<float> input() { return {in}; }
