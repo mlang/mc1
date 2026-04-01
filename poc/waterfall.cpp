@@ -1,7 +1,7 @@
 // Unicode braille waterfall
 
 #include <fftw3.h>
-#include <sndfile.h>
+#include <sndfile.hh>
 
 #include <algorithm>
 #include <chrono>
@@ -11,9 +11,12 @@
 #include <iostream>
 #include <limits>
 #include <numbers>
+#include <print>
+#include <ranges>
 #include <string>
 #include <thread>
 #include <vector>
+
 
 namespace {
 
@@ -28,16 +31,6 @@ int quant5(float x01)
   x01 = std::clamp(x01, 0.0f, 1.0f);
   int q = int(std::floor(x01 * 5.0f)); // 0..5
   return std::min(q, 4);               // 0..4
-}
-
-float amplitude_dbfs_from_fft_bin(
-  fftwf_complex value, int bin, int bins, float window_sum
-)
-{
-  float mag = std::hypot(value[0], value[1]);
-  if (bin != 0 && bin != bins - 1) mag *= 2.0f;
-  float amplitude = mag / window_sum;
-  return 20.0f * std::log10(std::max(amplitude, std::numeric_limits<float>::epsilon()));
 }
 
 float dbfs_to_unit(float dbfs, float min_dbfs, float max_dbfs)
@@ -141,13 +134,9 @@ std::string logfreq(
 
   std::string result;
   for (size_t x = 0; x < width; x++) {
-    float f0 = edge_hz(2 * x + 0);
-    float f1 = edge_hz(2 * x + 1);
-    float f2 = edge_hz(2 * x + 2);
-
-    int k0 = hz_to_bin(f0);
-    int k1 = hz_to_bin(f1);
-    int k2 = hz_to_bin(f2);
+    int k0 = hz_to_bin(edge_hz(2 * x + 0));
+    int k1 = hz_to_bin(edge_hz(2 * x + 1));
+    int k2 = hz_to_bin(edge_hz(2 * x + 2));
 
     // Ensure non-decreasing bin edges.
     if (k1 < k0) k1 = k0;
@@ -159,6 +148,23 @@ std::string logfreq(
   return result;
 }
 
+class FFT {
+  std::vector<float> in;
+  std::vector<fftwf_complex> out;
+  fftwf_plan plan;
+
+public:
+  FFT(size_t n)
+  : in(n), out(n / 2 + 1)
+  , plan{fftwf_plan_dft_r2c_1d(n, in.data(), out.data(), FFTW_ESTIMATE)}
+  {}
+  ~FFT() { fftwf_destroy_plan(plan); }
+
+  std::span<float> input() { return {in}; }
+  void execute() { fftwf_execute(plan); }
+  std::span<const fftwf_complex> output() const { return {out}; }
+};
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -169,21 +175,21 @@ int main(int argc, char* argv[])
   float display_min_dbfs = -60.0f;
   float display_max_dbfs = 0.0f;
 
-  SF_INFO info{};
-  SNDFILE* sf = sf_open(path.c_str(), SFM_READ, &info);
-  const size_t hop = info.samplerate / fps;
+  SndfileHandle sf(path.c_str());
+  if (sf.error()) {
+    std::println("libsndfile error: {}", sf.strError());
+    return EXIT_FAILURE;
+  }
+  const size_t hop = sf.samplerate() / fps;
   const size_t N = std::bit_ceil(std::bit_ceil(hop + 1) + 1);
   const size_t bins = N / 2 + 1;
 
-  std::vector<float> interleaved(N * info.channels);
-  if (sf_readf_float(sf, interleaved.data(), N) < N) {
-    sf_close(sf);
+  std::vector<float> interleaved(N * sf.channels());
+  if (sf.readf(interleaved.data(), N) < N) {
     return EXIT_SUCCESS;
   }
 
-  std::vector<float> in(N);
-  std::vector<fftwf_complex> out(bins);
-  auto plan = fftwf_plan_dft_r2c_1d(N, in.data(), out.data(), FFTW_ESTIMATE);
+  FFT fft(N);
 
   // Precompute Hann window
   std::vector<float> w(N);
@@ -191,28 +197,31 @@ int main(int argc, char* argv[])
   float window_sum = 0.0f;
   for (float wi: w) window_sum += wi;
 
-  std::vector<float> dbfs(bins);
+  std::vector<float> dbfs(fft.output().size());
 
   using clock = std::chrono::steady_clock;
   auto time = clock::now();
-  const auto hop_duration = clock::duration(std::chrono::seconds(hop)) / info.samplerate;
+  const auto hop_duration = clock::duration(std::chrono::seconds(hop)) / sf.samplerate();
   const int overlap = N - hop;
   do {
     for (sf_count_t i = 0; i < N; ++i) {
       float s = 0.0f;
-      for (int c = 0; c < info.channels; ++c) s += interleaved[i * info.channels + c];
-      s /= info.channels;
-      in[i] = s * w[i];
+      for (int c = 0; c < sf.channels(); ++c) s += interleaved[i * sf.channels() + c];
+      s /= sf.channels();
+      fft.input()[i] = s * w[i];
     }
 
-    fftwf_execute(plan);
+    fft.execute();
 
-    for (int k = 0; k < bins; ++k) {
-      dbfs[k] = amplitude_dbfs_from_fft_bin(out[k], k, bins, window_sum);
+    for (auto [k, value]: fft.output() | std::views::enumerate) {
+      float mag = std::hypot(value[0], value[1]);
+      if (k != 0 && k != fft.output().size() - 1) mag *= 2.0f;
+      const float amplitude = mag / window_sum;
+      dbfs[k] = 20.0f * std::log10(std::max(amplitude, std::numeric_limits<float>::epsilon()));
     }
 
     std::cout << logfreq(width,
-      N, bins, info.samplerate, dbfs, display_min_dbfs, display_max_dbfs, 20.0f, -1.0f
+      N, bins, sf.samplerate(), dbfs, display_min_dbfs, display_max_dbfs, 20.0f, -1.0f
     );
     std::cout.flush();
 
@@ -222,12 +231,10 @@ int main(int argc, char* argv[])
 
     std::memmove(
       interleaved.data(),
-      interleaved.data() + hop * info.channels,
-      size_t(overlap) * info.channels * sizeof(float)
+      interleaved.data() + hop * sf.channels(),
+      size_t(overlap) * sf.channels() * sizeof(float)
     );
-  } while (sf_readf_float(sf, interleaved.data() + overlap * info.channels, hop) == hop);
+  } while (sf.readf(interleaved.data() + overlap * sf.channels(), hop) == hop);
 
-  sf_close(sf);
-  fftwf_destroy_plan(plan);
   return EXIT_SUCCESS;
 }
