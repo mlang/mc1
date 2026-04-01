@@ -167,6 +167,16 @@ public:
   std::span<const fftwf_complex> output() const { return {out}; }
 };
 
+inline auto mono(size_t channels)
+{
+  constexpr auto mean = [](auto frame)
+  {
+    using V = std::ranges::range_value_t<decltype(frame)>;
+    return std::ranges::fold_left(frame, V{}, std::plus<>{}) / frame.size();
+  };
+  return std::views::chunk(channels) | std::views::transform(mean);
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -206,12 +216,12 @@ int main(int argc, char* argv[])
   const auto hop_duration = clock::duration(std::chrono::seconds(hop)) / sf.samplerate();
   const int overlap = N - hop;
   do {
-    for (sf_count_t i = 0; i < N; ++i) {
-      float s = 0.0f;
-      for (int c = 0; c < sf.channels(); ++c) s += interleaved[i * sf.channels() + c];
-      s /= sf.channels();
-      fft.input()[i] = s * w[i];
-    }
+    std::ranges::copy(
+      std::views::zip_transform(std::multiplies<>{},
+        interleaved | mono(sf.channels()), w
+      ),
+      fft.input().begin()
+    );
 
     fft.execute();
 
