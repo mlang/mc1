@@ -224,7 +224,7 @@ class JACK : public AudioSource
     for (auto [ch, port]: self.inports | std::views::enumerate) {
       auto* in = static_cast<const float*>(jack_port_get_buffer(port, nframes));
       for (jack_nframes_t i = 0; i < nframes; ++i)
-        self.tmp[size_t(i) * C + ch] = in[i];
+        self.tmp[C * i + ch] = in[i];
     }
 
     self.q.push(self.tmp.begin(), self.tmp.end());
@@ -265,7 +265,7 @@ public:
 
     while (q.read_available() < want_samples) {
       const size_t avail_frames = q.read_available() / channels();
-      const size_t missing_frames = frames - avail_frames;
+      const auto missing_frames = frames - avail_frames;
 
       using clock = std::chrono::steady_clock;
       auto dt = clock::duration(std::chrono::seconds(missing_frames)) / samplerate();
