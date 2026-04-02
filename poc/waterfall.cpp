@@ -244,7 +244,7 @@ public:
                                        JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
     }
 
-    tmp.resize(size_t(jack_get_buffer_size(client)) * inputs);
+    tmp.resize(inputs * jack_get_buffer_size(client));
 
     jack_set_process_callback(client, &JACK::process_cb, this);
     jack_activate(client);
@@ -261,10 +261,21 @@ public:
 
   size_t readf(float* interleaved, size_t frames) override
   {
-    const size_t want = frames * channels();
-    while (q.read_available() < want)
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    q.pop(interleaved, want);
+    const size_t want_samples = frames * channels();
+
+    while (q.read_available() < want_samples) {
+      const size_t avail_frames = q.read_available() / channels();
+      const size_t missing_frames = frames - avail_frames;
+
+      using clock = std::chrono::steady_clock;
+      auto dt = clock::duration(std::chrono::seconds(missing_frames)) / samplerate();
+
+      dt -= std::chrono::microseconds(200);
+      if (dt > std::chrono::microseconds(0)) std::this_thread::sleep_for(dt);
+      else std::this_thread::yield();
+    }
+
+    q.pop(interleaved, want_samples);
     return frames;
   }
 };
@@ -292,8 +303,6 @@ int main(int argc, char* argv[])
   }
 
   FFT fft(N);
-
-  // Precompute Hann window
   std::vector<float> w(N);
   for (int i = 0; i < N; ++i) w[i] = hann(i, N);
   float window_sum = 0.0f;
@@ -306,6 +315,8 @@ int main(int argc, char* argv[])
   const auto hop_duration = clock::duration(std::chrono::seconds(hop)) / src.samplerate();
   const int overlap = N - hop;
   do {
+    std::cout << '\n';
+
     std::ranges::copy(
       std::views::zip_transform(std::multiplies<>{},
         interleaved | mono(src.channels()), w
@@ -329,7 +340,6 @@ int main(int argc, char* argv[])
 
     time += hop_duration;
     std::this_thread::sleep_for(time - clock::now());
-    std::cout << '\n';
 
     std::memmove(
       interleaved.data(),
