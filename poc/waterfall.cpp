@@ -2,8 +2,12 @@
 
 #include <fftw3.h>
 #include <sndfile.hh>
+#include <jack/jack.h>
+#include <boost/lockfree/spsc_queue.hpp>
+
 
 #include <algorithm>
+#include <cassert>
 #include <chrono>
 #include <cmath>
 #include <cstdio>
@@ -177,6 +181,94 @@ inline auto mono(size_t channels)
   return std::views::chunk(channels) | std::views::transform(mean);
 }
 
+class AudioSource
+{
+public:
+  virtual ~AudioSource() = default;
+  virtual size_t channels() const = 0;
+  virtual unsigned int samplerate() const = 0;
+  virtual size_t readf(float *interleaved, size_t frames) = 0;
+};
+
+class SoundFile : public AudioSource
+{
+  SndfileHandle sf;
+
+public:
+  SoundFile(std::string path)
+  : sf(path)
+  { if (sf.error()) throw std::runtime_error(sf.strError()); }
+
+  size_t channels() const override { return sf.channels(); }
+  unsigned int samplerate() const override { return sf.samplerate(); }
+  size_t readf(float *interleaved, size_t frames) override
+  { return sf.readf(interleaved, frames); }
+};
+
+class JACK : public AudioSource
+{
+  jack_client_t* client{};
+  std::vector<jack_port_t*> inports;   // non-RT
+  std::vector<float> tmp;              // non-RT, reused in RT
+  unsigned int fs{};
+
+  boost::lockfree::spsc_queue<float, boost::lockfree::capacity<1 << 18>> q;
+
+  static int process_cb(jack_nframes_t nframes, void* arg)
+  {
+    auto& self = *static_cast<JACK*>(arg);
+    const size_t C = self.inports.size();
+    const size_t n = size_t(nframes) * C;
+    assert(n == self.tmp.size());
+
+    for (auto [ch, port]: self.inports | std::views::enumerate) {
+      auto* in = static_cast<const float*>(jack_port_get_buffer(port, nframes));
+      for (jack_nframes_t i = 0; i < nframes; ++i)
+        self.tmp[size_t(i) * C + ch] = in[i];
+    }
+
+    self.q.push(self.tmp.begin(), self.tmp.end());
+    return 0;
+  }
+
+public:
+  explicit JACK(size_t inputs = 1)
+  : inports(inputs)
+  {
+    client = jack_client_open("braille-waterfall", JackNoStartServer, nullptr);
+    fs = jack_get_sample_rate(client);
+
+    for (size_t ch = 0; ch < inputs; ++ch) {
+      auto name = "in_" + std::to_string(ch + 1);
+      inports[ch] = jack_port_register(client, name.c_str(),
+                                       JACK_DEFAULT_AUDIO_TYPE, JackPortIsInput, 0);
+    }
+
+    tmp.resize(size_t(jack_get_buffer_size(client)) * inputs);
+
+    jack_set_process_callback(client, &JACK::process_cb, this);
+    jack_activate(client);
+  }
+
+  ~JACK() override
+  {
+    jack_deactivate(client);
+    jack_client_close(client);
+  }
+
+  size_t channels() const override { return inports.size(); }
+  unsigned int samplerate() const override { return fs; }
+
+  size_t readf(float* interleaved, size_t frames) override
+  {
+    const size_t want = frames * channels();
+    while (q.read_available() < want)
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    q.pop(interleaved, want);
+    return frames;
+  }
+};
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -187,17 +279,15 @@ int main(int argc, char* argv[])
   float display_min_dbfs = -60.0f;
   float display_max_dbfs = 0.0f;
 
-  SndfileHandle sf(path.c_str());
-  if (sf.error()) {
-    std::println("libsndfile error: {}", sf.strError());
-    return EXIT_FAILURE;
-  }
-  const size_t hop = sf.samplerate() / fps;
+  std::unique_ptr<AudioSource> src_ptr;
+  src_ptr = std::make_unique<SoundFile>(path);
+  auto &src = *src_ptr;
+  const size_t hop = src.samplerate() / fps;
   const size_t N = std::bit_ceil(std::bit_ceil(hop + 1) + 1);
   const size_t bins = N / 2 + 1;
 
-  std::vector<float> interleaved(N * sf.channels());
-  if (sf.readf(interleaved.data(), N) < N) {
+  std::vector<float> interleaved(N * src.channels());
+  if (src.readf(interleaved.data(), N) < N) {
     return EXIT_SUCCESS;
   }
 
@@ -213,12 +303,12 @@ int main(int argc, char* argv[])
 
   using clock = std::chrono::steady_clock;
   auto time = clock::now();
-  const auto hop_duration = clock::duration(std::chrono::seconds(hop)) / sf.samplerate();
+  const auto hop_duration = clock::duration(std::chrono::seconds(hop)) / src.samplerate();
   const int overlap = N - hop;
   do {
     std::ranges::copy(
       std::views::zip_transform(std::multiplies<>{},
-        interleaved | mono(sf.channels()), w
+        interleaved | mono(src.channels()), w
       ),
       fft.input().begin()
     );
@@ -233,7 +323,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << logfreq(width,
-      N, bins, sf.samplerate(), dbfs, display_min_dbfs, display_max_dbfs, 20.0f, -1.0f
+      N, bins, src.samplerate(), dbfs, display_min_dbfs, display_max_dbfs, 20.0f, -1.0f
     );
     std::cout.flush();
 
@@ -243,10 +333,10 @@ int main(int argc, char* argv[])
 
     std::memmove(
       interleaved.data(),
-      interleaved.data() + hop * sf.channels(),
-      size_t(overlap) * sf.channels() * sizeof(float)
+      interleaved.data() + hop * src.channels(),
+      size_t(overlap) * src.channels() * sizeof(float)
     );
-  } while (sf.readf(interleaved.data() + overlap * sf.channels(), hop) == hop);
+  } while (src.readf(interleaved.data() + overlap * src.channels(), hop) == hop);
 
   return EXIT_SUCCESS;
 }
