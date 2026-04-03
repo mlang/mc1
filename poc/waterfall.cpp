@@ -5,11 +5,11 @@
 #include <jack/jack.h>
 #include <boost/lockfree/spsc_queue.hpp>
 
-
 #include <algorithm>
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <charconv>
 #include <cstdio>
 #include <cstring>
 #include <iostream>
@@ -190,7 +190,7 @@ public:
   virtual size_t readf(float *interleaved, size_t frames) = 0;
 };
 
-class SoundFile : public AudioSource
+class SoundFile final : public AudioSource
 {
   SndfileHandle sf;
 
@@ -205,7 +205,7 @@ public:
   { return sf.readf(interleaved, frames); }
 };
 
-class JACK : public AudioSource
+class JACK final : public AudioSource
 {
   jack_client_t* client{};
   std::vector<jack_port_t*> inports;   // non-RT
@@ -280,19 +280,14 @@ public:
   }
 };
 
-} // namespace
-
-int main(int argc, char* argv[])
+int waterfall(
+  AudioSource &src,
+  unsigned int fps = 30,
+  unsigned int width = 79,
+  float display_min_dbfs = -60.0f, float display_max_dbfs = 0.0f,
+  float min_freq = 20.0f, float max_freq = -1.0f
+)
 {
-  std::string path = (argc > 1) ? argv[1] : "";
-  unsigned int fps = 30;
-  unsigned int width = 79;
-  float display_min_dbfs = -60.0f;
-  float display_max_dbfs = 0.0f;
-
-  std::unique_ptr<AudioSource> src_ptr;
-  src_ptr = std::make_unique<SoundFile>(path);
-  auto &src = *src_ptr;
   const size_t hop = src.samplerate() / fps;
   const size_t N = std::bit_ceil(std::bit_ceil(hop + 1) + 1);
   const size_t bins = N / 2 + 1;
@@ -334,7 +329,7 @@ int main(int argc, char* argv[])
     }
 
     std::cout << logfreq(width,
-      N, bins, src.samplerate(), dbfs, display_min_dbfs, display_max_dbfs, 20.0f, -1.0f
+      N, bins, src.samplerate(), dbfs, display_min_dbfs, display_max_dbfs, min_freq, max_freq
     );
     std::cout.flush();
 
@@ -349,4 +344,123 @@ int main(int argc, char* argv[])
   } while (src.readf(interleaved.data() + overlap * src.channels(), hop) == hop);
 
   return EXIT_SUCCESS;
+}
+
+} // namespace
+
+int main(int argc, char* argv[])
+{
+  auto usage = [&]() -> int {
+    std::print(
+      "usage:\n"
+      "  {} [options] (--jack | <filename>)\n\n"
+      "options:\n"
+      "  --fps N                 Frames per second (default: 30)\n"
+      "  --min-freq HZ           Min displayed frequency (default: 20)\n"
+      "  --max-freq HZ           Max displayed frequency (default: nyquist)\n"
+      "  --min-dbfs DB           Min displayed level in dBFS (default: -60)\n"
+      "  --max-dbfs DB           Max displayed level in dBFS (default: 0)\n"
+      "  --width N               Output width in braille glyphs (default: 79)\n"
+      "  --jack                  Use JACK input instead of a file\n"
+      "  --help                  Show this help\n",
+      argv[0]
+    );
+    return EXIT_FAILURE;
+  };
+
+  auto die = [&](std::string_view msg) -> int {
+    std::println("error: {}", msg);
+    return EXIT_FAILURE;
+  };
+
+  auto require_value = [&](int& i, std::string_view opt) -> std::string_view {
+    if (i + 1 >= argc) throw opt;
+    return argv[++i];
+  };
+
+  auto parse_u32 = [&](std::string_view s, std::string_view opt) -> unsigned {
+    unsigned v{};
+    auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{} || p != s.data() + s.size()) {
+      std::println("error: invalid value for {}: '{}'", opt, s);
+      throw opt;
+    }
+    return v;
+  };
+
+  auto parse_f32 = [&](std::string_view s, std::string_view opt) -> float {
+    float v{};
+    auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
+    if (ec != std::errc{} || p != s.data() + s.size()) {
+      std::println("error: invalid value for {}: '{}'", opt, s);
+      throw opt;
+    }
+    return v;
+  };
+
+  // Defaults (match your existing call)
+  unsigned fps = 30;
+  unsigned width = 79;
+  float min_freq = 20.0f;
+  float max_freq = -1.0f; // <=0 => Nyquist
+  float min_dbfs = -60.0f;
+  float max_dbfs = 0.0f;
+
+  bool use_jack = false;
+  std::string filename;
+
+  try {
+    for (int i = 1; i < argc; ++i) {
+      std::string_view a = argv[i];
+
+      if (a == "--help") {
+        return usage();
+      } else if (a == "--fps") {
+        fps = parse_u32(require_value(i, "--fps"), "--fps");
+      } else if (a == "--width") {
+        width = parse_u32(require_value(i, "--width"), "--width");
+      } else if (a == "--min-freq") {
+        min_freq = parse_f32(require_value(i, "--min-freq"), "--min-freq");
+      } else if (a == "--max-freq") {
+        max_freq = parse_f32(require_value(i, "--max-freq"), "--max-freq");
+      } else if (a == "--min-dbfs") {
+        min_dbfs = parse_f32(require_value(i, "--min-dbfs"), "--min-dbfs");
+      } else if (a == "--max-dbfs") {
+        max_dbfs = parse_f32(require_value(i, "--max-dbfs"), "--max-dbfs");
+      } else if (a == "--jack") {
+        use_jack = true;
+      } else if (!a.empty() && a.front() == '-') {
+        std::println("error: unknown option: {}", a);
+        return usage();
+      } else {
+        if (!filename.empty()) {
+          std::println("error: multiple filenames given: '{}' and '{}'", filename, a);
+          return usage();
+        }
+        filename = std::string(a);
+      }
+    }
+  } catch (std::string_view opt) {
+    std::println("error: missing value for {}", opt);
+    return usage();
+  }
+
+  if (use_jack && !filename.empty())
+    return die("choose either --jack or <filename>, not both");
+  if (!use_jack && filename.empty())
+    return die("missing input source: specify --jack or <filename>");
+
+  if (fps == 0)   return die("--fps must be > 0");
+  if (width == 0) return die("--width must be > 0");
+
+  std::unique_ptr<AudioSource> src;
+  try {
+    if (use_jack) src = std::make_unique<JACK>(1);
+    else          src = std::make_unique<SoundFile>(filename);
+  } catch (const std::exception& e) {
+    std::println("error: failed to open input: {}", e.what());
+    return EXIT_FAILURE;
+  }
+
+  return waterfall(*src, fps, width, min_dbfs, max_dbfs, min_freq, max_freq);
 }
