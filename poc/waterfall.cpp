@@ -7,13 +7,13 @@
 
 #include <algorithm>
 #include <cassert>
-#include <chrono>
-#include <cmath>
 #include <charconv>
+#include <chrono>
+#include <concepts>
+#include <cmath>
 #include <cstdio>
 #include <cstdint>
 #include <cstring>
-#include <iostream>
 #include <limits>
 #include <numbers>
 #include <print>
@@ -27,56 +27,15 @@ namespace {
 
 using brl_t = uint8_t;
 
-float hann(int n, int N)
+constexpr brl_t brl(unsigned dots)
 {
-  constexpr auto tau = 2.0f * std::numbers::pi_v<float>;
-  return 0.5f - 0.5f * std::cos(tau * n / (N - 1));
-}
-
-int quant5(float x01)
-{
-  x01 = std::clamp(x01, 0.0f, 1.0f);
-  int q = int(std::floor(x01 * 5.0f)); // 0..5
-  return std::min(q, 4);               // 0..4
-}
-
-float dbfs_to_unit(float dbfs, float min_dbfs, float max_dbfs)
-{
-  if (max_dbfs <= min_dbfs) return 0.0f;
-  return (dbfs - min_dbfs) / (max_dbfs - min_dbfs);
-}
-
-brl_t glyph2x4(int L, int R)
-{
-  auto set_if = [](brl_t &mask, bool on, int dot) {
-    if (on) mask |= 1 << (dot - 1); // dot 1 -> bit0, dot 8 -> bit7
-  };
-
   brl_t mask = 0;
-
-  // Left column
-  set_if(mask, L >= 1, 1);
-  set_if(mask, L >= 2, 2);
-  set_if(mask, L >= 3, 3);
-  set_if(mask, L == 4, 7);
-
-  // Right column
-  set_if(mask, R >= 1, 4);
-  set_if(mask, R >= 2, 5);
-  set_if(mask, R >= 3, 6);
-  set_if(mask, R == 4, 8);
-
+  while (dots != 0) {
+    const unsigned d = dots % 10;
+    if (d >= 1 && d <= 8) mask |= brl_t{1} << (d - 1);
+    dots /= 10;
+  }
   return mask;
-}
-
-brl_t mirror_brl(brl_t cell)
-{
-  return static_cast<brl_t>(
-    ((cell & 0x07u) << 3) |
-    ((cell & 0x38u) >> 3) |
-    ((cell & 0x40u) << 1) |
-    ((cell & 0x80u) >> 1)
-  );
 }
 
 std::string to_utf8(std::span<brl_t> cells)
@@ -86,91 +45,37 @@ std::string to_utf8(std::span<brl_t> cells)
 
   for (brl_t cell: cells) {
     auto cp = static_cast<char32_t>(0x2800u + cell);
-    s.push_back(static_cast<char>(0xE0 | ((cp >> 12) & 0x0F)));
-    s.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
-    s.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    s.push_back(0xE0 | ((cp >> 12) & 0x0F));
+    s.push_back(0x80 | ((cp >> 6) & 0x3F));
+    s.push_back(0x80 | (cp & 0x3F));
   }
 
   return s;
 }
 
-std::vector<brl_t> logfreq(
-  int width,
-  int N, int bins, int samplerate,
-  const std::vector<float>& dbfs,
-  float min_dbfs,
-  float max_dbfs,
-  float f_min = 20.0f,           // lowest displayed frequency (Hz)
-  float f_max = -1.0f            // highest displayed frequency (Hz); <=0 means Nyquist
-)
+float hann(size_t n, size_t N)
 {
-  auto clampi = [](int v, int lo, int hi) { return std::max(lo, std::min(v, hi)); };
-
-  const float Fs = float(samplerate);
-  const float nyq = 0.5f * Fs;
-  if (f_max <= 0.0f || f_max > nyq) f_max = nyq;
-
-  // Avoid log(0) and invalid ranges
-  f_min = std::max(1.0f, std::min(f_min, f_max * 0.999f));
-
-  // Convert frequency (Hz) to nearest FFT bin index.
-  auto hz_to_bin = [&](float f_hz) -> int {
-    float k = f_hz * float(N) / Fs;          // bin index (float)
-    int ki = int(std::lround(k));
-    return clampi(ki, 0, bins - 1);
-  };
-
-  // Log-frequency edges for this character column: [f0, f2], split at f1 for L/R.
-  // We use edges (not centers) so the whole [f_min,f_max] is covered.
-  auto edge_hz = [&](int edgeIndex /*0..2*width*/) -> float {
-    float t = float(edgeIndex) / float(2 * width);            // 0..1
-    float r = std::log(f_max / f_min);
-    return f_min * std::exp(r * t);
-  };
-
-  // Reduce a bin range [a,b] (inclusive) into one level.
-  // We combine as: max over bins of dBFS, then normalize to the fixed display range.
-  // (Max works well for thin tonal lines; average works better for noise.)
-  auto level_for_range = [&](int a, int b) -> int
-  {
-    a = clampi(a, 0, bins - 1);
-    b = clampi(b, 0, bins - 1);
-    if (b < a) std::swap(a, b);
-
-    float best_dbfs = std::numeric_limits<float>::lowest();
-    for (int k = a; k <= b; ++k) {
-      best_dbfs = std::max(best_dbfs, dbfs[k]);
-    }
-
-    return quant5(dbfs_to_unit(best_dbfs, min_dbfs, max_dbfs));
-  };
-
-  std::vector<brl_t> result;
-  result.reserve(std::max(width, 0));
-
-  for (int x = 0; x < width; ++x) {
-    int k0 = hz_to_bin(edge_hz(2 * x + 0));
-    int k1 = hz_to_bin(edge_hz(2 * x + 1));
-    int k2 = hz_to_bin(edge_hz(2 * x + 2));
-
-    // Ensure non-decreasing bin edges.
-    if (k1 < k0) k1 = k0;
-    if (k2 < k1) k2 = k1;
-
-    result.push_back(glyph2x4(level_for_range(k0, k1), level_for_range(k1, k2)));
-  }
-
-  return result;
+  constexpr auto tau = 2.0f * std::numbers::pi_v<float>;
+  return 0.5f - 0.5f * std::cos(tau * n / (N - 1));
 }
 
-class FFT {
+class FFT
+{
   std::vector<float> in;
+  std::vector<float> win;
+  float win_sum;
   std::vector<fftwf_complex> out;
   fftwf_plan plan;
 
 public:
-  FFT(size_t n)
-  : in(n), out(n / 2 + 1)
+  FFT(size_t n, float (*window)(size_t, size_t))
+  : in(n)
+  , win{ std::views::iota(size_t{0}, n)
+       | std::views::transform([=](size_t i) { return window(i, n); })
+       | std::ranges::to<std::vector>()
+       }
+  , win_sum{std::ranges::fold_left(win, 0.0f, std::plus{})}
+  , out(n / 2 + 1)
   , plan{fftwf_plan_dft_r2c_1d(n, in.data(), out.data(), FFTW_ESTIMATE)}
   {}
   FFT(FFT const &) = delete;
@@ -178,8 +83,27 @@ public:
   ~FFT() { fftwf_destroy_plan(plan); }
 
   std::span<float> input() { return in; }
-  void execute() { fftwf_execute(plan); }
+
+  void execute()
+  {
+    std::ranges::transform(in, win, in.begin(), std::multiplies{});
+    fftwf_execute(plan);
+  }
+
   std::span<const fftwf_complex> output() const { return out; }
+
+  auto dbfs() const
+  {
+    auto to_dbfs = [win_sum = win_sum, max_k = out.size() - 1](auto&& t)
+    {
+      auto [k, value] = t;
+      float mag = std::hypot(value[0], value[1]);
+      if (k != 0 && k != max_k) mag *= 2.0f;
+      const float amplitude = mag / win_sum;
+      return 20.0f * std::log10(std::max(amplitude, std::numeric_limits<float>::epsilon()));
+    };
+    return out | std::views::enumerate | std::views::transform(to_dbfs);
+  }
 };
 
 inline auto mono(size_t channels)
@@ -192,9 +116,8 @@ inline auto mono(size_t channels)
   return std::views::chunk(channels) | std::views::transform(mean);
 }
 
-class AudioSource
+struct AudioSource
 {
-public:
   virtual ~AudioSource() = default;
   virtual size_t channels() const = 0;
   virtual unsigned int samplerate() const = 0;
@@ -225,12 +148,12 @@ class JACK final : public AudioSource
 
   boost::lockfree::spsc_queue<float, boost::lockfree::capacity<1 << 18>> q;
 
-  static int process_cb(jack_nframes_t nframes, void* arg)
+  static int process(jack_nframes_t nframes, void* arg)
   {
     auto& self = *static_cast<JACK*>(arg);
     const size_t C = self.inports.size();
     const size_t n = size_t(nframes) * C;
-    assert(n == self.tmp.size());
+    assert(n <= self.tmp.size());
 
     for (auto [ch, port]: self.inports | std::views::enumerate) {
       auto* in = static_cast<const float*>(jack_port_get_buffer(port, nframes));
@@ -242,11 +165,20 @@ class JACK final : public AudioSource
     return 0;
   }
 
+  static int bufsize(jack_nframes_t nframes, void* arg)
+  {
+    auto& self = *static_cast<JACK*>(arg);
+    auto new_size = self.inports.size() * nframes;
+    if (self.tmp.size() < new_size) self.tmp.resize(new_size);
+    return 0;
+  }
+
 public:
   explicit JACK(size_t inputs = 1)
-  : inports(inputs)
+  : client{jack_client_open("braille-waterfall", JackNoStartServer, nullptr)}
+  , inports(inputs)
   {
-    client = jack_client_open("braille-waterfall", JackNoStartServer, nullptr);
+    if (!client) throw std::runtime_error("Failed to open JACK client");
     fs = jack_get_sample_rate(client);
 
     for (size_t ch = 0; ch < inputs; ++ch) {
@@ -257,7 +189,8 @@ public:
 
     tmp.resize(inputs * jack_get_buffer_size(client));
 
-    jack_set_process_callback(client, &JACK::process_cb, this);
+    jack_set_process_callback(client, &JACK::process, this);
+    jack_set_buffer_size_callback(client, &JACK::bufsize, this);
     jack_activate(client);
   }
 
@@ -291,6 +224,63 @@ public:
   }
 };
 
+template <class R>
+concept resample_input =
+  std::ranges::random_access_range<R> &&
+  std::ranges::sized_range<R> &&
+  std::convertible_to<std::ranges::range_reference_t<R>, float>;
+
+auto log_resample(resample_input auto in,
+  float bin_scale, float f_min, float f_max, auto out, int size
+)
+{
+  const int bins = int(in.size());
+
+  auto edge_bin = [=, a = std::log(f_max / f_min) / size](int i)
+  {
+    const auto f = f_min * std::exp(a * i);
+    return std::clamp(int(std::lround(f * bin_scale)), 0, bins - 1);
+  };
+
+  auto edges = std::views::iota(0, size + 1)
+             | std::views::transform(edge_bin);
+
+  for (auto [k0, k1] : edges | std::views::adjacent<2>) {
+    *out++ = *std::max_element(in.begin() + k0, in.begin() + k1 + 1);
+  }
+  return out;
+}
+
+std::string braille_glyphs(std::span<const float> dbfs, float min_dbfs, float max_dbfs)
+{
+  auto level4 = [&](float d) -> int {
+    auto x01 = std::clamp((d - min_dbfs) / (max_dbfs - min_dbfs), 0.0f, 1.0f);
+    return std::min(4, int(std::floor(x01 * 5.0f))); // 0..4
+  };
+
+  std::vector<brl_t> cells;
+  cells.reserve((dbfs.size() + 1) / 2);
+
+  for (auto lr: dbfs | std::views::chunk(2)) {
+    const int L = level4(lr[0]);
+    const int R = lr.size() == 2 ? level4(lr[1]) : 0;
+    brl_t mask = 0;
+
+    if(L >= 1) mask |= brl(1);
+    if(L >= 2) mask |= brl(2);
+    if(L >= 3) mask |= brl(3);
+    if(L == 4) mask |= brl(7);
+    if(R >= 1) mask |= brl(4);
+    if(R >= 2) mask |= brl(5);
+    if(R >= 3) mask |= brl(6);
+    if(R == 4) mask |= brl(8);
+
+    cells.push_back(mask);
+  }
+
+  return to_utf8(cells);
+}
+
 int waterfall(
   AudioSource &src,
   unsigned int fps = 30,
@@ -300,94 +290,75 @@ int waterfall(
   bool stereo = false
 )
 {
-  const size_t hop = src.samplerate() / fps;
-  const size_t N = std::bit_ceil(std::bit_ceil(hop + 1) + 1);
-  const size_t bins = N / 2 + 1;
+  const size_t hop  = src.samplerate() / fps;
+  const size_t N    = std::bit_ceil(std::bit_ceil(hop + 1) + 1);
 
-  std::vector<float> interleaved(N * src.channels());
-  if (src.readf(interleaved.data(), N) < N) {
-    return EXIT_SUCCESS;
-  }
+  const float Fs  = float(src.samplerate());
+  const float nyq = 0.5f * Fs;
+  if (max_freq <= 0.0f || max_freq > nyq) max_freq = nyq;
+  min_freq = std::max(1.0f, std::min(min_freq, max_freq * 0.999f));
+  FFT fft(N, hann);
 
-  FFT fft(N);
-  std::vector<float> w(N);
-  for (int i = 0; i < N; ++i) w[i] = hann(i, N);
-  float window_sum = 0.0f;
-  for (float wi: w) window_sum += wi;
+  std::vector<float> line(2 * width, std::numeric_limits<float>::lowest());
 
-  std::vector<float> dbfs(fft.output().size());
-  std::vector<float> dbfs_r;
-  if (stereo) dbfs_r.resize(fft.output().size());
+  const float bin_scale = float(N) / Fs;
 
   using clock = std::chrono::steady_clock;
   auto time = clock::now();
   const auto hop_duration = clock::duration(std::chrono::seconds(hop)) / src.samplerate();
-  const int overlap = N - hop;
+  const size_t overlap = N - hop;
 
-  auto compute_dbfs = [&](auto fill_input, std::vector<float>& out_dbfs) {
-    fill_input();
-    fft.execute();
-
-    for (auto [k, value]: fft.output() | std::views::enumerate) {
-      float mag = std::hypot(value[0], value[1]);
-      if (k != 0 && k != fft.output().size() - 1) mag *= 2.0f;
-      const float amplitude = mag / window_sum;
-      out_dbfs[k] = 20.0f * std::log10(std::max(amplitude, std::numeric_limits<float>::epsilon()));
-    }
-  };
+  std::vector<float> interleaved(N * src.channels());
+  if (src.readf(interleaved.data(), N) < N) return EXIT_SUCCESS;
 
   do {
-    std::cout << '\n';
+    std::println("");
 
-    std::vector<brl_t> glyphs;
-    if (!stereo) {
-      compute_dbfs([&] {
-        std::ranges::copy(
-          std::views::zip_transform(std::multiplies<>{},
-            interleaved | mono(src.channels()), w
-          ),
-          fft.input().begin()
-        );
-      }, dbfs);
+    if (stereo) {
+      // Compute split in *glyphs*, then convert to "columns"
+      const int half_glyphs = int(width / 2);
+      const int mid_glyph   = int(width % 2);          // 1 => insert one blank glyph
+      const int left_cols   = 2 * half_glyphs;
+      const int mid_cols    = 2 * mid_glyph;           // 0 or 2 columns (one glyph)
+      const int right_cols  = 2 * half_glyphs;
 
-      glyphs = logfreq(width,
-        N, bins, src.samplerate(), dbfs, display_min_dbfs, display_max_dbfs, min_freq, max_freq
+      // Left FFT
+      for (size_t i = 0; i < N; ++i) fft.input()[i] = interleaved[2 * i + 0];
+      fft.execute();
+      log_resample(fft.dbfs(), bin_scale, min_freq, max_freq,
+       	line.begin(), left_cols
+      );
+      std::reverse(line.begin(), line.begin() + left_cols);
+
+      // Optional center blank glyph (2 columns)
+      if (mid_cols) {
+        line[left_cols + 0] = std::numeric_limits<float>::lowest();
+        line[left_cols + 1] = std::numeric_limits<float>::lowest();
+      }
+
+      // Right FFT
+      for (size_t i = 0; i < N; ++i) fft.input()[i] = interleaved[2 * i + 1];
+      fft.execute();
+      log_resample(fft.dbfs(), bin_scale, min_freq, max_freq,
+       	line.begin() + left_cols + mid_cols, right_cols
       );
     } else {
-      compute_dbfs([&] {
-        for (size_t i = 0; i < N; ++i) fft.input()[i] = interleaved[2 * i] * w[i];
-      }, dbfs);
-      compute_dbfs([&] {
-        for (size_t i = 0; i < N; ++i) fft.input()[i] = interleaved[2 * i + 1] * w[i];
-      }, dbfs_r);
-
-      const auto half_width = static_cast<int>(width / 2);
-      auto left = logfreq(half_width,
-        N, bins, src.samplerate(), dbfs, display_min_dbfs, display_max_dbfs, min_freq, max_freq
+      std::ranges::copy(interleaved | mono(src.channels()), fft.input().begin());
+      fft.execute();
+      log_resample(fft.dbfs(), bin_scale, min_freq, max_freq,
+       	line.begin(), line.size()
       );
-      auto right = logfreq(half_width,
-        N, bins, src.samplerate(), dbfs_r, display_min_dbfs, display_max_dbfs, min_freq, max_freq
-      );
-
-      std::ranges::reverse(left);
-      std::ranges::transform(left, left.begin(), mirror_brl);
-
-      glyphs.reserve(left.size() + right.size() + (width % 2));
-      glyphs.insert(glyphs.end(), left.begin(), left.end());
-      if (width % 2) glyphs.push_back(brl_t{0});
-      glyphs.insert(glyphs.end(), right.begin(), right.end());
     }
 
-    std::cout << to_utf8(glyphs);
-    std::cout.flush();
+    std::print("{}", braille_glyphs(line, display_min_dbfs, display_max_dbfs));
+    fflush(stdout);
 
     time += hop_duration;
     std::this_thread::sleep_for(time - clock::now());
 
     std::memmove(
-      interleaved.data(),
-      interleaved.data() + hop * src.channels(),
-      size_t(overlap) * src.channels() * sizeof(float)
+      interleaved.data(), interleaved.data() + hop * src.channels(),
+      overlap * src.channels() * sizeof(float)
     );
   } while (src.readf(interleaved.data() + overlap * src.channels(), hop) == hop);
 
@@ -398,7 +369,7 @@ int waterfall(
 
 int main(int argc, char* argv[])
 {
-  auto usage = [&]() -> int {
+  auto usage = [=]() -> int {
     std::print(
       "usage:\n"
       "  {} [options] (--jack | <filename>)\n\n"
@@ -447,7 +418,6 @@ int main(int argc, char* argv[])
     return v;
   };
 
-  // Defaults (match your existing call)
   unsigned fps = 30;
   unsigned width = 79;
   float min_freq = 20.0f;
