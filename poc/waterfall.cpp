@@ -16,7 +16,6 @@
 #include <cstring>
 #include <limits>
 #include <numbers>
-#include <print>
 #include <ranges>
 #include <span>
 #include <string>
@@ -357,7 +356,7 @@ int waterfall(
 
   auto edges = init_edges(stereo ? width / 2 * 2 : line.size(), fft.output().size(), bin_scale, min_freq, max_freq);
   do {
-    std::println("");
+    std::putchar('\n');
 
     if (stereo) {
       // Compute split in *glyphs*, then convert to "columns"
@@ -388,7 +387,7 @@ int waterfall(
       resample(fft.dbfs(), edges, line.begin());
     }
 
-    std::print("{}", braille_glyphs(line, display_min_dbfs, display_max_dbfs));
+    std::fputs(braille_glyphs(line, display_min_dbfs, display_max_dbfs).c_str(), stdout);
     fflush(stdout);
 
     time += hop_duration;
@@ -408,9 +407,10 @@ int waterfall(
 int main(int argc, char* argv[])
 {
   auto usage = [=]() -> int {
-    std::print(
+    std::fprintf(
+      stdout,
       "usage:\n"
-      "  {} [options] (--jack | <filename>)\n\n"
+      "  %s [options] (--jack | <filename>)\n\n"
       "options:\n"
       "  --fps N                 Frames per second (default: 30)\n"
       "  --min-freq HZ           Min displayed frequency (default: 20)\n"
@@ -429,7 +429,7 @@ int main(int argc, char* argv[])
   };
 
   auto die = [](std::string_view msg) -> int {
-    std::println("error: {}", msg);
+    std::fprintf(stdout, "error: %.*s\n", int(msg.size()), msg.data());
     return EXIT_FAILURE;
   };
 
@@ -442,7 +442,10 @@ int main(int argc, char* argv[])
     unsigned v{};
     auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
     if (ec != std::errc{} || p != s.data() + s.size()) {
-      std::println("error: invalid value for {}: '{}'", opt, s);
+      std::fprintf(
+        stdout, "error: invalid value for %.*s: '%.*s'\n",
+        int(opt.size()), opt.data(), int(s.size()), s.data()
+      );
       throw opt;
     }
     return v;
@@ -452,7 +455,10 @@ int main(int argc, char* argv[])
     float v{};
     auto [p, ec] = std::from_chars(s.data(), s.data() + s.size(), v);
     if (ec != std::errc{} || p != s.data() + s.size()) {
-      std::println("error: invalid value for {}: '{}'", opt, s);
+      std::fprintf(
+        stdout, "error: invalid value for %.*s: '%.*s'\n",
+        int(opt.size()), opt.data(), int(s.size()), s.data()
+      );
       throw opt;
     }
     return v;
@@ -498,18 +504,21 @@ int main(int argc, char* argv[])
       } else if (a == "--stereo") {
         stereo = true;
       } else if (!a.empty() && a.front() == '-') {
-        std::println("error: unknown option: {}", a);
+        std::fprintf(stdout, "error: unknown option: %.*s\n", int(a.size()), a.data());
         return usage();
       } else {
         if (!filename.empty()) {
-          std::println("error: multiple filenames given: '{}' and '{}'", filename, a);
+          std::fprintf(
+            stdout, "error: multiple filenames given: '%s' and '%.*s'\n",
+            filename.c_str(), int(a.size()), a.data()
+          );
           return usage();
         }
         filename = std::string(a);
       }
     }
   } catch (std::string_view opt) {
-    std::println("error: missing value for {}", opt);
+    std::fprintf(stdout, "error: missing value for %.*s\n", int(opt.size()), opt.data());
     return usage();
   }
 
@@ -526,7 +535,7 @@ int main(int argc, char* argv[])
     if (use_jack) src = std::make_unique<JACK>(stereo ? 2 : 1);
     else          src = std::make_unique<SoundFile>(filename);
   } catch (const std::exception& e) {
-    std::println("error: failed to open input: {}", e.what());
+    std::fprintf(stdout, "error: failed to open input: %s\n", e.what());
     return EXIT_FAILURE;
   }
 
