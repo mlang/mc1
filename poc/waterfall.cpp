@@ -230,24 +230,68 @@ concept resample_input =
   std::ranges::sized_range<R> &&
   std::convertible_to<std::ranges::range_reference_t<R>, float>;
 
-auto log_resample(resample_input auto in,
-  float bin_scale, float f_min, float f_max, auto out, int size
+std::vector<size_t> make_edges(
+  size_t size, size_t bins, float bin_scale, auto&& i_to_f
 )
 {
-  const int bins = int(in.size());
-
-  auto edge_bin = [=, a = std::log(f_max / f_min) / size](int i)
-  {
-    const auto f = f_min * std::exp(a * i);
-    return std::clamp(int(std::lround(f * bin_scale)), 0, bins - 1);
+  auto f_to_k = [=](float f) -> size_t {
+    long k = std::lround(f * bin_scale);
+    return size_t(std::clamp<long>(k, 0, long(bins - 1)));
   };
 
-  auto edges = std::views::iota(0, size + 1)
-             | std::views::transform(edge_bin);
+  auto edges = std::views::iota(size_t{0}, size + 1)
+             | std::views::transform(std::forward<decltype(i_to_f)>(i_to_f))
+             | std::views::transform(f_to_k)
+             | std::ranges::to<std::vector>();
 
-  for (auto [k0, k1] : edges | std::views::adjacent<2>) {
-    *out++ = *std::max_element(in.begin() + k0, in.begin() + k1 + 1);
+  for (size_t i = 1; i < edges.size(); ++i)
+    edges[i] = std::max(edges[i], edges[i - 1]);
+
+  return edges;
+}
+
+inline std::vector<size_t> linear(
+  size_t size, size_t bins, float bin_scale, float f_min, float f_max
+)
+{
+  return make_edges(size, bins, bin_scale, [&](size_t i) {
+    float x = float(i) / size;
+    return f_min + x * (f_max - f_min);
+  });
+}
+
+inline std::vector<size_t> logarithmic(
+  size_t size, size_t bins, float bin_scale, float f_min, float f_max
+)
+{
+  auto a = std::log(f_max / f_min) / size;
+  return make_edges(size, bins, bin_scale, [=](size_t i) {
+    return f_min * std::exp(a * i);
+  });
+}
+
+struct cents_per_column {
+  float cents = 100.0f;
+
+  std::vector<size_t> operator()(
+    size_t size, size_t bins, float bin_scale, float f_min, float f_max
+  ) const
+  {
+    float step = cents / 1200.0f;
+    return make_edges(size, bins, bin_scale, [=](size_t i) {
+      float f = f_min * std::exp2(step * float(i));
+      return std::min(f, f_max);
+    });
   }
+};
+
+auto resample(resample_input auto&& in, std::span<const size_t> edges, auto&& out)
+{
+  assert(edges.size() >= 2);
+  auto b = in.begin();
+  for (auto [k0, k1] : edges | std::views::adjacent<2>)
+    *out++ = *std::max_element(b + k0, b + k1 + 1); // inclusive
+
   return out;
 }
 
@@ -282,7 +326,7 @@ std::string braille_glyphs(std::span<const float> dbfs, float min_dbfs, float ma
 }
 
 int waterfall(
-  AudioSource &src,
+  AudioSource &src, auto&& init_edges,
   unsigned int fps = 30,
   unsigned int width = 79,
   float display_min_dbfs = -60.0f, float display_max_dbfs = 0.0f,
@@ -311,6 +355,7 @@ int waterfall(
   std::vector<float> interleaved(N * src.channels());
   if (src.readf(interleaved.data(), N) < N) return EXIT_SUCCESS;
 
+  auto edges = init_edges(stereo ? width / 2 * 2 : line.size(), fft.output().size(), bin_scale, min_freq, max_freq);
   do {
     std::println("");
 
@@ -318,36 +363,29 @@ int waterfall(
       // Compute split in *glyphs*, then convert to "columns"
       const int half_glyphs = int(width / 2);
       const int mid_glyph   = int(width % 2);          // 1 => insert one blank glyph
-      const int left_cols   = 2 * half_glyphs;
+      const int cols        = 2 * half_glyphs;
       const int mid_cols    = 2 * mid_glyph;           // 0 or 2 columns (one glyph)
-      const int right_cols  = 2 * half_glyphs;
 
       // Left FFT
       for (size_t i = 0; i < N; ++i) fft.input()[i] = interleaved[2 * i + 0];
       fft.execute();
-      log_resample(fft.dbfs(), bin_scale, min_freq, max_freq,
-       	line.begin(), left_cols
-      );
-      std::reverse(line.begin(), line.begin() + left_cols);
+      resample(fft.dbfs(), edges, line.begin());
+      std::reverse(line.begin(), line.begin() + cols);
 
       // Optional center blank glyph (2 columns)
       if (mid_cols) {
-        line[left_cols + 0] = std::numeric_limits<float>::lowest();
-        line[left_cols + 1] = std::numeric_limits<float>::lowest();
+        line[cols + 0] = std::numeric_limits<float>::lowest();
+        line[cols + 1] = std::numeric_limits<float>::lowest();
       }
 
       // Right FFT
       for (size_t i = 0; i < N; ++i) fft.input()[i] = interleaved[2 * i + 1];
       fft.execute();
-      log_resample(fft.dbfs(), bin_scale, min_freq, max_freq,
-       	line.begin() + left_cols + mid_cols, right_cols
-      );
+      resample(fft.dbfs(), edges, line.begin() + cols + mid_cols);
     } else {
       std::ranges::copy(interleaved | mono(src.channels()), fft.input().begin());
       fft.execute();
-      log_resample(fft.dbfs(), bin_scale, min_freq, max_freq,
-       	line.begin(), line.size()
-      );
+      resample(fft.dbfs(), edges, line.begin());
     }
 
     std::print("{}", braille_glyphs(line, display_min_dbfs, display_max_dbfs));
@@ -380,6 +418,8 @@ int main(int argc, char* argv[])
       "  --min-dbfs DB           Min displayed level in dBFS (default: -60)\n"
       "  --max-dbfs DB           Max displayed level in dBFS (default: 0)\n"
       "  --width N               Output width in braille glyphs (default: 79)\n"
+      "  --linear                Use a linear mapping\n"
+      " --cents-per-dot CENTS    One dot column is CENTS musical cents\n"
       "  --jack                  Use JACK input instead of a file\n"
       "  --stereo                Mirror 2 channels around the center axis\n"
       "  --help                  Show this help\n",
@@ -418,6 +458,7 @@ int main(int argc, char* argv[])
     return v;
   };
 
+  std::function<std::vector<size_t>(size_t, size_t, float, float, float)> init_edges = logarithmic;
   unsigned fps = 30;
   unsigned width = 79;
   float min_freq = 20.0f;
@@ -447,6 +488,11 @@ int main(int argc, char* argv[])
         min_dbfs = parse_f32(require_value(i, "--min-dbfs"), "--min-dbfs");
       } else if (a == "--max-dbfs") {
         max_dbfs = parse_f32(require_value(i, "--max-dbfs"), "--max-dbfs");
+      } else if (a == "--linear") {
+        init_edges = linear;
+      } else if (a == "--cents-per-dot") {
+        auto cents = parse_f32(require_value(i, "--cents-per-dot"), "--cents-per-dot");
+        init_edges = cents_per_column{cents};
       } else if (a == "--jack") {
         use_jack = true;
       } else if (a == "--stereo") {
@@ -487,5 +533,5 @@ int main(int argc, char* argv[])
   if (stereo && src->channels() != 2)
     return die("--stereo requires exactly 2 channels");
 
-  return waterfall(*src, fps, width, min_dbfs, max_dbfs, min_freq, max_freq, stereo);
+  return waterfall(*src, init_edges, fps, width, min_dbfs, max_dbfs, min_freq, max_freq, stereo);
 }
