@@ -40,46 +40,42 @@ def current_clock() -> "LogicalClock":
 
 def merge(*routines: Routine) -> Routine:
     routines = _coerce_routines(routines, caller="merge()")
+    elapsed = 0.0
+    pending: list[tuple[Routine, float]] = [(routine, 0.0) for routine in routines]
 
-    def merged() -> Routine:
-        elapsed = 0.0
-        pending: list[tuple[Routine, float]] = [(routine, 0.0) for routine in routines]
+    def advance_ready() -> None:
+        nonlocal pending
 
-        def advance_ready() -> None:
-            nonlocal pending
+        while True:
+            advanced = False
+            next_pending: list[tuple[Routine, float]] = []
 
-            while True:
-                advanced = False
-                next_pending: list[tuple[Routine, float]] = []
+            for routine, due in pending:
+                if due > elapsed:
+                    next_pending.append((routine, due))
+                    continue
 
-                for routine, due in pending:
-                    if due > elapsed:
-                        next_pending.append((routine, due))
-                        continue
+                advanced = True
+                try:
+                    delta = next(routine)
+                except StopIteration:
+                    continue
 
-                    advanced = True
-                    try:
-                        delta = next(routine)
-                    except StopIteration:
-                        continue
+                next_pending.append((routine, elapsed + _coerce_delay(delta)))
 
-                    next_pending.append((routine, elapsed + _coerce_delay(delta)))
-
-                pending = next_pending
-                if not advanced:
-                    return
-
-        while pending:
-            advance_ready()
-            if not pending:
+            pending = next_pending
+            if not advanced:
                 return
 
-            due = min(due for _, due in pending)
-            delta = due - elapsed
-            yield delta
-            elapsed = due
+    while pending:
+        advance_ready()
+        if not pending:
+            return
 
-    return merged()
+        due = min(due for _, due in pending)
+        delta = due - elapsed
+        yield delta
+        elapsed = due
 
 
 class LogicalClock:
